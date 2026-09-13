@@ -1,0 +1,6 @@
+name: MyPlugin
+version: '${version}'
+main: com.example.myplugin.MyPlugin
+api-version: '1.21'
+author: opopjjjidj
+description: A blank Paper plugin template.
