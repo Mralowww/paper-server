@@ -1,0 +1,27 @@
+name: PvPAttackGuard
+version: '${version}'
+main: dev.pvpattackguard.pvpattackguard.PvPAttackGuardPlugin
+api-version: '1.21'
+folia-supported: true
+author: opopjjjidj
+description: >
+  透過跨封包因果鏈驗證(視角/揮手/攻擊三種訊號互相佐證)偵測 PvP 異常攻擊行為，
+  例如 Reach、Killaura、無視冷卻連續攻擊等，採違規累積 + 分級處置，
+  降低誤判並保留可回放證據。
+
+commands:
+  pvpguard:
+    description: PvPAttackGuard 管理指令
+    usage: /pvpguard reload|stats|recent|export
+    permission: pvpattackguard.admin
+
+permissions:
+  pvpattackguard.admin:
+    description: 管理 PvPAttackGuard 設定與查看記錄
+    default: op
+  pvpattackguard.notify:
+    description: 有高信心異常攻擊時收到即時通知
+    default: op
+  pvpattackguard.bypass:
+    description: 允許繞過本插件的所有檢測
+    default: false

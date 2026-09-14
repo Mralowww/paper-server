@@ -1,0 +1,54 @@
+# PvPAttackGuard 設定
+#
+# 設計理念：不對單一封包/單一數值做硬性判定，而是讓「視角封包」「揮手動畫封包」
+# 「攻擊封包」三種訊號互相佐證，只有持續、規律性地出現多重異常，才會累積到會被
+# 處置的門檻。單次網路抖動、延遲尖峰不會造成誤判。
+
+database-file: pvpattackguard.db
+
+checks:
+  # 射線追蹤一致性：攻擊時最近一次回報的視角，是否真的能打中目標的碰撞箱
+  ray-trace:
+    enabled: true
+    weight: 3.0
+    # 除了嚴格 ray-trace 之外，允許的額外容錯半徑（方塊），用於補償延遲造成的
+    # 視角/位置些微落差，不是縮小碰撞箱本身。
+    tolerance-blocks: 0.3
+
+  # 視角時效性：攻擊發生時，最近一次視角封包是否「夠新」
+  aim-recency:
+    enabled: true
+    weight: 2.0
+    max-staleness-ms: 150
+
+  # 揮手動畫關聯性：攻擊封包前後，是否有對應的揮手動畫封包
+  swing-correlation:
+    enabled: true
+    weight: 2.0
+    max-offset-ms: 250
+
+  # 攻擊節奏規律性：偵測「無視冷卻、規律性過快」的連續攻擊（非單次超標，而是統計特徵）
+  attack-regularity:
+    enabled: true
+    weight: 1.0
+    sample-size: 10
+    fast-cooldown-threshold: 0.3
+    low-stddev-ms-threshold: 15.0
+
+# 違規累積系統：每次檢測失敗依權重加分，隨時間自然衰減，只有持續異常才會累積到高分。
+violation:
+  decay-per-second: 0.15
+  # 到達這個分數只記錄，不通知任何人
+  log-threshold: 3.0
+  # 到達這個分數通知管理員 + 記錄回放證據，不自動處置
+  notify-threshold: 8.0
+  # 到達這個分數才自動處置（分級處置的最後一層）
+  action-threshold: 15.0
+
+actions:
+  # 到達 action-threshold 之後的處置方式：KICK 或 NONE（僅記錄+通知，交給管理員判斷）
+  on-threshold: KICK
+  kick-message: "&c[PvPAttackGuard] 偵測到持續且多重的異常攻擊行為，已將你請出伺服器。"
+
+# 新玩家加入後的寬容期（毫秒），避免剛加入、視角資料尚未建立時被誤判
+join-grace-period-ms: 2000
