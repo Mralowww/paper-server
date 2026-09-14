@@ -133,6 +133,82 @@
     margin-right: 4px;
     image-rendering: pixelated;
   }
+  .type-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .type-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .type-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(92, 184, 92, 0.1);
+  }
+  .history-wrap {
+    margin-bottom: 24px;
+  }
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .history-header .label {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .clear-history {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .clear-history:hover { color: var(--accent-off); opacity: 1; }
+  .history-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .history-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 10px 5px 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .history-chip:hover { border-color: var(--accent); }
+  .history-chip .tag {
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: #14161c;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .history-chip .remove {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .history-chip .remove:hover { color: var(--accent-off); }
 </style>
 </head>
 <body>
@@ -140,9 +216,22 @@
   <h1>⛏️ Minecraft 伺服器狀態查詢</h1>
   <p class="sub">輸入伺服器位址（例如 mc.hypixel.net）查詢即時狀態</p>
 
+  <div class="type-toggle">
+    <button type="button" class="type-btn active" data-type="java">Java 版</button>
+    <button type="button" class="type-btn" data-type="bedrock">Bedrock 版</button>
+  </div>
+
   <div class="search-box">
     <input type="text" id="serverInput" placeholder="輸入伺服器位址..." autocomplete="off">
     <button id="queryBtn">查詢</button>
+  </div>
+
+  <div class="history-wrap" id="historyWrap" style="display: none;">
+    <div class="history-header">
+      <span class="label">最近查詢</span>
+      <button class="clear-history" id="clearHistoryBtn">清除全部</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
   </div>
 
   <div id="message" class="msg"></div>
@@ -154,12 +243,99 @@
   const btn = document.getElementById('queryBtn');
   const card = document.getElementById('card');
   const message = document.getElementById('message');
+  const typeBtns = document.querySelectorAll('.type-btn');
+  const historyWrap = document.getElementById('historyWrap');
+  const historyList = document.getElementById('historyList');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+  const HISTORY_KEY = 'mc-status-history';
+  const HISTORY_MAX = 8;
+  let serverType = 'java'; // 'java' | 'bedrock'
 
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
   }
+
+  // ---- 查詢歷史 (localStorage) ----
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistory(list) {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+    } catch (e) {
+      // localStorage 不可用時靜默略過
+    }
+  }
+
+  function addToHistory(address, type) {
+    let list = loadHistory();
+    list = list.filter(item => !(item.address === address && item.type === type));
+    list.unshift({ address, type });
+    if (list.length > HISTORY_MAX) list = list.slice(0, HISTORY_MAX);
+    saveHistory(list);
+    renderHistory();
+  }
+
+  function removeFromHistory(address, type) {
+    let list = loadHistory().filter(item => !(item.address === address && item.type === type));
+    saveHistory(list);
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = loadHistory();
+    if (!list.length) {
+      historyWrap.style.display = 'none';
+      return;
+    }
+    historyWrap.style.display = 'block';
+    historyList.innerHTML = list.map(item => `
+      <span class="history-chip" data-address="${escapeHtml(item.address)}" data-type="${item.type}">
+        <span class="tag">${item.type === 'bedrock' ? 'BE' : 'JE'}</span>
+        <span class="addr">${escapeHtml(item.address)}</span>
+        <span class="remove" data-remove="${escapeHtml(item.address)}" data-remove-type="${item.type}">✕</span>
+      </span>
+    `).join('');
+  }
+
+  historyList.addEventListener('click', (e) => {
+    const removeTarget = e.target.closest('.remove');
+    if (removeTarget) {
+      e.stopPropagation();
+      removeFromHistory(removeTarget.dataset.remove, removeTarget.dataset.removeType);
+      return;
+    }
+    const chip = e.target.closest('.history-chip');
+    if (chip) {
+      input.value = chip.dataset.address;
+      setServerType(chip.dataset.type);
+      queryServer();
+    }
+  });
+
+  clearHistoryBtn.addEventListener('click', () => {
+    saveHistory([]);
+    renderHistory();
+  });
+
+  // ---- Java / Bedrock 切換 ----
+  function setServerType(type) {
+    serverType = type;
+    typeBtns.forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  }
+
+  typeBtns.forEach(b => {
+    b.addEventListener('click', () => setServerType(b.dataset.type));
+  });
 
   async function queryServer() {
     const address = input.value.trim();
@@ -177,9 +353,14 @@
     card.classList.remove('show');
 
     try {
-      const res = await fetch(`https://api.mcsrvstat.us/3/${encodeURIComponent(address)}`);
+      const apiPath = serverType === 'bedrock'
+        ? `https://api.mcsrvstat.us/bedrock/3/${encodeURIComponent(address)}`
+        : `https://api.mcsrvstat.us/3/${encodeURIComponent(address)}`;
+      const res = await fetch(apiPath);
       if (!res.ok) throw new Error('查詢失敗');
       const data = await res.json();
+
+      addToHistory(address, serverType);
 
       if (!data.online) {
         card.innerHTML = `
@@ -257,6 +438,8 @@
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') queryServer();
   });
+
+  renderHistory();
 </script>
 </body>
 </html>
