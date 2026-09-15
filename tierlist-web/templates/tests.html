@@ -2,7 +2,10 @@
 {% block title %}測試紀錄 - Mralow Tiers{% endblock %}
 {% block content %}
 <h1>測試紀錄</h1>
+<p class="page-subtitle">最近的考試結果,由考官透過 /result 發布。</p>
+
 {% if results %}
+<div class="table-wrap">
 <table class="tier-table">
     <thead>
         <tr>
@@ -31,12 +34,13 @@
             <td>{{ tier_display_name(r.tier_before) }}</td>
             <td><span class="tier-badge tier-{{ r.tier_after }}">{{ tier_display_name(r.tier_after) }}</span></td>
             <td>{{ r.examiner_username }}</td>
-            <td>{{ r.created_at | timestamp_to_date }}</td>
+            <td class="muted">{{ r.created_at | timestamp_to_date }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
-<p>目前還沒有任何測試紀錄。</p>
+<div class="empty-state">目前還沒有任何測試紀錄。</div>
 {% endif %}
 {% endblock %}

@@ -3,11 +3,14 @@
 {% block content %}
 <h1>管理後台</h1>
 
+<p class="page-subtitle">只有 Discord 伺服器 Administrator 權限的人看得到這個頁面。</p>
+
 <h2>玩家資料編輯</h2>
-<p class="muted">只有 Discord 伺服器 Administrator 權限的人看得到這個頁面,可以直接編輯任何玩家的 MC 帳號、地區、Tier,或整筆刪除。</p>
+{% if players %}
+<div class="table-wrap">
 <table class="tier-table">
     <thead>
-        <tr><th>Discord</th><th>編輯</th><th>操作</th></tr>
+        <tr><th>Discord</th><th>編輯</th><th></th></tr>
     </thead>
     <tbody>
         {% for p in players %}
@@ -36,15 +39,21 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
+{% else %}
+<div class="empty-state">目前還沒有任何玩家資料。</div>
+{% endif %}
 
 <h2>API Key 管理</h2>
 <form method="post" action="{{ url_for('admin_create_api_key') }}" class="inline-form">
     <input type="text" name="label" placeholder="用途說明,例如:某某 mod" required>
     <button type="submit">建立新的 API Key</button>
 </form>
+{% if api_keys %}
+<div class="table-wrap" style="margin-top:12px;">
 <table class="tier-table">
     <thead>
-        <tr><th>Key</th><th>用途</th><th>狀態</th><th>操作</th></tr>
+        <tr><th>Key</th><th>用途</th><th>狀態</th><th></th></tr>
     </thead>
     <tbody>
         {% for k in api_keys %}
@@ -64,4 +73,6 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
+{% endif %}
 {% endblock %}

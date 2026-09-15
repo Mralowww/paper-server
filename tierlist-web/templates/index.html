@@ -2,26 +2,31 @@
 {% block title %}排名 - Mralow Tiers{% endblock %}
 {% block content %}
 <h1>Vanilla PvP 排名</h1>
+<p class="page-subtitle">依 Tier 高低排序,點右上角「我的帳號」綁定 Minecraft 帳號後即可申請測試。</p>
+
 {% if players %}
+<div class="table-wrap">
 <table class="tier-table">
     <thead>
-        <tr><th></th><th>Tier</th><th>玩家</th><th>地區</th></tr>
+        <tr><th>#</th><th></th><th>玩家</th><th>Tier</th><th>地區</th></tr>
     </thead>
     <tbody>
         {% for p in players %}
-        <tr>
+        <tr class="rank-row">
+            <td>{{ loop.index }}</td>
             <td>
                 {% set avatar = mc_avatar_url(p.mc_uuid) %}
                 {% if avatar %}<img src="{{ avatar }}" alt="" class="mc-avatar">{% endif %}
             </td>
-            <td><span class="tier-badge tier-{{ p.vanilla_tier }}">{{ p.vanilla_tier }}</span></td>
             <td>{{ p.mc_username }}</td>
+            <td><span class="tier-badge tier-{{ p.vanilla_tier }}">{{ p.vanilla_tier }}</span></td>
             <td>{{ p.region or '-' }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
-<p>目前還沒有任何玩家上榜。</p>
+<div class="empty-state">目前還沒有任何玩家上榜。</div>
 {% endif %}
 {% endblock %}
