@@ -12,20 +12,16 @@ DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost:8787/discord/callback")
 PLUGIN_SHARED_SECRET = os.environ.get("PLUGIN_SHARED_SECRET", "")
-SEED_ADMIN_DISCORD_ID = os.environ.get("SEED_ADMIN_DISCORD_ID", "")
+DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "")
 
 DISCORD_API = "https://discord.com/api"
 VERIFY_CODE_TTL_SECONDS = 600
+PERMISSION_ADMINISTRATOR = 0x8
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 
 models.init_db()
-if SEED_ADMIN_DISCORD_ID:
-    with models.get_db() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO admins (discord_id) VALUES (?)", (SEED_ADMIN_DISCORD_ID,)
-        )
 
 
 @app.after_request
@@ -42,7 +38,7 @@ def current_discord_user():
 
 def require_admin():
     discord_id, _ = current_discord_user()
-    if not discord_id or not models.is_admin(discord_id):
+    if not discord_id or not session.get("is_admin"):
         abort(403)
 
 
@@ -90,7 +86,7 @@ def login_discord():
         "client_id": DISCORD_CLIENT_ID,
         "redirect_uri": DISCORD_REDIRECT_URI,
         "response_type": "code",
-        "scope": "identify",
+        "scope": "identify guilds",
     }
     query = "&".join(f"{k}={requests.utils.quote(v)}" for k, v in params.items())
     return redirect(f"{DISCORD_API}/oauth2/authorize?{query}")
@@ -129,7 +125,30 @@ def discord_callback():
     user = user_resp.json()
     session["discord_id"] = user["id"]
     session["discord_username"] = user.get("username", "unknown")
+    session["is_admin"] = check_is_administrator(access_token)
     return redirect(url_for("account"))
+
+
+def check_is_administrator(access_token: str) -> bool:
+    """判斷這個玩家在指定 Discord 伺服器裡是否有 Administrator 權限(伺服器擁有者也算)。"""
+    if not DISCORD_GUILD_ID:
+        return False
+    try:
+        resp = requests.get(
+            f"{DISCORD_API}/users/@me/guilds",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        return False
+    if resp.status_code != 200:
+        return False
+
+    for guild in resp.json():
+        if guild.get("id") == DISCORD_GUILD_ID:
+            permissions = int(guild.get("permissions", 0))
+            return bool(permissions & PERMISSION_ADMINISTRATOR)
+    return False
 
 
 @app.route("/logout")
@@ -157,7 +176,7 @@ def account():
         player=player,
         code=code,
         ttl_minutes=VERIFY_CODE_TTL_SECONDS // 60,
-        is_admin=models.is_admin(discord_id),
+        is_admin=session.get("is_admin", False),
     )
 
 
@@ -199,17 +218,25 @@ def admin_home():
     return render_template("admin.html", players=players, tiers=models.TIERS, api_keys=api_keys)
 
 
-@app.route("/admin/set_tier", methods=["POST"])
-def admin_set_tier():
+@app.route("/admin/players/<int:player_id>/edit", methods=["POST"])
+def admin_edit_player(player_id):
     require_admin()
-    mc_username = request.form.get("mc_username", "").strip()
-    tier = request.form.get("tier", "").strip() or None
+    mc_username = request.form.get("mc_username", "").strip() or None
     region = request.form.get("region", "").strip() or None
-    if tier and tier not in models.TIERS:
+    tier_raw = request.form.get("tier", "__unset__")
+    tier = None if tier_raw == "" else (tier_raw if tier_raw != "__unset__" else "__unset__")
+    if tier not in ("__unset__", None) and tier not in models.TIERS:
         abort(400)
-    ok = models.set_tier(mc_username, tier, region)
+    ok = models.update_player(player_id, mc_username=mc_username, region=region, tier=tier)
     if not ok:
         abort(404)
+    return redirect(url_for("admin_home"))
+
+
+@app.route("/admin/players/<int:player_id>/delete", methods=["POST"])
+def admin_delete_player(player_id):
+    require_admin()
+    models.delete_player(player_id)
     return redirect(url_for("admin_home"))
 
 

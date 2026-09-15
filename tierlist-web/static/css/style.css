@@ -112,3 +112,12 @@ button {
     background: var(--accent);
     border: none;
 }
+
+button.danger {
+    background: #d9534f;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 0.9rem;
+}

@@ -33,9 +33,13 @@ cp .env.example .env   # 填入 Discord OAuth / 密鑰等設定
 2. 用 OAuth2 URL Generator 勾 `bot` + `applications.commands`,邀請進你的伺服器
 3. `ANNOUNCE_CHANNEL_ID` 填公告要發到哪個頻道(右鍵頻道 > 複製 ID,需開發者模式)
 
-### 設定第一個管理員
+### 管理員權限
 
-把你自己的 Discord 使用者 ID 填到 `.env` 的 `SEED_ADMIN_DISCORD_ID`,啟動網站後這個帳號登入就會有管理後台權限(`/admin`)。之後可以直接改資料庫 `admins` 表新增其他管理員。
+不用另外維護名單。網站的 `/admin` 跟 DC bot 的 `/admin_set_tier`、`/admin_delete_player`、`/setup_apply_panel`,
+都是即時檢查這個人在 `.env` 的 `DISCORD_GUILD_ID` 那個伺服器裡有沒有 **Administrator** 權限(伺服器擁有者也算)。
+把伺服器 ID 填到 `.env` 就好,之後在 Discord 伺服器設定裡調整身份組權限即可控制誰是管理員。
+
+網站的管理員判斷是在登入當下用 OAuth 的 `guilds` scope 查詢一次,存進 session,所以權限被拿掉後要重新登入才會生效。
 
 ## 執行
 
@@ -85,6 +89,14 @@ Header: X-API-Key: <你的 key>
   - 寫入資料庫,網站的 `/tests` 頁面會顯示完整測試紀錄(含頭像)
 
 需要的環境變數(`.env.example` 已列出):`EXAMINER_ROLE_ID`(考官身份組)、`TICKET_CATEGORY_ID`(考試單分類頻道)、`RESULTS_CHANNEL_ID`(結果公告頻道,可留空)。
+
+## 管理員直接編輯(需要 Administrator 權限)
+
+- 網站 `/admin`:編輯任何玩家的 MC 帳號 / 地區 / Tier,或整筆刪除
+- DC bot `/admin_set_tier <mc帳號> [tier] [region]`:直接設定任何玩家的段位跟地區,tier 留空清除段位
+- DC bot `/admin_delete_player <mc帳號>`:刪除某玩家的所有排名資料
+
+這三個都會檢查操作者在 Discord 伺服器裡是否有 Administrator 權限,沒有的話會被拒絕。
 
 ## 尚未做、之後可以再加強的部分
 

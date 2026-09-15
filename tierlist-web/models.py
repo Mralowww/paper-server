@@ -80,9 +80,6 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used_at INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS admins (
-    discord_id TEXT PRIMARY KEY
-);
 """
 
 
@@ -204,10 +201,40 @@ def list_all_players():
         return [dict(r) for r in rows]
 
 
-def is_admin(discord_id: str) -> bool:
+def get_player_by_id(player_id: int):
     with get_db() as conn:
-        row = conn.execute("SELECT 1 FROM admins WHERE discord_id = ?", (discord_id,)).fetchone()
-        return row is not None
+        row = conn.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def update_player(player_id: int, mc_username: str | None = None, region: str | None = None,
+                   tier: str | None = "__unset__"):
+    """管理員直接編輯玩家資料。mc_username/region 為 None 表示不變更;
+    tier 用 "__unset__" 當『不變更』的哨兵值,因為 None 本身是合法的『清除段位』。"""
+    if tier != "__unset__" and tier is not None and tier not in TIERS:
+        raise ValueError("invalid tier")
+
+    now = int(time.time())
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+        if not row:
+            return False
+
+        new_mc_username = mc_username if mc_username is not None else row["mc_username"]
+        new_region = region if region is not None else row["region"]
+        new_tier = row["vanilla_tier"] if tier == "__unset__" else tier
+
+        conn.execute(
+            "UPDATE players SET mc_username = ?, region = ?, vanilla_tier = ?, updated_at = ? WHERE id = ?",
+            (new_mc_username, new_region, new_tier, now, player_id),
+        )
+        return True
+
+
+def delete_player(player_id: int):
+    with get_db() as conn:
+        cur = conn.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        return cur.rowcount > 0
 
 
 def create_api_key(key: str, label: str):

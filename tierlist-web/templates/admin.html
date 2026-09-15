@@ -3,32 +3,34 @@
 {% block content %}
 <h1>管理後台</h1>
 
-<h2>玩家 Tier 設定</h2>
+<h2>玩家資料編輯</h2>
+<p class="muted">只有 Discord 伺服器 Administrator 權限的人看得到這個頁面,可以直接編輯任何玩家的 MC 帳號、地區、Tier,或整筆刪除。</p>
 <table class="tier-table">
     <thead>
-        <tr><th>MC 帳號</th><th>Discord</th><th>目前 Tier</th><th>地區</th><th>操作</th></tr>
+        <tr><th>Discord</th><th>編輯</th><th>操作</th></tr>
     </thead>
     <tbody>
         {% for p in players %}
         <tr>
-            <td>{{ p.mc_username or '(尚未綁定)' }}</td>
             <td>{{ p.discord_username }}</td>
-            <td>{{ p.vanilla_tier or '-' }}</td>
-            <td>{{ p.region or '-' }}</td>
             <td>
-                {% if p.mc_username %}
-                <form method="post" action="{{ url_for('admin_set_tier') }}" class="inline-form">
-                    <input type="hidden" name="mc_username" value="{{ p.mc_username }}">
+                <form method="post" action="{{ url_for('admin_edit_player', player_id=p.id) }}" class="inline-form">
+                    <input type="text" name="mc_username" placeholder="MC 帳號" value="{{ p.mc_username or '' }}">
                     <select name="tier">
                         <option value="">未評級</option>
                         {% for t in tiers %}
                         <option value="{{ t }}" {% if p.vanilla_tier == t %}selected{% endif %}>{{ t }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" name="region" placeholder="地區(可留空)" value="{{ p.region or '' }}">
+                    <input type="text" name="region" placeholder="地區" value="{{ p.region or '' }}">
                     <button type="submit">更新</button>
                 </form>
-                {% endif %}
+            </td>
+            <td>
+                <form method="post" action="{{ url_for('admin_delete_player', player_id=p.id) }}" class="inline-form"
+                      onsubmit="return confirm('確定要刪除 {{ p.discord_username }} 的所有資料嗎?');">
+                    <button type="submit" class="danger">刪除</button>
+                </form>
             </td>
         </tr>
         {% endfor %}

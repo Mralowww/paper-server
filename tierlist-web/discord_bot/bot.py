@@ -260,6 +260,43 @@ async def result_command(interaction: discord.Interaction):
     await interaction.response.send_modal(ResultModal(ticket, interaction.user))
 
 
+@tree.command(name="admin_set_tier", description="[管理員] 直接設定任何玩家的 Tier / 地區")
+@app_commands.describe(mc_username="Minecraft 帳號", tier=f"新的段位({'/'.join(models.TIERS)}),留空表示清除段位",
+                        region="地區,留空表示不變更")
+@app_commands.checks.has_permissions(administrator=True)
+async def admin_set_tier(interaction: discord.Interaction, mc_username: str, tier: str = "", region: str = ""):
+    tier_value = tier.strip().upper() or None
+    if tier_value and tier_value not in models.TIERS:
+        await interaction.response.send_message(
+            f"段位格式錯誤,必須是這些其中之一:{', '.join(models.TIERS)}", ephemeral=True
+        )
+        return
+
+    player = models.get_player_by_mc_username(mc_username)
+    if not player:
+        await interaction.response.send_message(f"找不到已綁定 `{mc_username}` 的玩家。", ephemeral=True)
+        return
+
+    models.set_tier(mc_username, tier_value, region.strip() or None)
+    await interaction.response.send_message(
+        f"已更新 **{player['mc_username']}**:段位 → {models.tier_display_name(tier_value)}"
+        + (f",地區 → {region.strip()}" if region.strip() else "")
+    )
+
+
+@tree.command(name="admin_delete_player", description="[管理員] 刪除某個玩家的所有排名資料")
+@app_commands.describe(mc_username="Minecraft 帳號")
+@app_commands.checks.has_permissions(administrator=True)
+async def admin_delete_player(interaction: discord.Interaction, mc_username: str):
+    player = models.get_player_by_mc_username(mc_username)
+    if not player:
+        await interaction.response.send_message(f"找不到已綁定 `{mc_username}` 的玩家。", ephemeral=True)
+        return
+
+    models.delete_player(player["id"])
+    await interaction.response.send_message(f"已刪除 **{player['mc_username']}** 的所有排名資料。")
+
+
 @tree.command(name="tier", description="查詢某位玩家目前的 Vanilla Tier")
 @app_commands.describe(username="Minecraft 帳號")
 async def tier_command(interaction: discord.Interaction, username: str):
@@ -298,6 +335,19 @@ async def poll_tier_changes():
                         f"🏆 **{p['mc_username']}** 的 Vanilla Tier 更新為 **{models.tier_display_name(new)}**!"
                     )
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+
+@tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        message = "只有 Administrator 權限的人可以使用這個指令。"
+    else:
+        message = f"發生錯誤:{error}"
+
+    if interaction.response.is_done():
+        await interaction.followup.send(message, ephemeral=True)
+    else:
+        await interaction.response.send_message(message, ephemeral=True)
 
 
 @client.event
