@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.mralow.tierbadge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "PlayerDisplayNameMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

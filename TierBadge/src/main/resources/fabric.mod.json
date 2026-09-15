@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "tierbadge",
+  "version": "${version}",
+  "name": "Tier Badge",
+  "description": "在遊戲內玩家名牌旁邊顯示 Mralow Tiers 網站的段位標記",
+  "authors": ["Mralow"],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.mralow.tierbadge.client.TierBadgeClient"
+    ]
+  },
+  "mixins": [
+    "tierbadge.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
