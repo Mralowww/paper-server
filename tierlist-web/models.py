@@ -368,9 +368,16 @@ def tier_display_name(tier: str | None) -> str:
     return f"{prefix} Tier {number}"
 
 
-def list_test_results(limit: int = 50):
+def list_test_results(limit: int = 50, mc_username: str | None = None):
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM test_results ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
+        if mc_username:
+            rows = conn.execute(
+                "SELECT * FROM test_results WHERE mc_username = ? COLLATE NOCASE "
+                "ORDER BY created_at DESC LIMIT ?",
+                (mc_username, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM test_results ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
         return [dict(r) for r in rows]

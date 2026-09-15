@@ -289,6 +289,53 @@ def api_get_tier(username):
     )
 
 
+@app.route("/api/v1/tiers")
+def api_list_tiers():
+    require_api_key()
+    players = models.list_ranked_players()
+    return jsonify(
+        [
+            {
+                "username": p["mc_username"],
+                "uuid": p["mc_uuid"],
+                "tier": p["vanilla_tier"],
+                "region": p.get("region"),
+            }
+            for p in players
+        ]
+    )
+
+
+@app.route("/api/v1/tests")
+def api_list_tests():
+    require_api_key()
+    username = request.args.get("username")
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+    except ValueError:
+        abort(400)
+
+    results = models.list_test_results(limit=limit, mc_username=username)
+    return jsonify(
+        [
+            {
+                "username": r["mc_username"],
+                "uuid": r["mc_uuid"],
+                "region": r.get("region"),
+                "game_name": r.get("game_name"),
+                "score_wins": r["score_wins"],
+                "score_losses": r["score_losses"],
+                "tier_before": r.get("tier_before"),
+                "tier_after": r["tier_after"],
+                "test_type": r["test_type"],
+                "examiner": r["examiner_username"],
+                "created_at": r["created_at"],
+            }
+            for r in results
+        ]
+    )
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8787"))
     app.run(host="0.0.0.0", port=port)

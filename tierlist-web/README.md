@@ -61,18 +61,46 @@ python discord_bot/bot.py
 
 需要先在管理後台(`/admin`)建立一組 API Key。
 
+### 查詢單一玩家
+
 ```
 GET /api/v1/tier/<mc使用者名稱>
 Header: X-API-Key: <你的 key>
 ```
-
-回應範例:
 
 ```json
 {"username": "Steve", "uuid": "...", "tier": "HT2", "region": "TW", "ranked": true}
 ```
 
 未上榜的玩家會回傳 `"ranked": false`,`tier` 是 `null`。
+
+### 列出全部排名
+
+```
+GET /api/v1/tiers
+Header: X-API-Key: <你的 key>
+```
+
+```json
+[{"username": "Steve", "uuid": "...", "tier": "HT2", "region": "TW"}, ...]
+```
+
+### 查詢測試紀錄
+
+```
+GET /api/v1/tests?username=<可省略>&limit=<可省略,預設 50,最多 200>
+Header: X-API-Key: <你的 key>
+```
+
+不帶 `username` 會回傳全站最近的測試紀錄;帶了就只回傳該玩家的紀錄。
+
+```json
+[{
+  "username": "Steve", "uuid": "...", "region": "TW", "game_name": "Sumo",
+  "score_wins": 3, "score_losses": 0, "tier_before": null, "tier_after": "HT3",
+  "test_type": "normal", "examiner": "examiner#0001", "created_at": 1234567890
+}]
+```
 
 ## 目前排名分類
 
