@@ -55,7 +55,14 @@ def mc_avatar_url(mc_uuid):
     return f"https://crafatar.com/avatars/{mc_uuid}?size=64&overlay"
 
 
+def namemc_url(mc_username):
+    if not mc_username:
+        return None
+    return f"https://namemc.com/profile/{requests.utils.quote(mc_username)}"
+
+
 app.jinja_env.globals["mc_avatar_url"] = mc_avatar_url
+app.jinja_env.globals["namemc_url"] = namemc_url
 app.jinja_env.globals["tier_display_name"] = models.tier_display_name
 
 

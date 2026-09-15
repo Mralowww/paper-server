@@ -27,7 +27,7 @@
                 {% set avatar = mc_avatar_url(r.mc_uuid) %}
                 {% if avatar %}<img src="{{ avatar }}" alt="" class="mc-avatar">{% endif %}
             </td>
-            <td>{{ r.mc_username }}</td>
+            <td><a href="{{ namemc_url(r.mc_username) }}" target="_blank" rel="noopener">{{ r.mc_username }}</a></td>
             <td>{{ r.region or '-' }}</td>
             <td>{{ r.game_name or '-' }}</td>
             <td>{{ r.score_wins }} 勝 - {{ r.score_losses }} 敗</td>

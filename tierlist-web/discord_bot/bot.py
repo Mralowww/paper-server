@@ -46,6 +46,12 @@ def mc_avatar_url(mc_uuid: str | None) -> str | None:
     return f"https://crafatar.com/avatars/{mc_uuid}?size=128&overlay"
 
 
+def namemc_url(mc_username: str | None) -> str | None:
+    if not mc_username:
+        return None
+    return f"https://namemc.com/profile/{mc_username}"
+
+
 def format_remaining(seconds: int) -> str:
     days, rem = divmod(seconds, 86400)
     hours, rem = divmod(rem, 3600)
@@ -215,7 +221,11 @@ class ResultModal(discord.ui.Modal, title="發布考試結果"):
         )
 
         applicant_name = self.ticket.get("discord_username") or applicant_id
-        embed = discord.Embed(title=f"{applicant_name} 的考試結果", color=discord.Color.green())
+        embed = discord.Embed(
+            title=f"{applicant_name} 的考試結果",
+            url=namemc_url(self.ticket.get("mc_username")),
+            color=discord.Color.green(),
+        )
         embed.add_field(name="考官", value=self.examiner.mention, inline=False)
         embed.add_field(name="伺服器地區", value=self.region.value.strip(), inline=False)
         embed.add_field(name="遊戲名稱", value=self.game_name.value.strip(), inline=False)
@@ -307,6 +317,7 @@ async def tier_command(interaction: discord.Interaction, username: str):
 
     embed = discord.Embed(
         title=player["mc_username"],
+        url=namemc_url(player["mc_username"]),
         description=f"目前段位:**{models.tier_display_name(player['vanilla_tier'])}**"
         + (f"\n地區:{player['region']}" if player.get("region") else ""),
         color=discord.Color.blurple(),

@@ -10,7 +10,8 @@
     <p style="display:flex;align-items:center;gap:10px;">
         {% set avatar = mc_avatar_url(player.mc_uuid) %}
         {% if avatar %}<img src="{{ avatar }}" alt="" class="mc-avatar">{% endif %}
-        已綁定 Minecraft 帳號:<strong>{{ player.mc_username }}</strong>
+        已綁定 Minecraft 帳號:
+        <strong><a href="{{ namemc_url(player.mc_username) }}" target="_blank" rel="noopener">{{ player.mc_username }}</a></strong>
     </p>
     <p>目前 Tier:
         {% if player.vanilla_tier %}
