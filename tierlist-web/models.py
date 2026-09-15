@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -101,6 +102,13 @@ CREATE TABLE IF NOT EXISTS downloads (
     description TEXT,
     uploaded_by TEXT NOT NULL,
     created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS player_mods (
+    mc_uuid TEXT PRIMARY KEY,
+    mc_username TEXT NOT NULL,
+    mods_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
 """
@@ -505,3 +513,29 @@ def delete_download(download_id: int):
             return None
         conn.execute("DELETE FROM downloads WHERE id = ?", (download_id,))
         return dict(row)
+
+
+# ---------- 玩家模組清單(TierBadge -> TierVerify -> 這裡) ----------
+
+def upsert_player_mods(mc_uuid: str, mc_username: str, mods: list[dict]):
+    now = int(time.time())
+    mods_json = json.dumps(mods, ensure_ascii=False)
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO player_mods (mc_uuid, mc_username, mods_json, updated_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(mc_uuid) DO UPDATE SET mc_username = excluded.mc_username, "
+            "mods_json = excluded.mods_json, updated_at = excluded.updated_at",
+            (mc_uuid, mc_username, mods_json, now),
+        )
+
+
+def get_player_mods(mc_uuid: str):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM player_mods WHERE mc_uuid = ?", (mc_uuid,)
+        ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data["mods"] = json.loads(data.pop("mods_json"))
+        return data

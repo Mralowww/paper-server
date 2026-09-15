@@ -30,6 +30,8 @@ public class TierBadgeClient implements ClientModInitializer {
                 apiClient::refreshOnce, 0, Math.max(config.refreshIntervalSeconds, 10), TimeUnit.SECONDS
         );
 
+        ModListNetworking.register(config);
+
         LOGGER.info("TierBadge 已啟動,每 {} 秒從 {} 更新一次 Tier 資料", config.refreshIntervalSeconds, config.baseUrl);
     }
 }

@@ -27,6 +27,9 @@ Fabric 客戶端模組(Minecraft 1.21.x),在遊戲裡玩家名稱旁邊(頭頂�
 - `baseUrl`:改成 Mralow Tiers 網站的網址(例如 `http://mralow.sytes.net:8787`)
 - `apiKey`:到網站管理後台(`/admin`)申請一組 API Key 填進來
 - `refreshIntervalSeconds`:多久跟網站同步一次段位資料,最低 10 秒
+- `sendModList`:進伺服器時要不要把目前安裝的所有 Fabric 模組清單,透過插件頻道
+  `tierbadge:modlist` 回報給伺服器端的 `TierVerify` 插件(它會再轉送到網站存起來)。
+  沒裝 `TierVerify` 的伺服器收不到訊息,不會出錯;不想讓伺服器看到你裝了哪些模組可以關掉(預設開啟)
 
 改完存檔後重開遊戲生效。
 

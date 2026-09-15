@@ -156,6 +156,17 @@ Header: X-API-Key: <你的 key>
 
 這三個都會檢查操作者在 Discord 伺服器裡是否有 Administrator 權限,沒有的話會被拒絕。
 
+## 玩家模組清單回報
+
+TierBadge(Fabric 模組)進伺服器時,如果偵測到伺服器有裝 `TierVerify` 插件(靠插件頻道
+`tierbadge:modlist` 判斷,沒裝的伺服器直接收不到訊息、不會出錯),就會把目前安裝的所有
+Fabric 模組清單送給 `TierVerify`,插件再轉送到網站的 `/internal/modlist`(用跟 `/internal/verify`
+一樣的 `PLUGIN_SHARED_SECRET` 驗證)存起來。
+
+- 這個行為可以在玩家的 `config/tierbadge.json` 裡把 `sendModList` 設成 `false` 關掉
+- 管理後台(`/admin`)玩家列表可以看到每個人最後回報的模組數量跟時間,滑鼠移上去看完整模組 id 清單
+- `GET /api/v1/player/discord/<id>`、`GET /api/v1/player/uuid/<uuid>` 這兩個 API 現在也會回傳 `mods` 欄位
+
 ## Discord 控制 API
 
 讓外部程式(遊戲伺服器、其他服務)透過網站 API 叫 Discord bot 發訊息到指定頻道,不用自己接 Discord API。

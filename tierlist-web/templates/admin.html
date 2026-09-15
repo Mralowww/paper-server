@@ -10,12 +10,22 @@
 <div class="table-wrap">
 <table class="tier-table">
     <thead>
-        <tr><th>Discord</th><th>編輯</th><th></th></tr>
+        <tr><th>Discord</th><th>已回報模組</th><th>編輯</th><th></th></tr>
     </thead>
     <tbody>
         {% for p in players %}
+        {% set mods_record = get_player_mods(p.mc_uuid) if p.mc_uuid else None %}
         <tr>
             <td>{{ p.discord_username }}</td>
+            <td>
+                {% if mods_record %}
+                <span title="{{ mods_record.mods | map(attribute='id') | join(', ') }}">
+                    {{ mods_record.mods | length }} 個({{ mods_record.updated_at | timestamp_to_date }})
+                </span>
+                {% else %}
+                <span class="muted">尚未回報</span>
+                {% endif %}
+            </td>
             <td>
                 <form method="post" action="{{ url_for('admin_edit_player', player_id=p.id) }}" class="inline-form">
                     <input type="text" name="mc_username" placeholder="MC 帳號" value="{{ p.mc_username or '' }}">

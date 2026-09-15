@@ -98,6 +98,7 @@ def namemc_url(mc_username):
 app.jinja_env.globals["mc_avatar_url"] = mc_avatar_url
 app.jinja_env.globals["namemc_url"] = namemc_url
 app.jinja_env.globals["tier_display_name"] = models.tier_display_name
+app.jinja_env.globals["get_player_mods"] = models.get_player_mods
 
 
 @app.template_filter("timestamp_to_date")
@@ -280,8 +281,9 @@ def _clear_secret_failures(ip: str):
     _secret_fail_counts.pop(ip, None)
 
 
-@app.route("/internal/verify", methods=["POST"])
-def internal_verify():
+def require_plugin_secret():
+    """遊戲伺服器插件(TierVerify)呼叫 /internal/* 端點都要過這關,
+    共用同一套鎖 IP 機制,避免有人對任何一個 /internal 端點狂猜密鑰。"""
     client_ip = request.remote_addr or "unknown"
     if _is_locked_out(client_ip):
         abort(429)
@@ -292,6 +294,11 @@ def internal_verify():
         abort(403)
 
     _clear_secret_failures(client_ip)
+
+
+@app.route("/internal/verify", methods=["POST"])
+def internal_verify():
+    require_plugin_secret()
 
     data = request.get_json(silent=True) or {}
     code = (data.get("code") or "").strip().upper()
@@ -312,6 +319,33 @@ def internal_verify():
         return jsonify({"error": reason}), 409
 
     return jsonify({"ok": True})
+
+
+@app.route("/internal/modlist", methods=["POST"])
+def internal_modlist():
+    require_plugin_secret()
+
+    data = request.get_json(silent=True) or {}
+    mc_uuid = (data.get("mc_uuid") or "").strip()
+    mc_username = (data.get("mc_username") or "").strip()
+    mods = data.get("mods")
+
+    if not mc_uuid or not mc_username or not isinstance(mods, list):
+        return jsonify({"error": "missing_fields"}), 400
+    if len(mods) > 2000:
+        return jsonify({"error": "too_many_mods"}), 400
+
+    cleaned = []
+    for m in mods:
+        if not isinstance(m, dict):
+            continue
+        mod_id = str(m.get("id") or "").strip()[:200]
+        mod_version = str(m.get("version") or "").strip()[:200]
+        if mod_id:
+            cleaned.append({"id": mod_id, "version": mod_version})
+
+    models.upsert_player_mods(mc_uuid, mc_username, cleaned)
+    return jsonify({"ok": True, "count": len(cleaned)})
 
 
 # ---------- 管理後台 ----------
@@ -454,6 +488,7 @@ def api_list_tiers():
 
 
 def serialize_player(player):
+    mods_record = models.get_player_mods(player["mc_uuid"]) if player.get("mc_uuid") else None
     return {
         "discord_id": player["discord_id"],
         "discord_username": player["discord_username"],
@@ -462,6 +497,8 @@ def serialize_player(player):
         "tier": player.get("vanilla_tier"),
         "region": player.get("region"),
         "last_test_at": player.get("last_test_at"),
+        "mods": mods_record["mods"] if mods_record else None,
+        "mods_updated_at": mods_record["updated_at"] if mods_record else None,
     }
 
 

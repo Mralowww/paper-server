@@ -1,6 +1,6 @@
-# Tier List 網站後端的驗證用內部 API
-# 這個 URL 是網站專案 (tierlist-web) 提供的 /internal/verify 端點
-backend-url: "http://127.0.0.1:8787/internal/verify"
+# Tier List 網站(tierlist-web)的網址根目錄,不要加結尾斜線
+# 這個插件會自己組出 /internal/verify、/internal/modlist 這兩個端點的完整網址
+backend-base-url: "http://127.0.0.1:8787"
 
 # 必須跟網站專案 .env 裡的 PLUGIN_SHARED_SECRET 完全一致
 # 用來確認請求真的是從遊戲伺服器發出,不是外部亂打的

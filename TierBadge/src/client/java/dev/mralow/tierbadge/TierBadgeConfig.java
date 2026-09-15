@@ -24,6 +24,11 @@ public class TierBadgeConfig {
     public int refreshIntervalSeconds = 60;
     public String badgeColor = "#7c8cff";
 
+    // 進伺服器時要不要透過插件頻道 (tierbadge:modlist) 把目前安裝的模組清單回報給
+    // 伺服器上的 TierVerify 插件(它會再轉送到網站存起來)。只有裝了 TierVerify 的伺服器會收到,
+    // 沒裝的伺服器單純收不到訊息,不會出錯。不想被看到模組清單的話可以關掉。
+    public boolean sendModList = true;
+
     public static TierBadgeConfig loadOrCreate() {
         try {
             if (Files.exists(PATH)) {
