@@ -184,15 +184,15 @@ def login_temp():
         abort(404)
 
     client_ip = request.remote_addr or "unknown"
-    if _is_locked_out(client_ip):
+    if _is_locked_out("temp_login", client_ip):
         abort(429)
 
     provided_token = request.args.get("token") or ""
     if not hmac.compare_digest(provided_token, TEMP_ADMIN_TOKEN):
-        _record_secret_failure(client_ip)
+        _record_secret_failure("temp_login", client_ip)
         abort(403)
 
-    _clear_secret_failures(client_ip)
+    _clear_secret_failures("temp_login", client_ip)
 
     session["discord_id"] = "temp-admin"
     session["discord_username"] = "臨時管理員"
@@ -312,34 +312,37 @@ def account():
 
 # ---------- 遊戲伺服器插件呼叫的內部驗證 API ----------
 
-def _is_locked_out(ip: str) -> bool:
-    count, locked_until = _secret_fail_counts.get(ip, (0, 0))
+def _is_locked_out(bucket: str, ip: str) -> bool:
+    key = f"{bucket}:{ip}"
+    count, locked_until = _secret_fail_counts.get(key, (0, 0))
     return count >= _SECRET_FAIL_LIMIT and time.time() < locked_until
 
 
-def _record_secret_failure(ip: str):
-    count, _ = _secret_fail_counts.get(ip, (0, 0))
+def _record_secret_failure(bucket: str, ip: str):
+    key = f"{bucket}:{ip}"
+    count, _ = _secret_fail_counts.get(key, (0, 0))
     count += 1
-    _secret_fail_counts[ip] = (count, time.time() + _SECRET_LOCKOUT_SECONDS)
+    _secret_fail_counts[key] = (count, time.time() + _SECRET_LOCKOUT_SECONDS)
 
 
-def _clear_secret_failures(ip: str):
-    _secret_fail_counts.pop(ip, None)
+def _clear_secret_failures(bucket: str, ip: str):
+    _secret_fail_counts.pop(f"{bucket}:{ip}", None)
 
 
 def require_plugin_secret():
     """遊戲伺服器插件(TierVerify)呼叫 /internal/* 端點都要過這關,
-    共用同一套鎖 IP 機制,避免有人對任何一個 /internal 端點狂猜密鑰。"""
+    這些端點共用一個鎖 IP 的計數桶,跟 /login/temp 分開算,
+    避免遊戲伺服器跟管理員剛好用同一個對外 IP 時互相把對方鎖出去。"""
     client_ip = request.remote_addr or "unknown"
-    if _is_locked_out(client_ip):
+    if _is_locked_out("plugin", client_ip):
         abort(429)
 
     provided_secret = request.headers.get("X-Plugin-Secret") or ""
     if not PLUGIN_SHARED_SECRET or not hmac.compare_digest(provided_secret, PLUGIN_SHARED_SECRET):
-        _record_secret_failure(client_ip)
+        _record_secret_failure("plugin", client_ip)
         abort(403)
 
-    _clear_secret_failures(client_ip)
+    _clear_secret_failures("plugin", client_ip)
 
 
 @app.route("/internal/verify", methods=["POST"])
@@ -347,9 +350,9 @@ def internal_verify():
     require_plugin_secret()
 
     data = request.get_json(silent=True) or {}
-    code = (data.get("code") or "").strip().upper()
-    mc_uuid = (data.get("mc_uuid") or "").strip()
-    mc_username = (data.get("mc_username") or "").strip()
+    code = (data.get("code") or "").strip().upper()[:32]
+    mc_uuid = (data.get("mc_uuid") or "").strip()[:64]
+    mc_username = (data.get("mc_username") or "").strip()[:32]
 
     if not code or not mc_uuid or not mc_username:
         return jsonify({"error": "missing_fields"}), 400
@@ -372,8 +375,8 @@ def internal_modlist():
     require_plugin_secret()
 
     data = request.get_json(silent=True) or {}
-    mc_uuid = (data.get("mc_uuid") or "").strip()
-    mc_username = (data.get("mc_username") or "").strip()
+    mc_uuid = (data.get("mc_uuid") or "").strip()[:64]
+    mc_username = (data.get("mc_username") or "").strip()[:32]
     mods = data.get("mods")
 
     if not mc_uuid or not mc_username or not isinstance(mods, list):
@@ -411,9 +414,9 @@ def admin_home():
 @app.route("/admin/players/create", methods=["POST"])
 def admin_create_player():
     require_admin()
-    mc_username = request.form.get("mc_username", "").strip()
+    mc_username = request.form.get("mc_username", "").strip()[:32]
     tier = request.form.get("tier", "").strip() or None
-    region = request.form.get("region", "").strip() or None
+    region = request.form.get("region", "").strip()[:64] or None
 
     if not mc_username:
         abort(400)
@@ -427,8 +430,8 @@ def admin_create_player():
 @app.route("/admin/players/<int:player_id>/edit", methods=["POST"])
 def admin_edit_player(player_id):
     require_admin()
-    mc_username = request.form.get("mc_username", "").strip() or None
-    region = request.form.get("region", "").strip() or None
+    mc_username = request.form.get("mc_username", "").strip()[:32] or None
+    region = request.form.get("region", "").strip()[:64] or None
     tier_raw = request.form.get("tier", "__unset__")
     tier = None if tier_raw == "" else (tier_raw if tier_raw != "__unset__" else "__unset__")
     if tier not in ("__unset__", None) and tier not in models.TIERS:
@@ -452,20 +455,25 @@ def admin_upload_download():
     discord_id, _ = current_discord_user()
 
     file = request.files.get("file")
-    version = request.form.get("version", "").strip()
-    mc_version_min = request.form.get("mc_version_min", "").strip()
-    mc_version_max = request.form.get("mc_version_max", "").strip()
-    description = request.form.get("description", "").strip() or None
+    version = request.form.get("version", "").strip()[:32]
+    mc_version_min = request.form.get("mc_version_min", "").strip()[:16]
+    mc_version_max = request.form.get("mc_version_max", "").strip()[:16]
+    description = request.form.get("description", "").strip()[:500] or None
 
     if not file or not file.filename or not version or not mc_version_min or not mc_version_max:
         abort(400)
     if models.parse_mc_version(mc_version_min) > models.parse_mc_version(mc_version_max):
         abort(400, description="最低版本不能比最高版本新")
 
-    original_name = secure_filename(file.filename)
-    ext = Path(original_name).suffix.lower()
-    if ext not in ALLOWED_DOWNLOAD_EXTENSIONS:
+    # 先看「原始」檔名的副檔名決定准不准傳,secure_filename 對非 ASCII 檔名(例如純中文檔名)
+    # 可能會把副檔名一起吃掉,如果反過來先 sanitize 再檢查副檔名,惡意或純中文檔名可能繞過這關。
+    raw_ext = Path(file.filename).suffix.lower()
+    if raw_ext not in ALLOWED_DOWNLOAD_EXTENSIONS:
         abort(400, description="只能上傳 .jar 檔案")
+
+    original_name = secure_filename(file.filename) or f"upload{raw_ext}"
+    if not original_name.lower().endswith(raw_ext):
+        original_name += raw_ext
 
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     stored_filename = f"{secrets.token_hex(8)}_{original_name}"
