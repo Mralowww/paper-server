@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     stored_filename TEXT NOT NULL,
     original_filename TEXT NOT NULL,
     version TEXT NOT NULL,
+    mc_version_min TEXT NOT NULL,
+    mc_version_max TEXT NOT NULL,
     description TEXT,
     uploaded_by TEXT NOT NULL,
     created_at INTEGER NOT NULL
@@ -450,22 +452,44 @@ def list_test_results(limit: int = 50, mc_username: str | None = None):
 
 # ---------- 模組下載 ----------
 
+def parse_mc_version(version: str) -> tuple[int, ...]:
+    """把 "1.21.11" 這種版本字串拆成 (1, 21, 11) 方便照數字大小排序/比較,
+    不能直接用字串比大小,不然 "1.21.10" 會被誤判比 "1.21.2" 小。"""
+    parts = []
+    for p in version.strip().split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def version_in_range(version: str, min_version: str, max_version: str) -> bool:
+    v = parse_mc_version(version)
+    return parse_mc_version(min_version) <= v <= parse_mc_version(max_version)
+
+
 def create_download(stored_filename: str, original_filename: str, version: str,
+                     mc_version_min: str, mc_version_max: str,
                      description: str | None, uploaded_by: str):
     now = int(time.time())
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO downloads (stored_filename, original_filename, version, description, "
-            "uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (stored_filename, original_filename, version, description, uploaded_by, now),
+            "INSERT INTO downloads (stored_filename, original_filename, version, mc_version_min, "
+            "mc_version_max, description, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (stored_filename, original_filename, version, mc_version_min, mc_version_max,
+             description, uploaded_by, now),
         )
         return cur.lastrowid
 
 
-def list_downloads():
+def list_downloads(mc_version: str | None = None):
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM downloads ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+        items = [dict(r) for r in rows]
+    if mc_version:
+        items = [d for d in items if version_in_range(mc_version, d["mc_version_min"], d["mc_version_max"])]
+    return items
 
 
 def get_download(download_id: int):

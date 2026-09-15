@@ -123,10 +123,17 @@ def docs():
     return render_template("docs.html")
 
 
+SUPPORTED_MC_VERSIONS = ["1.21"] + [f"1.21.{i}" for i in range(1, 12)]
+
+
 @app.route("/downloads")
 def downloads():
-    items = models.list_downloads()
-    return render_template("downloads.html", downloads=items)
+    selected_version = request.args.get("mc_version") or ""
+    items = models.list_downloads(mc_version=selected_version or None)
+    return render_template(
+        "downloads.html", downloads=items,
+        mc_versions=SUPPORTED_MC_VERSIONS, selected_version=selected_version,
+    )
 
 
 @app.route("/downloads/file/<int:download_id>")
@@ -316,7 +323,8 @@ def admin_home():
     api_keys = models.list_api_keys()
     download_items = models.list_downloads()
     return render_template(
-        "admin.html", players=players, tiers=models.TIERS, api_keys=api_keys, downloads=download_items
+        "admin.html", players=players, tiers=models.TIERS, api_keys=api_keys,
+        downloads=download_items, mc_versions=SUPPORTED_MC_VERSIONS,
     )
 
 
@@ -349,10 +357,14 @@ def admin_upload_download():
 
     file = request.files.get("file")
     version = request.form.get("version", "").strip()
+    mc_version_min = request.form.get("mc_version_min", "").strip()
+    mc_version_max = request.form.get("mc_version_max", "").strip()
     description = request.form.get("description", "").strip() or None
 
-    if not file or not file.filename or not version:
+    if not file or not file.filename or not version or not mc_version_min or not mc_version_max:
         abort(400)
+    if models.parse_mc_version(mc_version_min) > models.parse_mc_version(mc_version_max):
+        abort(400, description="最低版本不能比最高版本新")
 
     original_name = secure_filename(file.filename)
     ext = Path(original_name).suffix.lower()
@@ -363,7 +375,9 @@ def admin_upload_download():
     stored_filename = f"{secrets.token_hex(8)}_{original_name}"
     file.save(DOWNLOADS_DIR / stored_filename)
 
-    models.create_download(stored_filename, original_name, version, description, discord_id)
+    models.create_download(
+        stored_filename, original_name, version, mc_version_min, mc_version_max, description, discord_id
+    )
     return redirect(url_for("admin_home"))
 
 

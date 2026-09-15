@@ -1,6 +1,6 @@
 # TierBadge
 
-Fabric 客戶端模組(Minecraft 1.21.1),在遊戲裡玩家名稱旁邊(頭頂名牌、Tab 名單等)自動加上
+Fabric 客戶端模組(Minecraft 1.21.x),在遊戲裡玩家名稱旁邊(頭頂名牌、Tab 名單等)自動加上
 [Mralow Tiers](../tierlist-web) 網站上的段位標記,例如 `Steve [HT3]`。
 
 只讀資料,不會改動遊戲行為,也不需要伺服器端安裝什麼東西(跟 `../TierVerify` 那個伺服器插件是兩回事)。
@@ -49,6 +49,25 @@ Fabric 客戶端模組(Minecraft 1.21.1),在遊戲裡玩家名稱旁邊(頭頂�
 
 如果 `PlayerDisplayNameMixin` 編譯失敗(通常是 mixin apply 失敗的錯誤),八成是 `getDisplayName` 這個方法在你用的 Yarn mappings 版本裡簽章跑掉了,
 用 IDE 打開 `PlayerEntity` 反編譯後的原始碼確認一下正確的方法名稱/回傳型別再調整。
+
+## 跨版本支援(1.21 ~ 1.21.x)
+
+`fabric.mod.json` 的 `depends.minecraft` 已經寫成 `">=1.21- <1.22-"`,理論上同一包 jar 可以讓 Fabric Loader
+在 1.21 到 1.22 之前的任何點版本(1.21.1、1.21.2……)都能載入,不用每個版本各編一包。
+
+但這只是「Loader 允不允許載入」的範圍設定,不是「保證能動」:
+
+- `PlayerDisplayNameMixin` 是攔截 `PlayerEntity#getDisplayName()`,只要 Mojang 在某個點版本沒改這個方法的
+  名稱或簽章,一包 jar 通常真的可以跨好幾個點版本正常運作,這是 Fabric intermediary mapping 這層的常見特性
+- 如果哪個版本 Mojang 剛好動到這個方法,遊戲啟動時 Mixin apply 會直接失敗、丟出明確的錯誤訊息(不會是那種
+  「看起來能跑但邏輯是錯的」的沉默失敗),那個版本就需要另外調整 mixin 目標重新編譯一包
+- 建置的時候 `gradle.properties` 裡的 `minecraft_version`/`yarn_mappings` 還是只能填一個版本,Loom 是拿那個
+  版本來產生反混淆的原始碼給你對照。建議固定用最低支援版本(1.21 或 1.21.1)去編,再實際去其他點版本開遊戲
+  裝上測試過,確認名牌真的有顯示、也沒有任何 Mixin 錯誤,再正式發布
+
+換句話說:**「宣告支援 1.21~1.21.x」跟「每個版本都實測過」是兩件事**,正式發布前建議至少挑幾個常見版本
+(例如最低、最高、中間一個)實際玩一輪確認。網站的 `/downloads` 頁面上傳新版本時可以填「支援版本」欄位,
+方便玩家自己選對應的版本下載,也方便你之後針對某個版本另外出一包修正版。
 
 ## 已知限制
 
