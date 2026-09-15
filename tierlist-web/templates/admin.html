@@ -75,4 +75,36 @@
 </table>
 </div>
 {% endif %}
+
+<h2>模組下載管理</h2>
+<form method="post" action="{{ url_for('admin_upload_download') }}" class="inline-form" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".jar" required>
+    <input type="text" name="version" placeholder="版本號,例如 1.0.0" required>
+    <input type="text" name="description" placeholder="說明(可留空)" style="min-width:220px;">
+    <button type="submit">上傳新版本</button>
+</form>
+{% if downloads %}
+<div class="table-wrap" style="margin-top:12px;">
+<table class="tier-table">
+    <thead>
+        <tr><th>版本</th><th>說明</th><th>發布時間</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for d in downloads %}
+        <tr>
+            <td>{{ d.version }}</td>
+            <td>{{ d.description or '-' }}</td>
+            <td class="muted">{{ d.created_at | timestamp_to_date }}</td>
+            <td>
+                <form method="post" action="{{ url_for('admin_delete_download', download_id=d.id) }}" class="inline-form"
+                      onsubmit="return confirm('確定要刪除版本 {{ d.version }} 嗎?');">
+                    <button type="submit" class="danger">刪除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
 {% endblock %}

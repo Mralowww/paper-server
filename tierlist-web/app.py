@@ -4,12 +4,19 @@ import secrets
 import string
 import threading
 import time  # noqa: F401 (used by timestamp_to_date filter)
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for,
+)
+from werkzeug.utils import secure_filename
 
 import models
+
+DOWNLOADS_DIR = Path(__file__).parent / "data" / "downloads"
+ALLOWED_DOWNLOAD_EXTENSIONS = {".jar"}
 
 load_dotenv()
 
@@ -35,7 +42,9 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FORCE_SECURE_COOKIES") == "1",
-    MAX_CONTENT_LENGTH=64 * 1024,  # 對外 API/內部驗證的請求本體都很小,擋掉異常大的請求
+    # 模組下載檔案(.jar)需要比較大的上傳上限,其餘 API 端點的請求本體其實都很小,
+    # 這個上限主要是擋掉異常巨大的請求,不是真的預期會有人上傳到滿
+    MAX_CONTENT_LENGTH=64 * 1024 * 1024,
 )
 
 models.init_db()
@@ -112,6 +121,23 @@ def index():
 @app.route("/docs")
 def docs():
     return render_template("docs.html")
+
+
+@app.route("/downloads")
+def downloads():
+    items = models.list_downloads()
+    return render_template("downloads.html", downloads=items)
+
+
+@app.route("/downloads/file/<int:download_id>")
+def downloads_file(download_id):
+    item = models.get_download(download_id)
+    if not item:
+        abort(404)
+    return send_from_directory(
+        DOWNLOADS_DIR, item["stored_filename"],
+        as_attachment=True, download_name=item["original_filename"],
+    )
 
 
 @app.route("/tests")
@@ -288,7 +314,10 @@ def admin_home():
     require_admin()
     players = models.list_all_players()
     api_keys = models.list_api_keys()
-    return render_template("admin.html", players=players, tiers=models.TIERS, api_keys=api_keys)
+    download_items = models.list_downloads()
+    return render_template(
+        "admin.html", players=players, tiers=models.TIERS, api_keys=api_keys, downloads=download_items
+    )
 
 
 @app.route("/admin/players/<int:player_id>/edit", methods=["POST"])
@@ -310,6 +339,41 @@ def admin_edit_player(player_id):
 def admin_delete_player(player_id):
     require_admin()
     models.delete_player(player_id)
+    return redirect(url_for("admin_home"))
+
+
+@app.route("/admin/downloads/upload", methods=["POST"])
+def admin_upload_download():
+    require_admin()
+    discord_id, _ = current_discord_user()
+
+    file = request.files.get("file")
+    version = request.form.get("version", "").strip()
+    description = request.form.get("description", "").strip() or None
+
+    if not file or not file.filename or not version:
+        abort(400)
+
+    original_name = secure_filename(file.filename)
+    ext = Path(original_name).suffix.lower()
+    if ext not in ALLOWED_DOWNLOAD_EXTENSIONS:
+        abort(400, description="只能上傳 .jar 檔案")
+
+    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    stored_filename = f"{secrets.token_hex(8)}_{original_name}"
+    file.save(DOWNLOADS_DIR / stored_filename)
+
+    models.create_download(stored_filename, original_name, version, description, discord_id)
+    return redirect(url_for("admin_home"))
+
+
+@app.route("/admin/downloads/<int:download_id>/delete", methods=["POST"])
+def admin_delete_download(download_id):
+    require_admin()
+    item = models.delete_download(download_id)
+    if item:
+        file_path = DOWNLOADS_DIR / item["stored_filename"]
+        file_path.unlink(missing_ok=True)
     return redirect(url_for("admin_home"))
 
 

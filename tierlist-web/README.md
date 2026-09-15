@@ -156,6 +156,13 @@ Header: X-API-Key: <你的 key>
 
 這三個都會檢查操作者在 Discord 伺服器裡是否有 Administrator 權限,沒有的話會被拒絕。
 
+## 模組下載
+
+`/downloads` 是公開頁面,列出所有已發布的 TierBadge(或其他)模組 jar 檔給玩家下載。
+
+管理員在 `/admin` 頁面下方「模組下載管理」上傳新版本(只接受 `.jar`,填版本號跟說明),
+檔案存在 `data/downloads/`(已加進 `.gitignore`,不會被推上 GitHub)。要下架某個版本直接在後台刪除即可。
+
 ## 安全性
 
 - Discord OAuth 登入有 `state` 防 CSRF,登入請求被竄改或重放會直接拒絕

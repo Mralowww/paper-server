@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used_at INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS downloads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stored_filename TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    version TEXT NOT NULL,
+    description TEXT,
+    uploaded_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
 """
 
 
@@ -381,3 +391,38 @@ def list_test_results(limit: int = 50, mc_username: str | None = None):
                 "SELECT * FROM test_results ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+
+# ---------- 模組下載 ----------
+
+def create_download(stored_filename: str, original_filename: str, version: str,
+                     description: str | None, uploaded_by: str):
+    now = int(time.time())
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO downloads (stored_filename, original_filename, version, description, "
+            "uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (stored_filename, original_filename, version, description, uploaded_by, now),
+        )
+        return cur.lastrowid
+
+
+def list_downloads():
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM downloads ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_download(download_id: int):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM downloads WHERE id = ?", (download_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_download(download_id: int):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM downloads WHERE id = ?", (download_id,)).fetchone()
+        if not row:
+            return None
+        conn.execute("DELETE FROM downloads WHERE id = ?", (download_id,))
+        return dict(row)

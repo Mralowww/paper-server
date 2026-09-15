@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}模組下載 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>模組下載</h1>
+<p class="page-subtitle">
+    TierBadge 是給玩家用的 Fabric 客戶端模組(Minecraft 1.21.1),裝了之後遊戲裡看得到其他人的 Tier 標記。
+    模組本身不影響遊戲平衡,單純顯示用。
+</p>
+
+{% if downloads %}
+<div class="table-wrap">
+<table class="tier-table">
+    <thead>
+        <tr><th>版本</th><th>說明</th><th>發布時間</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for d in downloads %}
+        <tr>
+            <td><strong>{{ d.version }}</strong></td>
+            <td>{{ d.description or '-' }}</td>
+            <td class="muted">{{ d.created_at | timestamp_to_date }}</td>
+            <td><a class="btn" href="{{ url_for('downloads_file', download_id=d.id) }}">下載</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">📦</div>
+    <p>目前還沒有可下載的模組版本。</p>
+</div>
+{% endif %}
+{% endblock %}
