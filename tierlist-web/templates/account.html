@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}我的帳號 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>我的帳號</h1>
+<p>Discord: <strong>{{ discord_username }}</strong></p>
+
+{% if player and player.mc_uuid %}
+<p>已綁定 Minecraft 帳號: <strong>{{ player.mc_username }}</strong></p>
+<p>目前 Tier: <strong>{{ player.vanilla_tier or '尚未評級' }}</strong></p>
+<p><a href="{{ url_for('account', new_code=1) }}">重新綁定 / 換一個 Minecraft 帳號</a></p>
+{% endif %}
+
+{% if code %}
+<div class="verify-box">
+    <p>請到 Minecraft 伺服器輸入以下指令完成綁定(驗證碼 {{ ttl_minutes }} 分鐘內有效):</p>
+    <pre>/verify {{ code }}</pre>
+</div>
+{% endif %}
+
+{% if is_admin %}
+<p><a href="{{ url_for('admin_home') }}">前往管理後台</a></p>
+{% endif %}
+
+<p><a href="{{ url_for('logout') }}">登出</a></p>
+{% endblock %}

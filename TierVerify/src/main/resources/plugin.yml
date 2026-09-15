@@ -1,0 +1,10 @@
+name: TierVerify
+version: '${version}'
+main: dev.mralow.tierverify.TierVerifyPlugin
+api-version: '1.21'
+author: Mralow
+description: 玩家在遊戲內輸入驗證碼,綁定 Discord 帳號與 MC 帳號給 Tier List 網站使用
+commands:
+  verify:
+    description: 綁定你的 Minecraft 帳號到 Tier List 網站
+    usage: /verify <code>

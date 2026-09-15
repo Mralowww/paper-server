@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Mralow Tiers{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="topnav">
+        <a class="brand" href="{{ url_for('index') }}">Mralow Tiers</a>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">排名</a>
+            <a href="{{ url_for('account') }}">我的帳號</a>
+        </div>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

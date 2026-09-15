@@ -1,0 +1,10 @@
+# Tier List 網站後端的驗證用內部 API
+# 這個 URL 是網站專案 (tierlist-web) 提供的 /internal/verify 端點
+backend-url: "http://127.0.0.1:8787/internal/verify"
+
+# 必須跟網站專案 .env 裡的 PLUGIN_SHARED_SECRET 完全一致
+# 用來確認請求真的是從遊戲伺服器發出,不是外部亂打的
+shared-secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+
+# HTTP 請求逾時秒數
+timeout-seconds: 5

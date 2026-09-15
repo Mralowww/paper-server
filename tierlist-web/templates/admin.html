@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}管理後台 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>管理後台</h1>
+
+<h2>玩家 Tier 設定</h2>
+<table class="tier-table">
+    <thead>
+        <tr><th>MC 帳號</th><th>Discord</th><th>目前 Tier</th><th>地區</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+        {% for p in players %}
+        <tr>
+            <td>{{ p.mc_username or '(尚未綁定)' }}</td>
+            <td>{{ p.discord_username }}</td>
+            <td>{{ p.vanilla_tier or '-' }}</td>
+            <td>{{ p.region or '-' }}</td>
+            <td>
+                {% if p.mc_username %}
+                <form method="post" action="{{ url_for('admin_set_tier') }}" class="inline-form">
+                    <input type="hidden" name="mc_username" value="{{ p.mc_username }}">
+                    <select name="tier">
+                        <option value="">未評級</option>
+                        {% for t in tiers %}
+                        <option value="{{ t }}" {% if p.vanilla_tier == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="region" placeholder="地區(可留空)" value="{{ p.region or '' }}">
+                    <button type="submit">更新</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>API Key 管理</h2>
+<form method="post" action="{{ url_for('admin_create_api_key') }}" class="inline-form">
+    <input type="text" name="label" placeholder="用途說明,例如:某某 mod" required>
+    <button type="submit">建立新的 API Key</button>
+</form>
+<table class="tier-table">
+    <thead>
+        <tr><th>Key</th><th>用途</th><th>狀態</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+        {% for k in api_keys %}
+        <tr>
+            <td><code>{{ k.key }}</code></td>
+            <td>{{ k.label }}</td>
+            <td>{{ '已停用' if k.revoked else '啟用中' }}</td>
+            <td>
+                {% if not k.revoked %}
+                <form method="post" action="{{ url_for('admin_revoke_api_key') }}" class="inline-form">
+                    <input type="hidden" name="key" value="{{ k.key }}">
+                    <button type="submit">停用</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

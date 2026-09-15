@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}排名 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>Vanilla PvP 排名</h1>
+{% if players %}
+<table class="tier-table">
+    <thead>
+        <tr><th>Tier</th><th>玩家</th><th>地區</th></tr>
+    </thead>
+    <tbody>
+        {% for p in players %}
+        <tr>
+            <td><span class="tier-badge tier-{{ p.vanilla_tier }}">{{ p.vanilla_tier }}</span></td>
+            <td>{{ p.mc_username }}</td>
+            <td>{{ p.region or '-' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>目前還沒有任何玩家上榜。</p>
+{% endif %}
+{% endblock %}
