@@ -79,6 +79,11 @@ def index():
     return render_template("index.html", players=players, tiers=models.TIERS)
 
 
+@app.route("/docs")
+def docs():
+    return render_template("docs.html")
+
+
 @app.route("/tests")
 def tests():
     results = models.list_test_results(limit=100)

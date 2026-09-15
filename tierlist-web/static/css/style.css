@@ -287,3 +287,23 @@ code {
     padding: 2px 6px;
     border-radius: 6px;
 }
+
+.panel pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    background: #000;
+    color: var(--accent-2);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.panel ol {
+    padding-left: 20px;
+    margin: 0;
+}
+
+.panel ol li {
+    margin-bottom: 6px;
+}

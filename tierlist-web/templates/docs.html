@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}文件 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>使用說明 / API 文件</h1>
+<p class="page-subtitle">給玩家看的綁定流程,以及給 Mod / 第三方開發者用的公開 API。</p>
+
+<div class="panel">
+    <h2 style="margin-top:0;border-top:none;padding-top:0;">玩家:如何綁定 Minecraft 帳號</h2>
+    <ol>
+        <li>到<a href="{{ url_for('login_discord') }}">用 Discord 登入</a></li>
+        <li>登入後在<a href="{{ url_for('account') }}">我的帳號</a>頁面會看到一組驗證碼</li>
+        <li>到 Minecraft 伺服器輸入 <code>/verify &lt;驗證碼&gt;</code>,驗證碼 10 分鐘內有效</li>
+        <li>綁定完成後就可以在 Discord 按「🎫 申請測試」排隊測 Tier</li>
+    </ol>
+</div>
+
+<h2>公開 API</h2>
+<p class="page-subtitle">需要先請網站管理員在後台核發一組 API Key,每次請求帶在 Header 或 query string 裡。</p>
+
+<div class="panel">
+    <p><code>X-API-Key: &lt;你的 key&gt;</code> 或 <code>?api_key=&lt;你的 key&gt;</code></p>
+</div>
+
+<h2>查詢單一玩家 Tier</h2>
+<div class="panel">
+    <p><code>GET /api/v1/tier/&lt;mc使用者名稱&gt;</code></p>
+    <pre>{
+  "username": "Steve",
+  "uuid": "...",
+  "tier": "HT2",
+  "region": "TW",
+  "ranked": true
+}</pre>
+    <p class="muted">找不到或尚未評級的玩家會回傳 <code>"ranked": false</code>,<code>tier</code> 是 <code>null</code>。</p>
+</div>
+
+<h2>列出全部排名</h2>
+<div class="panel">
+    <p><code>GET /api/v1/tiers</code></p>
+    <pre>[
+  {"username": "Steve", "uuid": "...", "tier": "HT2", "region": "TW"}
+]</pre>
+</div>
+
+<h2>查詢測試紀錄</h2>
+<div class="panel">
+    <p><code>GET /api/v1/tests?username=&lt;可省略&gt;&amp;limit=&lt;可省略,預設 50,最多 200&gt;</code></p>
+    <p class="muted">不帶 <code>username</code> 會回傳全站最近的測試紀錄;帶了就只回傳該玩家的紀錄。</p>
+    <pre>[
+  {
+    "username": "Steve", "uuid": "...", "region": "TW", "game_name": "Sumo",
+    "score_wins": 3, "score_losses": 0, "tier_before": null, "tier_after": "HT3",
+    "test_type": "normal", "examiner": "examiner#0001", "created_at": 1234567890
+  }
+]</pre>
+</div>
+{% endblock %}
