@@ -156,6 +156,17 @@ Header: X-API-Key: <你的 key>
 
 這三個都會檢查操作者在 Discord 伺服器裡是否有 Administrator 權限,沒有的話會被拒絕。
 
+## 安全性
+
+- Discord OAuth 登入有 `state` 防 CSRF,登入請求被竄改或重放會直接拒絕
+- session cookie 是 `HttpOnly` + `SameSite=Lax`,JS 拿不到也不會被跨站表單濫用
+- `/internal/verify` 的共用密鑰用 timing-safe 比對(`hmac.compare_digest`),同一個 IP 連續猜錯 6 次會鎖 5 分鐘
+- 所有頁面都有基本的 CSP / `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff`
+- `.env`、`data/`(內含 SQLite 資料庫)都在 `.gitignore` 裡,不會被推上 GitHub
+
+如果之後在網站前面加了反向代理提供 HTTPS,記得把 `.env` 的 `FORCE_SECURE_COOKIES` 設成 `1`,
+沒有 HTTPS 的情況下設了會導致 session cookie 完全送不出去、無法登入。
+
 ## 尚未做、之後可以再加強的部分
 
 - 多分類排名(目前只有 Vanilla)

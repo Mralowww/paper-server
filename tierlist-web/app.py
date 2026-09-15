@@ -1,3 +1,4 @@
+import hmac
 import os
 import secrets
 import string
@@ -22,8 +23,20 @@ DISCORD_API = "https://discord.com/api"
 VERIFY_CODE_TTL_SECONDS = 600
 PERMISSION_ADMINISTRATOR = 0x8
 
+# 暴力猜 PLUGIN_SHARED_SECRET 的簡易防護:同一個 IP 連續猜錯太多次就先鎖一陣子。
+# 存在記憶體就好,重啟網站會重置,不需要為了這個再多開一張資料表。
+_SECRET_FAIL_LIMIT = 6
+_SECRET_LOCKOUT_SECONDS = 5 * 60
+_secret_fail_counts: dict[str, tuple[int, float]] = {}
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("FORCE_SECURE_COOKIES") == "1",
+    MAX_CONTENT_LENGTH=64 * 1024,  # 對外 API/內部驗證的請求本體都很小,擋掉異常大的請求
+)
 
 models.init_db()
 
@@ -33,6 +46,14 @@ def add_security_headers(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "same-origin"
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' https://crafatar.com data:; "
+        "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
+        "font-src https://fonts.gstatic.com; "
+        "script-src 'self'; "
+        "frame-ancestors 'none'"
+    )
     return resp
 
 
@@ -98,11 +119,16 @@ def tests():
 def login_discord():
     if not DISCORD_CLIENT_ID:
         return "尚未設定 DISCORD_CLIENT_ID,請聯絡管理員。", 500
+
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+
     params = {
         "client_id": DISCORD_CLIENT_ID,
         "redirect_uri": DISCORD_REDIRECT_URI,
         "response_type": "code",
         "scope": "identify guilds",
+        "state": state,
     }
     query = "&".join(f"{k}={requests.utils.quote(v)}" for k, v in params.items())
     return redirect(f"{DISCORD_API}/oauth2/authorize?{query}")
@@ -111,8 +137,11 @@ def login_discord():
 @app.route("/discord/callback")
 def discord_callback():
     code = request.args.get("code")
-    if not code:
-        return redirect(url_for("index"))
+    state = request.args.get("state")
+    expected_state = session.pop("oauth_state", None)
+
+    if not code or not state or not expected_state or not hmac.compare_digest(state, expected_state):
+        return "登入請求驗證失敗,請重新登入(避免 CSRF 攻擊)。", 400
 
     token_resp = requests.post(
         f"{DISCORD_API}/oauth2/token",
@@ -198,10 +227,33 @@ def account():
 
 # ---------- 遊戲伺服器插件呼叫的內部驗證 API ----------
 
+def _is_locked_out(ip: str) -> bool:
+    count, locked_until = _secret_fail_counts.get(ip, (0, 0))
+    return count >= _SECRET_FAIL_LIMIT and time.time() < locked_until
+
+
+def _record_secret_failure(ip: str):
+    count, _ = _secret_fail_counts.get(ip, (0, 0))
+    count += 1
+    _secret_fail_counts[ip] = (count, time.time() + _SECRET_LOCKOUT_SECONDS)
+
+
+def _clear_secret_failures(ip: str):
+    _secret_fail_counts.pop(ip, None)
+
+
 @app.route("/internal/verify", methods=["POST"])
 def internal_verify():
-    if not PLUGIN_SHARED_SECRET or request.headers.get("X-Plugin-Secret") != PLUGIN_SHARED_SECRET:
+    client_ip = request.remote_addr or "unknown"
+    if _is_locked_out(client_ip):
+        abort(429)
+
+    provided_secret = request.headers.get("X-Plugin-Secret") or ""
+    if not PLUGIN_SHARED_SECRET or not hmac.compare_digest(provided_secret, PLUGIN_SHARED_SECRET):
+        _record_secret_failure(client_ip)
         abort(403)
+
+    _clear_secret_failures(client_ip)
 
     data = request.get_json(silent=True) or {}
     code = (data.get("code") or "").strip().upper()
