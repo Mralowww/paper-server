@@ -408,6 +408,22 @@ def admin_home():
     )
 
 
+@app.route("/admin/players/create", methods=["POST"])
+def admin_create_player():
+    require_admin()
+    mc_username = request.form.get("mc_username", "").strip()
+    tier = request.form.get("tier", "").strip() or None
+    region = request.form.get("region", "").strip() or None
+
+    if not mc_username:
+        abort(400)
+    if tier and tier not in models.TIERS:
+        abort(400)
+
+    models.create_manual_player(mc_username, tier, region)
+    return redirect(url_for("admin_home"))
+
+
 @app.route("/admin/players/<int:player_id>/edit", methods=["POST"])
 def admin_edit_player(player_id):
     require_admin()

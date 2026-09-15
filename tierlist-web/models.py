@@ -1,4 +1,5 @@
 import json
+import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -193,12 +194,28 @@ def bind_player(discord_id: str, discord_username: str, mc_uuid: str, mc_usernam
                 "WHERE discord_id = ?",
                 (mc_uuid, mc_username, discord_username, now, discord_id),
             )
-        else:
+            return True, "ok"
+
+        # 管理員手動新增的佔位資料(discord_id 是 "manual:xxx",mc_uuid 還是 NULL)
+        # 剛好對到同一個 MC 帳號的話,直接讓這次真的綁定接手這筆,而不是另外開一筆重複的。
+        manual_placeholder = conn.execute(
+            "SELECT id FROM players WHERE mc_uuid IS NULL AND mc_username = ? COLLATE NOCASE "
+            "AND discord_id LIKE 'manual:%'",
+            (mc_username,),
+        ).fetchone()
+        if manual_placeholder:
             conn.execute(
-                "INSERT INTO players (discord_id, discord_username, mc_uuid, mc_username, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (discord_id, discord_username, mc_uuid, mc_username, now, now),
+                "UPDATE players SET discord_id = ?, discord_username = ?, mc_uuid = ?, mc_username = ?, "
+                "updated_at = ? WHERE id = ?",
+                (discord_id, discord_username, mc_uuid, mc_username, now, manual_placeholder["id"]),
             )
+            return True, "ok"
+
+        conn.execute(
+            "INSERT INTO players (discord_id, discord_username, mc_uuid, mc_username, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (discord_id, discord_username, mc_uuid, mc_username, now, now),
+        )
         return True, "ok"
 
 
@@ -260,6 +277,24 @@ def update_player(player_id: int, mc_username: str | None = None, region: str | 
             (new_mc_username, new_region, new_tier, now, player_id),
         )
         return True
+
+
+def create_manual_player(mc_username: str, tier: str | None = None, region: str | None = None):
+    """管理員在後台手動新增一筆玩家資料,不用等玩家自己走 Discord 綁定流程。
+    因為 discord_id 是 UNIQUE NOT NULL,手動建立的玩家給一個 "manual:<隨機碼>" 當佔位值,
+    之後這個人真的用 Discord 登入 + /verify 綁定的話,會走 bind_player 的更新路徑蓋掉這筆。"""
+    if tier is not None and tier not in TIERS:
+        raise ValueError("invalid tier")
+
+    now = int(time.time())
+    placeholder_discord_id = f"manual:{secrets.token_hex(8)}"
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO players (discord_id, discord_username, mc_username, vanilla_tier, region, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (placeholder_discord_id, "(管理員手動新增)", mc_username, tier, region, now, now),
+        )
+        return cur.lastrowid
 
 
 def delete_player(player_id: int):

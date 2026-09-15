@@ -459,6 +459,80 @@ main > *:nth-child(n+5) { animation-delay: 0.2s; }
 .stat-row .stat-tile:nth-child(2) { animation-delay: 0.08s; }
 .stat-row .stat-tile:nth-child(3) { animation-delay: 0.16s; }
 
+/* ---- 額外互動動畫 ---- */
+
+.nav-links a {
+    position: relative;
+}
+
+.nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 4px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 2px;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+}
+
+.nav-links a:hover::after {
+    transform: scaleX(1);
+}
+
+.topnav .brand {
+    background-size: 200% auto;
+    animation: brandShift 6s ease-in-out infinite;
+}
+
+@keyframes brandShift {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+}
+
+.mc-avatar, .player-skin {
+    transition: transform 0.2s ease;
+}
+
+.rank-row:hover .mc-avatar {
+    transform: scale(1.15);
+}
+
+.player-skin:hover {
+    transform: translateY(-4px);
+}
+
+.tier-badge {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rank-row:hover .tier-badge,
+.player-header .tier-badge:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 14px rgba(124, 140, 255, 0.35);
+}
+
+.verify-box pre {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(34, 211, 184, 0); }
+    50% { box-shadow: 0 0 16px rgba(34, 211, 184, 0.35); }
+}
+
+.btn, button {
+    transition: filter 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn:hover, button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 140, 255, 0.25);
+}
+
 @media (prefers-reduced-motion: reduce) {
     * {
         animation-duration: 0.001s !important;

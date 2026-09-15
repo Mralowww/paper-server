@@ -6,6 +6,18 @@
 <p class="page-subtitle">只有 Discord 伺服器 Administrator 權限的人看得到這個頁面。</p>
 
 <h2>玩家資料編輯</h2>
+<form method="post" action="{{ url_for('admin_create_player') }}" class="inline-form">
+    <input type="text" name="mc_username" placeholder="MC 帳號" required>
+    <select name="tier">
+        <option value="">未評級</option>
+        {% for t in tiers %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="region" placeholder="地區(可留空)">
+    <button type="submit">手動新增玩家</button>
+</form>
+<p class="muted">這是給還沒走完 Discord 綁定流程、想先手動加進排名的情況用,之後這個人真的用 Discord 登入 + /verify 綁定的話會自動接手這筆資料。</p>
 {% if players %}
 <div class="table-wrap">
 <table class="tier-table">
