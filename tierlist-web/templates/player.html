@@ -50,7 +50,7 @@
 {% endif %}
 
 {% if mods_record %}
-<h2>已回報的模組</h2>
+<h2>已回報的模組 <span class="muted" style="font-size:0.7em;font-weight:400;">(僅管理員可見)</span></h2>
 <div class="panel">
     <p class="muted">最後更新:{{ mods_record.updated_at | timestamp_to_date }}</p>
     <p>{{ mods_record.mods | map(attribute='id') | join(', ') }}</p>

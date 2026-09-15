@@ -25,6 +25,9 @@ DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost:8787/discord/callback")
 PLUGIN_SHARED_SECRET = os.environ.get("PLUGIN_SHARED_SECRET", "")
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "")
+# 還沒設好 Discord OAuth App 之前,先用這組 token 讓自己能登入看後台。
+# 只有設了這個環境變數才會啟用這個入口,正式對外開放前記得從 .env 拿掉。
+TEMP_ADMIN_TOKEN = os.environ.get("TEMP_ADMIN_TOKEN", "")
 
 DISCORD_API = "https://discord.com/api"
 VERIFY_CODE_TTL_SECONDS = 600
@@ -167,8 +170,34 @@ def player_profile(mc_username):
     if not player:
         abort(404)
     history = models.list_test_results(limit=100, mc_username=player["mc_username"])
-    mods_record = models.get_player_mods(player["mc_uuid"]) if player.get("mc_uuid") else None
+    mods_record = None
+    if session.get("is_admin") and player.get("mc_uuid"):
+        mods_record = models.get_player_mods(player["mc_uuid"])
     return render_template("player.html", player=player, history=history, mods_record=mods_record)
+
+
+@app.route("/login/temp")
+def login_temp():
+    """還沒設好 Discord OAuth App 前,先用網址帶 token 的方式登入看後台用。
+    .env 沒設 TEMP_ADMIN_TOKEN 的話這個入口直接 404,不會多一個攻擊面。"""
+    if not TEMP_ADMIN_TOKEN:
+        abort(404)
+
+    client_ip = request.remote_addr or "unknown"
+    if _is_locked_out(client_ip):
+        abort(429)
+
+    provided_token = request.args.get("token") or ""
+    if not hmac.compare_digest(provided_token, TEMP_ADMIN_TOKEN):
+        _record_secret_failure(client_ip)
+        abort(403)
+
+    _clear_secret_failures(client_ip)
+
+    session["discord_id"] = "temp-admin"
+    session["discord_username"] = "臨時管理員"
+    session["is_admin"] = True
+    return redirect(url_for("admin_home"))
 
 
 @app.route("/login/discord")
