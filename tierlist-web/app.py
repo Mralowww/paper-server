@@ -89,6 +89,12 @@ def mc_avatar_url(mc_uuid):
     return f"https://crafatar.com/avatars/{mc_uuid}?size=64&overlay"
 
 
+def mc_body_url(mc_uuid):
+    if not mc_uuid:
+        return None
+    return f"https://crafatar.com/renders/body/{mc_uuid}?scale=6&overlay"
+
+
 def namemc_url(mc_username):
     if not mc_username:
         return None
@@ -96,6 +102,7 @@ def namemc_url(mc_username):
 
 
 app.jinja_env.globals["mc_avatar_url"] = mc_avatar_url
+app.jinja_env.globals["mc_body_url"] = mc_body_url
 app.jinja_env.globals["namemc_url"] = namemc_url
 app.jinja_env.globals["tier_display_name"] = models.tier_display_name
 app.jinja_env.globals["get_player_mods"] = models.get_player_mods
@@ -152,6 +159,16 @@ def downloads_file(download_id):
 def tests():
     results = models.list_test_results(limit=100)
     return render_template("tests.html", results=results)
+
+
+@app.route("/player/<mc_username>")
+def player_profile(mc_username):
+    player = models.get_player_by_mc_username(mc_username)
+    if not player:
+        abort(404)
+    history = models.list_test_results(limit=100, mc_username=player["mc_username"])
+    mods_record = models.get_player_mods(player["mc_uuid"]) if player.get("mc_uuid") else None
+    return render_template("player.html", player=player, history=history, mods_record=mods_record)
 
 
 @app.route("/login/discord")

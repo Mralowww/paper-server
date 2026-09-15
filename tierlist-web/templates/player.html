@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ player.mc_username }} - Mralow Tiers{% endblock %}
+{% block content %}
+<div class="player-header panel">
+    {% set body = mc_body_url(player.mc_uuid) %}
+    {% if body %}
+    <img src="{{ body }}" alt="" class="player-skin">
+    {% endif %}
+    <div class="player-header-info">
+        <h1>{{ player.mc_username }}</h1>
+        <p class="page-subtitle" style="margin-bottom:12px;">
+            <a href="{{ namemc_url(player.mc_username) }}" target="_blank" rel="noopener">在 NameMC 上查看 ↗</a>
+        </p>
+        <div class="player-badges">
+            {% if player.vanilla_tier %}
+            <span class="tier-badge tier-{{ player.vanilla_tier }}">{{ player.vanilla_tier }}</span>
+            {% else %}
+            <span class="muted">尚未評級</span>
+            {% endif %}
+            {% if player.region %}
+            <span class="muted">📍 {{ player.region }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<h2>測試紀錄</h2>
+{% if history %}
+<div class="table-wrap">
+<table class="tier-table">
+    <thead>
+        <tr><th>項目</th><th>比分</th><th>考前段位</th><th>取得段位</th><th>考官</th><th>時間</th></tr>
+    </thead>
+    <tbody>
+        {% for r in history %}
+        <tr>
+            <td>{{ r.game_name or '-' }}</td>
+            <td>{{ r.score_wins }} 勝 - {{ r.score_losses }} 敗</td>
+            <td>{{ tier_display_name(r.tier_before) }}</td>
+            <td><span class="tier-badge tier-{{ r.tier_after }}">{{ tier_display_name(r.tier_after) }}</span></td>
+            <td>{{ r.examiner_username }}</td>
+            <td class="muted">{{ r.created_at | timestamp_to_date }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">這位玩家還沒有測試紀錄。</div>
+{% endif %}
+
+{% if mods_record %}
+<h2>已回報的模組</h2>
+<div class="panel">
+    <p class="muted">最後更新:{{ mods_record.updated_at | timestamp_to_date }}</p>
+    <p>{{ mods_record.mods | map(attribute='id') | join(', ') }}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -204,6 +204,34 @@ h2 {
     white-space: nowrap;
 }
 
+/* ---- 玩家個人頁 ---- */
+
+.player-header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+}
+
+.player-skin {
+    width: 96px;
+    height: auto;
+    image-rendering: pixelated;
+    flex: 0 0 auto;
+}
+
+.player-header-info h1 {
+    margin-bottom: 4px;
+}
+
+.player-badges {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 /* ---- 頭像 ---- */
 
 .mc-avatar {
