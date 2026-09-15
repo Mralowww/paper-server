@@ -5,11 +5,15 @@
 {% if players %}
 <table class="tier-table">
     <thead>
-        <tr><th>Tier</th><th>玩家</th><th>地區</th></tr>
+        <tr><th></th><th>Tier</th><th>玩家</th><th>地區</th></tr>
     </thead>
     <tbody>
         {% for p in players %}
         <tr>
+            <td>
+                {% set avatar = mc_avatar_url(p.mc_uuid) %}
+                {% if avatar %}<img src="{{ avatar }}" alt="" class="mc-avatar">{% endif %}
+            </td>
             <td><span class="tier-badge tier-{{ p.vanilla_tier }}">{{ p.vanilla_tier }}</span></td>
             <td>{{ p.mc_username }}</td>
             <td>{{ p.region or '-' }}</td>

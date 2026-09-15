@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}測試紀錄 - Mralow Tiers{% endblock %}
+{% block content %}
+<h1>測試紀錄</h1>
+{% if results %}
+<table class="tier-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th>玩家</th>
+            <th>地區</th>
+            <th>項目</th>
+            <th>比分</th>
+            <th>考前段位</th>
+            <th>取得段位</th>
+            <th>考官</th>
+            <th>時間</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in results %}
+        <tr>
+            <td>
+                {% set avatar = mc_avatar_url(r.mc_uuid) %}
+                {% if avatar %}<img src="{{ avatar }}" alt="" class="mc-avatar">{% endif %}
+            </td>
+            <td>{{ r.mc_username }}</td>
+            <td>{{ r.region or '-' }}</td>
+            <td>{{ r.game_name or '-' }}</td>
+            <td>{{ r.score_wins }} 勝 - {{ r.score_losses }} 敗</td>
+            <td>{{ tier_display_name(r.tier_before) }}</td>
+            <td><span class="tier-badge tier-{{ r.tier_after }}">{{ tier_display_name(r.tier_after) }}</span></td>
+            <td>{{ r.examiner_username }}</td>
+            <td>{{ r.created_at | timestamp_to_date }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>目前還沒有任何測試紀錄。</p>
+{% endif %}
+{% endblock %}

@@ -58,6 +58,14 @@ main {
     text-align: left;
 }
 
+.mc-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: block;
+    image-rendering: pixelated;
+}
+
 .tier-badge {
     display: inline-block;
     padding: 2px 10px;

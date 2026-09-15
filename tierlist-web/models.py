@@ -7,6 +7,18 @@ DB_PATH = Path(__file__).parent / "data" / "tierlist.db"
 
 TIERS = ["HT1", "LT1", "HT2", "LT2", "HT3", "LT3", "HT4", "LT4", "HT5", "LT5"]
 
+# 目前段位是 HT3 或更好(HT1/LT1/HT2/LT2/HT3)算高階測試,30 天冷卻
+# 其餘(LT3 以下)或尚未評級算普通測試,7 天冷卻
+ADVANCED_TIERS = set(TIERS[: TIERS.index("HT3") + 1])
+NORMAL_TEST_COOLDOWN_SECONDS = 7 * 24 * 3600
+ADVANCED_TEST_COOLDOWN_SECONDS = 30 * 24 * 3600
+
+TEST_TYPE_NORMAL = "normal"
+TEST_TYPE_ADVANCED = "advanced"
+
+TICKET_STATUS_OPEN = "open"
+TICKET_STATUS_CLOSED = "closed"
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,8 +28,40 @@ CREATE TABLE IF NOT EXISTS players (
     mc_username TEXT,
     vanilla_tier TEXT,
     region TEXT,
+    last_test_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT UNIQUE NOT NULL,
+    discord_id TEXT NOT NULL,
+    discord_username TEXT NOT NULL,
+    mc_uuid TEXT,
+    mc_username TEXT,
+    test_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    closed_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS test_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER,
+    discord_id TEXT NOT NULL,
+    mc_uuid TEXT,
+    mc_username TEXT NOT NULL,
+    examiner_discord_id TEXT NOT NULL,
+    examiner_username TEXT NOT NULL,
+    region TEXT,
+    game_name TEXT,
+    score_wins INTEGER NOT NULL,
+    score_losses INTEGER NOT NULL,
+    tier_before TEXT,
+    tier_after TEXT NOT NULL,
+    test_type TEXT NOT NULL,
+    created_at INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS verify_codes (
@@ -195,3 +239,111 @@ def check_api_key(key: str) -> bool:
             return False
         conn.execute("UPDATE api_keys SET last_used_at = ? WHERE key = ?", (now, key))
         return True
+
+
+# ---------- 測試 (Testing) ----------
+
+def required_test_type(current_tier: str | None) -> str:
+    """依照玩家『目前』段位判斷這次要考的是普通測試還是高階測試。"""
+    if current_tier and current_tier in ADVANCED_TIERS:
+        return TEST_TYPE_ADVANCED
+    return TEST_TYPE_NORMAL
+
+
+def cooldown_seconds_for(test_type: str) -> int:
+    return ADVANCED_TEST_COOLDOWN_SECONDS if test_type == TEST_TYPE_ADVANCED else NORMAL_TEST_COOLDOWN_SECONDS
+
+
+def check_test_cooldown(discord_id: str):
+    """回傳 (可以測試: bool, 剩餘秒數: int, 這次要考的類型: str)。"""
+    player = get_player_by_discord_id(discord_id)
+    current_tier = player.get("vanilla_tier") if player else None
+    test_type = required_test_type(current_tier)
+
+    if not player or not player.get("last_test_at"):
+        return True, 0, test_type
+
+    elapsed = int(time.time()) - player["last_test_at"]
+    remaining = cooldown_seconds_for(test_type) - elapsed
+    if remaining <= 0:
+        return True, 0, test_type
+    return False, remaining, test_type
+
+
+def create_ticket(channel_id: str, discord_id: str, discord_username: str, mc_uuid: str | None,
+                   mc_username: str | None, test_type: str):
+    now = int(time.time())
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO tickets (channel_id, discord_id, discord_username, mc_uuid, mc_username, "
+            "test_type, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)",
+            (channel_id, discord_id, discord_username, mc_uuid, mc_username, test_type, now),
+        )
+
+
+def get_open_ticket_by_channel(channel_id: str):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM tickets WHERE channel_id = ? AND status = 'open'", (channel_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_open_ticket_by_discord_id(discord_id: str):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM tickets WHERE discord_id = ? AND status = 'open'", (discord_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def close_ticket(channel_id: str):
+    now = int(time.time())
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE tickets SET status = 'closed', closed_at = ? WHERE channel_id = ?",
+            (now, channel_id),
+        )
+
+
+def record_test_result(*, ticket_id: int | None, discord_id: str, mc_uuid: str | None, mc_username: str,
+                        examiner_discord_id: str, examiner_username: str, region: str, game_name: str,
+                        score_wins: int, score_losses: int, tier_before: str | None, tier_after: str,
+                        test_type: str):
+    if tier_after not in TIERS:
+        raise ValueError("invalid tier")
+    now = int(time.time())
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO test_results (ticket_id, discord_id, mc_uuid, mc_username, examiner_discord_id, "
+            "examiner_username, region, game_name, score_wins, score_losses, tier_before, tier_after, "
+            "test_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (ticket_id, discord_id, mc_uuid, mc_username, examiner_discord_id, examiner_username,
+             region, game_name, score_wins, score_losses, tier_before, tier_after, test_type, now),
+        )
+
+        existing = conn.execute(
+            "SELECT id FROM players WHERE discord_id = ?", (discord_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE players SET vanilla_tier = ?, region = COALESCE(?, region), "
+                "last_test_at = ?, updated_at = ? WHERE discord_id = ?",
+                (tier_after, region, now, now, discord_id),
+            )
+
+
+def tier_display_name(tier: str | None) -> str:
+    if not tier:
+        return "未評級"
+    prefix = "High" if tier.startswith("H") else "Low"
+    number = tier[2:]
+    return f"{prefix} Tier {number}"
+
+
+def list_test_results(limit: int = 50):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM test_results ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]

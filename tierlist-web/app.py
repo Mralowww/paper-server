@@ -1,7 +1,7 @@
 import os
 import secrets
 import string
-import time
+import time  # noqa: F401 (used by timestamp_to_date filter)
 
 import requests
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
@@ -53,10 +53,33 @@ def gen_code(length: int = 8) -> str:
 
 # ---------- 前台 ----------
 
+def mc_avatar_url(mc_uuid):
+    if not mc_uuid:
+        return None
+    return f"https://crafatar.com/avatars/{mc_uuid}?size=64&overlay"
+
+
+app.jinja_env.globals["mc_avatar_url"] = mc_avatar_url
+app.jinja_env.globals["tier_display_name"] = models.tier_display_name
+
+
+@app.template_filter("timestamp_to_date")
+def timestamp_to_date(ts):
+    if not ts:
+        return "-"
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
+
+
 @app.route("/")
 def index():
     players = models.list_ranked_players()
     return render_template("index.html", players=players, tiers=models.TIERS)
+
+
+@app.route("/tests")
+def tests():
+    results = models.list_test_results(limit=100)
+    return render_template("tests.html", results=results)
 
 
 @app.route("/login/discord")
