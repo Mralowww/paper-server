@@ -156,6 +156,21 @@ Header: X-API-Key: <你的 key>
 
 這三個都會檢查操作者在 Discord 伺服器裡是否有 Administrator 權限,沒有的話會被拒絕。
 
+## Discord 控制 API
+
+讓外部程式(遊戲伺服器、其他服務)透過網站 API 叫 Discord bot 發訊息到指定頻道,不用自己接 Discord API。
+
+```
+POST /api/v1/discord/announce
+Header: X-API-Key: <control 權限的 key>
+Body: {"channel_id": "123456789012345678", "message": "要發的內容"}
+```
+
+- 一定要用 `scope=control` 的 API Key(在 `/admin` 建立時選),`read` 權限的 key 會被拒絕(401)
+- 成功會回 `202 {"ok": true, "queued_id": ...}`,代表已經排進去了,不是已經送達
+- 網站把訊息寫進資料庫的 `discord_outbox` 表,Discord bot 每 5 秒輪詢一次實際發送,
+  所以不管 bot 是跟網站同一個程序還是分開跑都能用,不用額外開 HTTP 介面
+
 ## 模組下載
 
 `/downloads` 是公開頁面,列出所有已發布的 TierBadge(或其他)模組 jar 檔給玩家下載。

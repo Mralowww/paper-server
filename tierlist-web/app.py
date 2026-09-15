@@ -381,8 +381,11 @@ def admin_delete_download(download_id):
 def admin_create_api_key():
     require_admin()
     label = request.form.get("label", "").strip() or "未命名"
+    scope = request.form.get("scope", "read").strip()
+    if scope not in ("read", "control"):
+        abort(400)
     key = "tlk_" + secrets.token_urlsafe(32)
-    models.create_api_key(key, label)
+    models.create_api_key(key, label, scope)
     return redirect(url_for("admin_home"))
 
 
@@ -396,9 +399,9 @@ def admin_revoke_api_key():
 
 # ---------- 對外公開 API(給 Minecraft mod 用) ----------
 
-def require_api_key():
+def require_api_key(required_scope: str | None = None):
     key = request.headers.get("X-API-Key") or request.args.get("api_key")
-    if not key or not models.check_api_key(key):
+    if not key or not models.check_api_key(key, required_scope=required_scope):
         abort(401)
 
 
@@ -512,6 +515,24 @@ def api_list_tests():
             for r in results
         ]
     )
+
+
+@app.route("/api/v1/discord/announce", methods=["POST"])
+def api_discord_announce():
+    require_api_key(required_scope="control")
+
+    data = request.get_json(silent=True) or {}
+    channel_id = str(data.get("channel_id") or "").strip()
+    message = str(data.get("message") or "").strip()
+
+    if not channel_id or not channel_id.isdigit():
+        return jsonify({"error": "invalid_channel_id"}), 400
+    if not message or len(message) > 2000:
+        return jsonify({"error": "invalid_message"}), 400
+
+    key = request.headers.get("X-API-Key") or request.args.get("api_key")
+    message_id = models.enqueue_discord_message(channel_id, message, created_by=f"apikey:{key[:12]}...")
+    return jsonify({"ok": True, "queued_id": message_id}), 202
 
 
 def start_discord_bot_in_background():

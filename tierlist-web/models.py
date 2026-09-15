@@ -75,9 +75,20 @@ CREATE TABLE IF NOT EXISTS verify_codes (
 CREATE TABLE IF NOT EXISTS api_keys (
     key TEXT PRIMARY KEY,
     label TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'read',
     created_at INTEGER NOT NULL,
     revoked INTEGER NOT NULL DEFAULT 0,
     last_used_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS discord_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS downloads (
@@ -247,11 +258,14 @@ def delete_player(player_id: int):
         return cur.rowcount > 0
 
 
-def create_api_key(key: str, label: str):
+def create_api_key(key: str, label: str, scope: str = "read"):
+    if scope not in ("read", "control"):
+        raise ValueError("invalid scope")
     now = int(time.time())
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO api_keys (key, label, created_at) VALUES (?, ?, ?)", (key, label, now)
+            "INSERT INTO api_keys (key, label, scope, created_at) VALUES (?, ?, ?, ?)",
+            (key, label, scope, now),
         )
 
 
@@ -266,16 +280,57 @@ def list_api_keys():
         return [dict(r) for r in rows]
 
 
-def check_api_key(key: str) -> bool:
+def check_api_key(key: str, required_scope: str | None = None) -> bool:
+    """required_scope=None 表示只要是有效的 key 就好(任何 scope 都算);
+    required_scope='control' 表示一定要是 control 權限的 key,'read' 權限的 key 不算。"""
     now = int(time.time())
     with get_db() as conn:
         row = conn.execute(
-            "SELECT key FROM api_keys WHERE key = ? AND revoked = 0", (key,)
+            "SELECT scope FROM api_keys WHERE key = ? AND revoked = 0", (key,)
         ).fetchone()
         if not row:
             return False
+        if required_scope and row["scope"] != required_scope:
+            return False
         conn.execute("UPDATE api_keys SET last_used_at = ? WHERE key = ?", (now, key))
         return True
+
+
+# ---------- Discord 控制(讓外部程式透過網站 API 叫 bot 發訊息) ----------
+
+def enqueue_discord_message(channel_id: str, message: str, created_by: str):
+    now = int(time.time())
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO discord_outbox (channel_id, message, created_by, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (channel_id, message, created_by, now),
+        )
+        return cur.lastrowid
+
+
+def get_pending_discord_messages(limit: int = 20):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM discord_outbox WHERE sent_at IS NULL ORDER BY created_at ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_discord_message_sent(message_id: int):
+    now = int(time.time())
+    with get_db() as conn:
+        conn.execute("UPDATE discord_outbox SET sent_at = ? WHERE id = ?", (now, message_id))
+
+
+def mark_discord_message_failed(message_id: int, error: str):
+    now = int(time.time())
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE discord_outbox SET sent_at = ?, error = ? WHERE id = ?",
+            (now, error[:500], message_id),
+        )
 
 
 # ---------- 測試 (Testing) ----------

@@ -348,6 +348,24 @@ async def poll_tier_changes():
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
+async def poll_discord_outbox():
+    """讓網站的 /api/v1/discord/announce 可以透過共用資料庫叫這支 bot 發訊息:
+    網站只負責把訊息塞進 discord_outbox 表,實際發送還是由 bot 這邊處理,
+    這樣不管 bot 是跟網站同一個程序還是分開跑,都不用額外開一個 HTTP 介面互相呼叫。"""
+    await client.wait_until_ready()
+    while not client.is_closed():
+        for msg in models.get_pending_discord_messages():
+            try:
+                channel = client.get_channel(int(msg["channel_id"])) or await client.fetch_channel(
+                    int(msg["channel_id"])
+                )
+                await channel.send(msg["message"])
+                models.mark_discord_message_sent(msg["id"])
+            except Exception as e:  # noqa: BLE001 - 任何發送失敗都記錄下來,不要讓整個迴圈掛掉
+                models.mark_discord_message_failed(msg["id"], str(e))
+        await asyncio.sleep(5)
+
+
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
@@ -367,6 +385,7 @@ async def on_ready():
     client.add_view(CloseView())
     await tree.sync()
     client.loop.create_task(poll_tier_changes())
+    client.loop.create_task(poll_discord_outbox())
     print(f"已登入為 {client.user}")
 
 

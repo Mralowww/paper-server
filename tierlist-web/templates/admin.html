@@ -45,21 +45,30 @@
 {% endif %}
 
 <h2>API Key 管理</h2>
+<p class="page-subtitle">
+    <code>read</code>:只能查排名/測試紀錄等唯讀資料。
+    <code>control</code>:額外可以叫 Discord bot 發訊息(<code>/api/v1/discord/announce</code>),請只發給信任的程式。
+</p>
 <form method="post" action="{{ url_for('admin_create_api_key') }}" class="inline-form">
     <input type="text" name="label" placeholder="用途說明,例如:某某 mod" required>
+    <select name="scope">
+        <option value="read">read(唯讀)</option>
+        <option value="control">control(可控制 Discord bot)</option>
+    </select>
     <button type="submit">建立新的 API Key</button>
 </form>
 {% if api_keys %}
 <div class="table-wrap" style="margin-top:12px;">
 <table class="tier-table">
     <thead>
-        <tr><th>Key</th><th>用途</th><th>狀態</th><th></th></tr>
+        <tr><th>Key</th><th>用途</th><th>權限</th><th>狀態</th><th></th></tr>
     </thead>
     <tbody>
         {% for k in api_keys %}
         <tr>
             <td><code>{{ k.key }}</code></td>
             <td>{{ k.label }}</td>
+            <td>{{ k.scope }}</td>
             <td>{{ '已停用' if k.revoked else '啟用中' }}</td>
             <td>
                 {% if not k.revoked %}

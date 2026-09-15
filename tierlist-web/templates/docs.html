@@ -63,6 +63,17 @@
     </p>
 </div>
 
+<h2>Discord 控制:發送公告</h2>
+<div class="panel">
+    <p><code>POST /api/v1/discord/announce</code></p>
+    <p class="muted">
+        一定要用 <code>scope=control</code> 的 API Key(在後台建立時選),
+        <code>read</code> 權限的 key 呼叫會被拒絕(401)。
+    </p>
+    <pre>{"channel_id": "123456789012345678", "message": "要發的內容"}</pre>
+    <p class="muted">成功回 <code>202 {"ok": true, "queued_id": ...}</code>,表示已排進佇列,幾秒內由 bot 實際送出。</p>
+</div>
+
 <h2>查詢測試紀錄</h2>
 <div class="panel">
     <p><code>GET /api/v1/tests?username=&lt;可省略&gt;&amp;limit=&lt;可省略,預設 50,最多 200&gt;</code></p>
