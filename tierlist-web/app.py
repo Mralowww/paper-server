@@ -1,12 +1,16 @@
 import os
 import secrets
 import string
+import threading
 import time  # noqa: F401 (used by timestamp_to_date filter)
 
 import requests
+from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 
 import models
+
+load_dotenv()
 
 DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
@@ -389,6 +393,22 @@ def api_list_tests():
     )
 
 
+def start_discord_bot_in_background():
+    """有些主機一次只能跑一支 Python 程式(例如 Pterodactyl 的 Generic Python egg),
+    這種情況下把 Discord bot 跟網站放進同一個程序,用背景執行緒跑,兩邊都能動。
+    如果有能力另外開一支程序跑 discord_bot/bot.py,那樣做更乾淨,不強制用這個。"""
+    if not os.environ.get("DISCORD_BOT_TOKEN") or os.environ.get("RUN_BOT_IN_WEB_PROCESS") != "1":
+        return
+
+    def _run():
+        from discord_bot import bot as discord_bot_module
+        discord_bot_module.run_in_current_thread()
+
+    thread = threading.Thread(target=_run, name="discord-bot", daemon=True)
+    thread.start()
+
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8787"))
+    start_discord_bot_in_background()
+    port = int(os.environ.get("PORT") or os.environ.get("SERVER_PORT") or 8787)
     app.run(host="0.0.0.0", port=port)

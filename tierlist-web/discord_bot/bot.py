@@ -371,10 +371,22 @@ async def on_ready():
 
 
 def main():
+    """獨立執行這支檔案時呼叫,用 client.run() 讓 Ctrl+C 之類的訊號可以正常結束程式。"""
     if not DISCORD_BOT_TOKEN:
         raise SystemExit("請設定環境變數 DISCORD_BOT_TOKEN")
     models.init_db()
     client.run(DISCORD_BOT_TOKEN)
+
+
+def run_in_current_thread():
+    """在背景執行緒裡跑(不是主執行緒)時呼叫,例如跟網站塞進同一個程序。
+    discord.py 的 client.run() 會嘗試註冊訊號處理,只有主執行緒能用,
+    所以這裡改用 client.start() 自己開一個新的事件迴圈跑,不碰訊號。"""
+    if not DISCORD_BOT_TOKEN:
+        return
+    models.init_db()
+    import asyncio
+    asyncio.run(client.start(DISCORD_BOT_TOKEN))
 
 
 if __name__ == "__main__":
