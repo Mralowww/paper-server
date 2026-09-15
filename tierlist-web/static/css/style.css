@@ -103,6 +103,49 @@ h2 {
     font-size: 0.98rem;
 }
 
+/* ---- Hero / 首頁統計 ---- */
+
+.hero {
+    margin-bottom: 32px;
+}
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.stat-tile {
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.stat-tile:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.stat-label {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 4px;
+}
+
 /* ---- 卡片 / 面板 ---- */
 
 .panel {
@@ -276,6 +319,19 @@ button.danger {
     color: var(--muted);
     border: 1px dashed var(--border);
     border-radius: var(--radius);
+}
+
+.empty-state-icon {
+    font-size: 2.4rem;
+    margin-bottom: 10px;
+}
+
+.rank-row td:first-child {
+    box-shadow: inset 3px 0 0 transparent;
+}
+
+.rank-row:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 
 a { color: var(--accent); }
