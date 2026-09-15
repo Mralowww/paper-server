@@ -311,6 +311,54 @@ def api_list_tiers():
     )
 
 
+def serialize_player(player):
+    return {
+        "discord_id": player["discord_id"],
+        "discord_username": player["discord_username"],
+        "mc_uuid": player.get("mc_uuid"),
+        "mc_username": player.get("mc_username"),
+        "tier": player.get("vanilla_tier"),
+        "region": player.get("region"),
+        "last_test_at": player.get("last_test_at"),
+    }
+
+
+@app.route("/api/v1/player/discord/<discord_id>")
+def api_get_player_by_discord(discord_id):
+    require_api_key()
+    player = models.get_player_by_discord_id(discord_id)
+    if not player:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(serialize_player(player))
+
+
+@app.route("/api/v1/player/uuid/<mc_uuid>")
+def api_get_player_by_uuid(mc_uuid):
+    require_api_key()
+    player = models.get_player_by_mc_uuid(mc_uuid)
+    if not player:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(serialize_player(player))
+
+
+@app.route("/api/v1/cooldown/<username>")
+def api_get_cooldown(username):
+    require_api_key()
+    player = models.get_player_by_mc_username(username)
+    if not player:
+        return jsonify({"username": username, "can_test": True, "remaining_seconds": 0, "next_test_type": "normal"})
+
+    can_test, remaining, test_type = models.check_test_cooldown(player["discord_id"])
+    return jsonify(
+        {
+            "username": player["mc_username"],
+            "can_test": can_test,
+            "remaining_seconds": remaining,
+            "next_test_type": test_type,
+        }
+    )
+
+
 @app.route("/api/v1/tests")
 def api_list_tests():
     require_api_key()

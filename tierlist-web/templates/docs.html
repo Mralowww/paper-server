@@ -42,6 +42,27 @@
 ]</pre>
 </div>
 
+<h2>查詢玩家綁定關係</h2>
+<div class="panel">
+    <p><code>GET /api/v1/player/discord/&lt;discord_id&gt;</code></p>
+    <p><code>GET /api/v1/player/uuid/&lt;mc_uuid&gt;</code></p>
+    <pre>{
+  "discord_id": "...", "discord_username": "...", "mc_uuid": "...", "mc_username": "Steve",
+  "tier": "HT2", "region": "TW", "last_test_at": 1234567890
+}</pre>
+    <p class="muted">找不到會回傳 404 <code>{"error": "not_found"}</code>。</p>
+</div>
+
+<h2>查詢冷卻狀態</h2>
+<div class="panel">
+    <p><code>GET /api/v1/cooldown/&lt;mc使用者名稱&gt;</code></p>
+    <pre>{"username": "Steve", "can_test": false, "remaining_seconds": 2591000, "next_test_type": "advanced"}</pre>
+    <p class="muted">
+        <code>next_test_type</code> 是依玩家目前段位判斷下一次要考普通(<code>normal</code>)還是高階(<code>advanced</code>)測試。
+        查無此人一律回傳可以測試。
+    </p>
+</div>
+
 <h2>查詢測試紀錄</h2>
 <div class="panel">
     <p><code>GET /api/v1/tests?username=&lt;可省略&gt;&amp;limit=&lt;可省略,預設 50,最多 200&gt;</code></p>

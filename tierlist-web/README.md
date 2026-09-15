@@ -85,6 +85,36 @@ Header: X-API-Key: <你的 key>
 [{"username": "Steve", "uuid": "...", "tier": "HT2", "region": "TW"}, ...]
 ```
 
+### 查詢玩家綁定關係
+
+```
+GET /api/v1/player/discord/<discord_id>
+GET /api/v1/player/uuid/<mc_uuid>
+Header: X-API-Key: <你的 key>
+```
+
+```json
+{
+  "discord_id": "...", "discord_username": "...", "mc_uuid": "...", "mc_username": "Steve",
+  "tier": "HT2", "region": "TW", "last_test_at": 1234567890
+}
+```
+
+找不到會回傳 404 `{"error": "not_found"}`。
+
+### 查詢冷卻狀態
+
+```
+GET /api/v1/cooldown/<mc使用者名稱>
+Header: X-API-Key: <你的 key>
+```
+
+```json
+{"username": "Steve", "can_test": false, "remaining_seconds": 2591000, "next_test_type": "advanced"}
+```
+
+`next_test_type` 是依照玩家目前段位判斷下一次要考普通(`normal`)還是高階(`advanced`)測試。查無此人一律回傳可以測試。
+
 ### 查詢測試紀錄
 
 ```
