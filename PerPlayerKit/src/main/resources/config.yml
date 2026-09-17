@@ -45,7 +45,7 @@ locations:
 kits:
   max-slots: 9 # 1-99. Applies to personal kits and enderchest kits.
   load:
-    heal: false
+    heal: true # Also applies when rekit.respawn auto-loads a kit after death.
     feed: false
     saturate: false
     clear-effects: false
