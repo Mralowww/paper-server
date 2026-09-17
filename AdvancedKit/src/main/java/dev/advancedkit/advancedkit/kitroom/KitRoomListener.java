@@ -2,13 +2,11 @@ package dev.advancedkit.advancedkit.kitroom;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
@@ -17,8 +15,7 @@ public class KitRoomListener implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        InventoryHolder holder = event.getInventory().getHolder();
-        if (!(holder instanceof KitRoomHolder)) {
+        if (!(event.getInventory().getHolder() instanceof KitRoomHolder holder)) {
             return;
         }
         event.setCancelled(true);
@@ -26,13 +23,17 @@ public class KitRoomListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType() == Material.AIR) {
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getInventory().getSize()) {
+            return;
+        }
+        ItemStack clean = holder.getCleanItem(slot);
+        if (clean == null) {
             return;
         }
 
-        int amount = event.isShiftClick() ? clicked.getType().getMaxStackSize() : clicked.getAmount();
-        ItemStack toGive = clicked.clone();
+        int amount = event.isShiftClick() ? clean.getType().getMaxStackSize() : clean.getAmount();
+        ItemStack toGive = clean.clone();
         toGive.setAmount(amount);
 
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(toGive);

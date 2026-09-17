@@ -3,6 +3,7 @@ package dev.advancedkit.advancedkit.command;
 import dev.advancedkit.advancedkit.AdvancedKitPlugin;
 import dev.advancedkit.advancedkit.KitManager;
 import dev.advancedkit.advancedkit.gui.KitMenuGUI;
+import dev.advancedkit.advancedkit.kitroom.EditKitRoomGUI;
 import dev.advancedkit.advancedkit.kitroom.KitRoomGUI;
 import dev.advancedkit.advancedkit.model.Kit;
 import net.kyori.adventure.text.Component;
@@ -40,7 +41,7 @@ public class KitCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase();
         switch (sub) {
-            case "room", "kitroom" -> handleRoom(sender);
+            case "room", "kitroom" -> handleRoom(sender, args);
             case "create" -> handleCreate(sender, args);
             case "save" -> handleSave(sender, args);
             case "delete" -> handleDelete(sender, args);
@@ -52,11 +53,24 @@ public class KitCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void handleRoom(CommandSender sender) {
+    private void handleRoom(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("僅限玩家使用");
             return;
         }
+
+        boolean editMode = args.length >= 2 && args[1].equalsIgnoreCase("edit");
+        if (editMode) {
+            if (!player.hasPermission("advancedkit.kitroom.edit")) {
+                player.sendMessage(Component.text("你沒有權限編輯 Kit 房間").color(NamedTextColor.RED));
+                return;
+            }
+            player.openInventory(new EditKitRoomGUI(plugin.getKitRoomManager()).build(player));
+            player.sendMessage(Component.text("編輯模式：自由擺放物品，點擊右下角綠寶石方塊儲存")
+                    .color(NamedTextColor.YELLOW));
+            return;
+        }
+
         if (!player.hasPermission("advancedkit.kitroom.use")) {
             player.sendMessage(Component.text("你沒有權限進入 Kit 房間").color(NamedTextColor.RED));
             return;
@@ -241,6 +255,9 @@ public class KitCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("=== AdvancedKit 指令 ===").color(NamedTextColor.AQUA));
         sender.sendMessage(Component.text("/kit - 開啟 Kit 選單").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit room - 開啟 Kit 房間(無限資源，拿取後用 create/save 存成 Kit)").color(NamedTextColor.GRAY));
+        if (sender.hasPermission("advancedkit.kitroom.edit")) {
+            sender.sendMessage(Component.text("/kit room edit - 直接在遊戲內編輯 Kit 房間內容並儲存").color(NamedTextColor.GRAY));
+        }
         sender.sendMessage(Component.text("/kit create <名稱> [冷卻秒數] - 以目前物品欄建立新 Kit").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit save <名稱> - 更新既有 Kit 內容").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit delete <名稱> - 刪除 Kit").color(NamedTextColor.GRAY));
@@ -275,6 +292,9 @@ public class KitCommand implements CommandExecutor, TabCompleter {
             }
             if (args[0].equalsIgnoreCase("admin")) {
                 return filter(List.of("create", "delete", "give"), args[1]);
+            }
+            if (args[0].equalsIgnoreCase("room") && sender.hasPermission("advancedkit.kitroom.edit")) {
+                return filter(List.of("edit"), args[1]);
             }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("admin")) {

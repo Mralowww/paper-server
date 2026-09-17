@@ -1,6 +1,7 @@
 package dev.advancedkit.advancedkit;
 
 import dev.advancedkit.advancedkit.command.KitCommand;
+import dev.advancedkit.advancedkit.kitroom.EditKitRoomListener;
 import dev.advancedkit.advancedkit.kitroom.KitRoomListener;
 import dev.advancedkit.advancedkit.kitroom.KitRoomManager;
 import dev.advancedkit.advancedkit.listener.KitGuiListener;
@@ -34,6 +35,7 @@ public class AdvancedKitPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new KitGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new KitRoomListener(), this);
+        getServer().getPluginManager().registerEvents(new EditKitRoomListener(kitRoomManager), this);
 
         getLogger().info("AdvancedKit 已啟用");
     }

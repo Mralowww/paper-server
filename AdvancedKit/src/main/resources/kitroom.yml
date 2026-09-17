@@ -1,141 +1,14 @@
 # AdvancedKit - Kit 房間設定檔
-# 這裡是「無限資源展示櫃」，玩家點擊物品即可無限拿取(不會消耗庫存)。
+#
+# 這裡是「無限資源展示櫃」，一般玩家點擊物品即可無限拿取(不會消耗展示櫃庫存)。
 # 拿完想要的裝備後，使用 /kit create <名稱> 或 /kit save <名稱> 把目前物品欄存成自己的 Kit。
 #
-# 每個物品設定：
-#   slot: 放置的格子編號(0 開始，54 格共 6 排)
-#   material: 物品 ID (Bukkit Material 名稱)
-#   amount: 左鍵單次拿取數量；Shift+左鍵永遠拿一組(該物品的最大疊加數)
-#   name: 顯示名稱，支援 & 色碼
-#   lore: 額外說明文字(可省略)
-#   custom-model-data: 自訂材質編號(可省略)
+# 管理員請不要手動編輯此檔案！
+# 請在遊戲內使用 /kit room edit 進入編輯模式：
+#   - 像操作一般箱子一樣自由擺放/替換任何物品(含附魔、藥水效果、自訂名稱等)
+#   - 編輯完成後點擊右下角的綠寶石方塊即可儲存並立即套用給所有玩家
+#
+# 在管理員第一次於遊戲內儲存之前，插件會自動顯示內建的水晶 PVP 風格預設展示櫃。
 
 title: "&8&lKit 房間 &7- 無限資源"
 size: 54
-
-items:
-  - slot: 10
-    material: END_CRYSTAL
-    amount: 16
-    name: "&d終界水晶"
-    lore:
-      - "&7水晶 PVP 核心道具"
-  - slot: 11
-    material: RESPAWN_ANCHOR
-    amount: 4
-    name: "&5重生錨"
-  - slot: 12
-    material: GLOWSTONE
-    amount: 16
-    name: "&e螢石"
-    lore:
-      - "&7用來填充重生錨"
-  - slot: 13
-    material: TOTEM_OF_UNDYING
-    amount: 1
-    name: "&6不死圖騰"
-  - slot: 14
-    material: OBSIDIAN
-    amount: 16
-    name: "&8黑曜石"
-  - slot: 15
-    material: FLINT_AND_STEEL
-    amount: 1
-    name: "&7打火石"
-  - slot: 16
-    material: ENDER_PEARL
-    amount: 16
-    name: "&d終界珍珠"
-
-  - slot: 19
-    material: DIAMOND_SWORD
-    amount: 1
-    name: "&b鑽石劍"
-    lore:
-      - "&7近戰主武器"
-  - slot: 20
-    material: DIAMOND_AXE
-    amount: 1
-    name: "&b鑽石斧"
-  - slot: 21
-    material: BOW
-    amount: 1
-    name: "&a弓"
-  - slot: 22
-    material: CROSSBOW
-    amount: 1
-    name: "&a弩"
-  - slot: 23
-    material: ARROW
-    amount: 16
-    name: "&f箭矢"
-  - slot: 24
-    material: TRIDENT
-    amount: 1
-    name: "&3三叉戟"
-  - slot: 25
-    material: SHIELD
-    amount: 1
-    name: "&e盾牌"
-
-  - slot: 28
-    material: DIAMOND_HELMET
-    amount: 1
-    name: "&b鑽石頭盔"
-  - slot: 29
-    material: DIAMOND_CHESTPLATE
-    amount: 1
-    name: "&b鑽石胸甲"
-  - slot: 30
-    material: DIAMOND_LEGGINGS
-    amount: 1
-    name: "&b鑽石護腿"
-  - slot: 31
-    material: DIAMOND_BOOTS
-    amount: 1
-    name: "&b鑽石靴子"
-  - slot: 32
-    material: SHEARS
-    amount: 1
-    name: "&f剪刀"
-  - slot: 33
-    material: WATER_BUCKET
-    amount: 1
-    name: "&9水桶"
-  - slot: 34
-    material: ELYTRA
-    amount: 1
-    name: "&d鞘翅"
-
-  - slot: 37
-    material: GOLDEN_APPLE
-    amount: 16
-    name: "&6金蘋果"
-  - slot: 38
-    material: ENCHANTED_GOLDEN_APPLE
-    amount: 4
-    name: "&e附魔金蘋果"
-  - slot: 39
-    material: SPLASH_POTION
-    amount: 4
-    name: "&c噴濺藥水(治療)"
-    lore:
-      - "&7領取後請至鐵砧或創造模式調整效果"
-  - slot: 40
-    material: COOKED_BEEF
-    amount: 16
-    name: "&c熟牛排"
-  - slot: 41
-    material: FIREWORK_ROCKET
-    amount: 16
-    name: "&f煙火火箭"
-    lore:
-      - "&7搭配鞘翅使用"
-  - slot: 42
-    material: BLAZE_ROD
-    amount: 4
-    name: "&6烈焰棒"
-  - slot: 43
-    material: EXPERIENCE_BOTTLE
-    amount: 16
-    name: "&a附魔之瓶"

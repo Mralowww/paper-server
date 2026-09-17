@@ -21,6 +21,9 @@ permissions:
   advancedkit.kitroom.use:
     description: 允許進入 Kit 房間拿取無限資源裝備
     default: true
+  advancedkit.kitroom.edit:
+    description: 允許使用 /kit room edit 在遊戲內編輯 Kit 房間內容
+    default: op
   advancedkit.admin:
     description: 允許管理伺服器共用 Kit 與重新載入設定
     default: op

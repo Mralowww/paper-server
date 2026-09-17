@@ -9,6 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class KitRoomGUI {
@@ -26,22 +27,21 @@ public class KitRoomGUI {
         holder.setInventory(inventory);
 
         for (KitRoomItem roomItem : manager.getItems()) {
-            ItemStack stack = new ItemStack(roomItem.getMaterial(), Math.min(roomItem.getAmount(), roomItem.getMaterial().getMaxStackSize()));
-            ItemMeta meta = stack.getItemMeta();
-            meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(roomItem.getDisplayName())
-                    .decoration(TextDecoration.ITALIC, false));
-            if (roomItem.getCustomModelData() > 0) {
-                meta.setCustomModelData(roomItem.getCustomModelData());
+            ItemStack clean = roomItem.getItem();
+            holder.bind(roomItem.getSlot(), clean);
+
+            ItemStack display = clean.clone();
+            ItemMeta meta = display.getItemMeta();
+            List<Component> lore = new ArrayList<>();
+            if (meta.hasLore() && meta.lore() != null) {
+                lore.addAll(meta.lore());
             }
-            List<Component> lore = roomItem.getLore().stream()
-                    .map(line -> LegacyComponentSerializer.legacyAmpersand().deserialize(line)
-                            .decoration(TextDecoration.ITALIC, false))
-                    .collect(java.util.stream.Collectors.toList());
-            lore.add(Component.text("左鍵拿取 " + roomItem.getAmount() + " 個 | Shift+左鍵拿取一組")
+            lore.add(Component.text("左鍵拿取 " + clean.getAmount() + " 個 | Shift+左鍵拿取一組")
                     .color(NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             meta.lore(lore);
-            stack.setItemMeta(meta);
-            inventory.setItem(roomItem.getSlot(), stack);
+            display.setItemMeta(meta);
+
+            inventory.setItem(roomItem.getSlot(), display);
         }
 
         return inventory;
