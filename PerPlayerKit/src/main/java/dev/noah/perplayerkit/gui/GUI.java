@@ -52,6 +52,8 @@ import dev.noah.perplayerkit.commands.core.ActionGuards;
 public class GUI {
     private static final int PUBLIC_PAGE_SIZE = 27;
     private static final int TRIM_BUTTON_SLOT = 49;
+    private static final int ANVIL_BUTTON_SLOT = 47;
+    private static final Map<UUID, dev.noah.perplayerkit.anvil.EnchantSession> anvilSessions = new HashMap<>();
     private static final Map<UUID, TrimSession> trimSessions = new HashMap<>();
     // Every pattern on the 1.20.4 trim registry this plugin compiles against.
     private static final String[] TRIM_PATTERNS = {
@@ -182,6 +184,7 @@ public class GUI {
         addClear(menu.getSlot(CLEAR_SLOT));
         addImport(menu.getSlot(IMPORT_SLOT));
         addTrimButton(menu, TRIM_BUTTON_SLOT, slot);
+        addAnvilButton(menu, ANVIL_BUTTON_SLOT, slot);
         menu.setCursorDropHandler(Menu.ALLOW_CURSOR_DROPPING);
 
         openMenu(p, titledMenu, "perplayerkit.kit", LocationFeature.KITS);
@@ -205,6 +208,154 @@ public class GUI {
             };
             openTrimPieceSelect(player, kitSlot, armor);
         });
+    }
+
+    private void addAnvilButton(Menu kitMenu, int buttonSlot, int kitSlot) {
+        kitMenu.getSlot(buttonSlot).setItem(createItem(Material.ANVIL, 1,
+                lang("gui.anvil-button"), lang("gui.lore-anvil-button")));
+        kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
+            if (!ActionGuards.allowed(player, "perplayerkit.anvil")) return;
+            SoundManager.playClick(player);
+            ItemStack[] snapshot = new ItemStack[KIT_CONTENT_END];
+            for (int i = 0; i < KIT_CONTENT_END; i++) {
+                snapshot[i] = kitMenu.getSlot(i).getItem();
+            }
+            openAnvilItemPicker(player, kitSlot, snapshot);
+        });
+    }
+
+    /** Shows every non-empty item currently in the kit editor at its own slot; click one to enchant/repair/rename it. */
+    public void openAnvilItemPicker(Player p, int kitSlot, ItemStack[] itemsFromEditor) {
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createAnvilItemPickerMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        for (int i = 0; i < itemsFromEditor.length && i < MENU_SIZE - 9; i++) {
+            ItemStack item = itemsFromEditor[i];
+            if (item == null || item.getType() == Material.AIR) continue;
+            final int itemIndex = i;
+            Slot slot = menu.getSlot(i);
+            slot.setItem(addHideFlags(item.clone()));
+            slot.setClickHandler((player, info) -> {
+                SoundManager.playClick(player);
+                anvilSessions.put(player.getUniqueId(), new dev.noah.perplayerkit.anvil.EnchantSession(kitSlot, itemIndex, item.clone()));
+                openAnvilEnchantEditor(player);
+            });
+        }
+
+        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
+        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            OpenKitMenu(player, kitSlot);
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.anvil", LocationFeature.KITS);
+    }
+
+    private void openAnvilEnchantEditor(Player p) {
+        dev.noah.perplayerkit.anvil.EnchantSession session = anvilSessions.get(p.getUniqueId());
+        if (session == null) return;
+
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createAnvilEnchantMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        menu.getSlot(4).setItem(addHideFlags(session.getItem().clone()));
+
+        java.util.List<org.bukkit.enchantments.Enchantment> enchants = dev.noah.perplayerkit.anvil.EnchantEditor.applicableEnchants(session.getItem());
+        int slotIndex = 19;
+        for (org.bukkit.enchantments.Enchantment enchantment : enchants) {
+            if (slotIndex >= 44) break;
+            renderEnchantSlot(menu.getSlot(slotIndex), session, enchantment);
+            slotIndex++;
+            if ((slotIndex + 1) % 9 == 0) slotIndex += 2;
+        }
+
+        menu.getSlot(48).setItem(createItem(Material.EXPERIENCE_BOTTLE, 1,
+                lang("gui.anvil-repair-button"), lang("gui.lore-anvil-repair")));
+        menu.getSlot(48).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            if (dev.noah.perplayerkit.anvil.EnchantEditor.repair(session.getItem())) {
+                Lang.get().send(player, "success.anvil-repaired");
+            }
+            openAnvilEnchantEditor(player);
+        });
+
+        boolean canRename = dev.noah.perplayerkit.trim.TrimTierConfig.get().atLeastTier(p, "lt2");
+        if (canRename) {
+            menu.getSlot(50).setItem(createItem(Material.NAME_TAG, 1,
+                    lang("gui.anvil-rename-button"), lang("gui.lore-anvil-rename")));
+            menu.getSlot(50).setClickHandler((player, info) -> {
+                SoundManager.playClick(player);
+                promptRename(player, session);
+            });
+        } else {
+            menu.getSlot(50).setItem(createItem(Material.BARRIER, 1,
+                    lang("gui.anvil-rename-locked-name"), lang("gui.anvil-rename-locked-lore")));
+        }
+
+        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-and-save-button")));
+        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            saveAnvilSessionAndReturn(player);
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.anvil", LocationFeature.KITS);
+    }
+
+    private void renderEnchantSlot(Slot slot, dev.noah.perplayerkit.anvil.EnchantSession session, org.bukkit.enchantments.Enchantment enchantment) {
+        int level = dev.noah.perplayerkit.anvil.EnchantEditor.currentLevel(session.getItem(), enchantment);
+        String name = enchantment.getKey().getKey().replace('_', ' ');
+        slot.setItem(createItem(level > 0 ? Material.ENCHANTED_BOOK : Material.BOOK, 1,
+                lang("gui.anvil-enchant-name", "enchant", name, "level", String.valueOf(level), "max", String.valueOf(enchantment.getMaxLevel())),
+                lang("gui.lore-anvil-enchant-add"),
+                level > 0 ? lang("gui.lore-anvil-enchant-remove") : ""));
+        slot.setClickHandler((player, info) -> {
+            if (info.getClickType().isShiftClick()) {
+                dev.noah.perplayerkit.anvil.EnchantEditor.removeEnchant(session.getItem(), enchantment);
+                SoundManager.playClick(player);
+                openAnvilEnchantEditor(player);
+                return;
+            }
+            var result = dev.noah.perplayerkit.anvil.EnchantEditor.increaseLevel(session.getItem(), enchantment);
+            switch (result) {
+                case ADDED -> SoundManager.playClick(player);
+                case MAX_LEVEL -> Lang.get().send(player, "error.anvil-max-level");
+                case CONFLICT -> Lang.get().send(player, "error.anvil-enchant-conflict");
+            }
+            openAnvilEnchantEditor(player);
+        });
+    }
+
+    private void promptRename(Player p, dev.noah.perplayerkit.anvil.EnchantSession session) {
+        p.closeInventory();
+        Lang.get().send(p, "info.anvil-rename-prompt");
+        dev.noah.perplayerkit.anvil.RenamePrompt.await(p.getUniqueId(), text -> {
+            if (!p.isOnline()) return;
+            if (!text.equalsIgnoreCase("cancel")) {
+                dev.noah.perplayerkit.anvil.EnchantEditor.rename(session.getItem(), text);
+                Lang.get().send(p, "success.anvil-renamed");
+            }
+            openAnvilEnchantEditor(p);
+        });
+    }
+
+    private void saveAnvilSessionAndReturn(Player p) {
+        dev.noah.perplayerkit.anvil.EnchantSession session = anvilSessions.remove(p.getUniqueId());
+        if (session == null) {
+            OpenMainMenu(p);
+            return;
+        }
+        ItemStack[] fullKit = KitManager.get().getPlayerKit(p.getUniqueId(), session.getKitSlot());
+        if (fullKit != null && session.getItemIndex() < fullKit.length) {
+            fullKit[session.getItemIndex()] = session.getItem();
+            KitManager.get().savekit(p.getUniqueId(), session.getKitSlot(), fullKit, true);
+        }
+        OpenKitMenu(p, session.getKitSlot());
     }
 
     /** Snapshot taken; opens the piece picker (helmet/chestplate/leggings/boots). */

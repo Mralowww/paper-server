@@ -52,10 +52,15 @@ permissions:
       perplayerkit.rekitonrespawn: true
       perplayerkit.rekitonkill: true
       perplayerkit.trims: true
+      perplayerkit.anvil: true
   # Armor trim editor. The pattern is always free; the material tiers below
   # are rank permissions an admin grants through a permissions plugin. Each
   # tier a player is given also unlocks every weaker tier automatically.
   perplayerkit.trims:
+    default: op
+  # Anvil editor: enchant/repair/rename any item in a kit. Renaming further
+  # needs at least the trims.lt2 tier (see TrimTierConfig#atLeastTier).
+  perplayerkit.anvil:
     default: op
   perplayerkit.trims.lt5:
     default: true

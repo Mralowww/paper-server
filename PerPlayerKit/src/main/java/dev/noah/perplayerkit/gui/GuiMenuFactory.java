@@ -81,6 +81,14 @@ public final class GuiMenuFactory {
         return chestMenu(title("gui.tutorial-title"));
     }
 
+    public static TitledMenu createAnvilItemPickerMenu() {
+        return chestMenu(title("gui.anvil-picker-title"));
+    }
+
+    public static TitledMenu createAnvilEnchantMenu() {
+        return chestMenu(title("gui.anvil-enchant-title"));
+    }
+
     public static TitledMenu createTrimPieceMenu() {
         return chestMenu(title("gui.trim-piece-title"));
     }

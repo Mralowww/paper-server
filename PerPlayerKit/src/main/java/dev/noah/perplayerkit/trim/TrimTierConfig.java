@@ -105,4 +105,29 @@ public class TrimTierConfig {
     public boolean canUse(Player player, String materialKey) {
         return unlockedMaterials(player).contains(materialKey.toUpperCase(java.util.Locale.ROOT));
     }
+
+    /**
+     * Whether the player's highest owned tier is at or above the named rung
+     * (e.g. {@code atLeastTier(player, "lt2")} for "lt2 or anything stronger").
+     * Used to gate features unrelated to trim materials, such as renaming
+     * items in the anvil editor, off the same rank ladder.
+     */
+    public boolean atLeastTier(Player player, String tierSuffix) {
+        int requiredIndex = -1;
+        for (int i = 0; i < tiers.size(); i++) {
+            if (tiers.get(i).permission().endsWith("." + tierSuffix)) {
+                requiredIndex = i;
+                break;
+            }
+        }
+        if (requiredIndex < 0) return false;
+
+        int highestIndex = -1;
+        for (int i = 0; i < tiers.size(); i++) {
+            if (player.hasPermission(tiers.get(i).permission())) {
+                highestIndex = i;
+            }
+        }
+        return highestIndex >= requiredIndex;
+    }
 }

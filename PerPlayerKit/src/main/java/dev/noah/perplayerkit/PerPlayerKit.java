@@ -254,6 +254,7 @@ public final class PerPlayerKit extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new KitMenuCloseListener(), this);
         Bukkit.getPluginManager().registerEvents(new AutoRekitListener(this), this);
         Bukkit.getPluginManager().registerEvents(new AboutCommandListener(), this);
+        Bukkit.getPluginManager().registerEvents(new dev.noah.perplayerkit.listeners.RenameChatListener(this), this);
 
         // features
         if (getConfig().getBoolean("death.condensed-drops", false)) {
