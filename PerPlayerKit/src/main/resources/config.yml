@@ -236,7 +236,7 @@ broadcasts:
       enabled: true
       permission: "perplayerkit.kitnotify"
     player-healed:
-      enabled: true
+      enabled: false # Off by default: heal fires constantly on a practice server and floods chat.
       permission: "perplayerkit.kitnotify"
     player-opened-kit-room:
       enabled: true
@@ -257,7 +257,7 @@ broadcasts:
       enabled: true
       permission: "perplayerkit.kitnotify"
     player-regeared:
-      enabled: true
+      enabled: false # Off by default: rekit fires constantly on a practice server and floods chat.
       permission: "perplayerkit.kitnotify"
 
 interface:
