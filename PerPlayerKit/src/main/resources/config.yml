@@ -57,6 +57,38 @@ enderchests:
     saturate: false
     clear-effects: false
 
+# Armor trim editor, opened from a button inside the kit editor. The pattern
+# (shape) is always free to pick; the material is gated by permission tiers.
+# Tiers are listed worst-to-best. A player unlocks a tier's material by having
+# its permission node, and automatically keeps every worse tier below it too
+# (so granting perplayerkit.trims.ht3 also unlocks lt3, ht4, lt4, ht5, lt5).
+# Naming: "lt" = low tier, "ht" = high tier, lower numbers are stronger, and
+# every "lt" tier outranks the "ht" tier with the same number
+# (lt5 < ht5 < lt4 < ht4 < lt3 < ht3 < lt2 < ht2 < lt1 < ht1).
+trims:
+  enabled: true
+  tiers:
+    - permission: "perplayerkit.trims.lt5"
+      material: "QUARTZ"
+    - permission: "perplayerkit.trims.ht5"
+      material: "IRON"
+    - permission: "perplayerkit.trims.lt4"
+      material: "COPPER"
+    - permission: "perplayerkit.trims.ht4"
+      material: "GOLD"
+    - permission: "perplayerkit.trims.lt3"
+      material: "REDSTONE"
+    - permission: "perplayerkit.trims.ht3"
+      material: "LAPIS"
+    - permission: "perplayerkit.trims.lt2"
+      material: "AMETHYST"
+    - permission: "perplayerkit.trims.ht2"
+      material: "EMERALD"
+    - permission: "perplayerkit.trims.lt1"
+      material: "DIAMOND"
+    - permission: "perplayerkit.trims.ht1"
+      material: "NETHERITE"
+
 # Last loaded kit and enderchest selections are saved in your configured storage.
 # In kits maps, keys are your world or "world:region" names; values are public kit IDs.
 rekit:

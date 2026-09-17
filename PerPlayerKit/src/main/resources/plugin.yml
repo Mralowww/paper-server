@@ -51,6 +51,32 @@ permissions:
       perplayerkit.repair: true
       perplayerkit.rekitonrespawn: true
       perplayerkit.rekitonkill: true
+      perplayerkit.trims: true
+  # Armor trim editor. The pattern is always free; the material tiers below
+  # are rank permissions an admin grants through a permissions plugin. Each
+  # tier a player is given also unlocks every weaker tier automatically.
+  perplayerkit.trims:
+    default: op
+  perplayerkit.trims.lt5:
+    default: true
+  perplayerkit.trims.ht5:
+    default: false
+  perplayerkit.trims.lt4:
+    default: false
+  perplayerkit.trims.ht4:
+    default: false
+  perplayerkit.trims.lt3:
+    default: false
+  perplayerkit.trims.ht3:
+    default: false
+  perplayerkit.trims.lt2:
+    default: false
+  perplayerkit.trims.ht2:
+    default: false
+  perplayerkit.trims.lt1:
+    default: false
+  perplayerkit.trims.ht1:
+    default: false
 
 
 commands:

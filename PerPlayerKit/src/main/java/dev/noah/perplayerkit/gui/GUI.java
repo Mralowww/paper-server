@@ -23,6 +23,7 @@ import dev.noah.perplayerkit.ItemFilter;
 import dev.noah.perplayerkit.KitManager;
 import dev.noah.perplayerkit.KitRoomDataManager;
 import dev.noah.perplayerkit.PublicKit;
+import dev.noah.perplayerkit.trim.TrimSession;
 import dev.noah.perplayerkit.util.*;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Material;
@@ -50,6 +51,25 @@ import dev.noah.perplayerkit.commands.core.ActionGuards;
 
 public class GUI {
     private static final int PUBLIC_PAGE_SIZE = 27;
+    private static final int TRIM_BUTTON_SLOT = 49;
+    private static final Map<UUID, TrimSession> trimSessions = new HashMap<>();
+    // Every pattern on the 1.20.4 trim registry this plugin compiles against.
+    private static final String[] TRIM_PATTERNS = {
+            "sentry", "dune", "coast", "wild", "ward", "eye", "vex", "tide",
+            "snout", "rib", "spire", "wayfinder", "shaper", "silence", "raiser", "host"
+    };
+    private static final Map<String, Material> TRIM_MATERIAL_ICONS = Map.ofEntries(
+            Map.entry("QUARTZ", Material.QUARTZ),
+            Map.entry("IRON", Material.IRON_INGOT),
+            Map.entry("COPPER", Material.COPPER_INGOT),
+            Map.entry("GOLD", Material.GOLD_INGOT),
+            Map.entry("REDSTONE", Material.REDSTONE),
+            Map.entry("LAPIS", Material.LAPIS_LAZULI),
+            Map.entry("AMETHYST", Material.AMETHYST_SHARD),
+            Map.entry("EMERALD", Material.EMERALD),
+            Map.entry("DIAMOND", Material.DIAMOND),
+            Map.entry("NETHERITE", Material.NETHERITE_INGOT)
+    );
     private record MenuAccess(String permission, LocationFeature feature) {}
     private static final Map<Menu, MenuAccess> menuAccess = new java.util.WeakHashMap<>();
 
@@ -161,10 +181,182 @@ public class GUI {
         addMainButton(menu.getSlot(BACK_SLOT), KitSlots.pageOf(slot));
         addClear(menu.getSlot(CLEAR_SLOT));
         addImport(menu.getSlot(IMPORT_SLOT));
+        addTrimButton(menu, TRIM_BUTTON_SLOT, slot);
         menu.setCursorDropHandler(Menu.ALLOW_CURSOR_DROPPING);
 
         openMenu(p, titledMenu, "perplayerkit.kit", LocationFeature.KITS);
         setEditorContext(p, new EditorContext(EditorType.KIT, slot, null, null, null));
+    }
+
+    private void addTrimButton(Menu kitMenu, int buttonSlot, int kitSlot) {
+        if (!dev.noah.perplayerkit.trim.TrimCompat.isSupported() || !dev.noah.perplayerkit.trim.TrimTierConfig.get().isEnabled()) {
+            return;
+        }
+        kitMenu.getSlot(buttonSlot).setItem(createItem(Material.SHIELD, 1,
+                lang("gui.trim-button"), lang("gui.lore-trim-button")));
+        kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
+            if (!ActionGuards.allowed(player, "perplayerkit.trims")) return;
+            SoundManager.playClick(player);
+            ItemStack[] armor = new ItemStack[]{
+                    kitMenu.getSlot(39).getItem(),
+                    kitMenu.getSlot(38).getItem(),
+                    kitMenu.getSlot(37).getItem(),
+                    kitMenu.getSlot(36).getItem()
+            };
+            openTrimPieceSelect(player, kitSlot, armor);
+        });
+    }
+
+    /** Snapshot taken; opens the piece picker (helmet/chestplate/leggings/boots). */
+    public void openTrimPieceSelect(Player p, int kitSlot, ItemStack[] armorFromEditor) {
+        TrimSession session = new TrimSession(kitSlot, armorFromEditor);
+        trimSessions.put(p.getUniqueId(), session);
+
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimPieceMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        placeTrimPieceIcon(menu, 11, session, TrimSession.Piece.HELMET);
+        placeTrimPieceIcon(menu, 13, session, TrimSession.Piece.CHESTPLATE);
+        placeTrimPieceIcon(menu, 15, session, TrimSession.Piece.LEGGINGS);
+        placeTrimPieceIcon(menu, 17, session, TrimSession.Piece.BOOTS);
+
+        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
+        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            trimSessions.remove(player.getUniqueId());
+            OpenKitMenu(player, session.getKitSlot());
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.trims", LocationFeature.KITS);
+    }
+
+    private void placeTrimPieceIcon(Menu menu, int slotIndex, TrimSession session, TrimSession.Piece piece) {
+        ItemStack armor = session.getArmorItem(piece);
+        Slot slot = menu.getSlot(slotIndex);
+        if (armor == null || armor.getType() == Material.AIR || !dev.noah.perplayerkit.trim.TrimCompat.isArmorPiece(armor)) {
+            slot.setItem(createItem(Material.BARRIER, 1, lang("gui.trim-piece-empty", "piece", pieceName(piece))));
+            return;
+        }
+        slot.setItem(addHideFlags(armor.clone()));
+        slot.setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            session.setPiece(piece);
+            openTrimPatternSelect(player);
+        });
+    }
+
+    private void openTrimPatternSelect(Player p) {
+        TrimSession session = trimSessions.get(p.getUniqueId());
+        if (session == null) return;
+
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimPatternMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        int slotIndex = 10;
+        for (String pattern : TRIM_PATTERNS) {
+            Slot slot = menu.getSlot(slotIndex);
+            slot.setItem(createItem(Material.PAPER, 1, lang("gui.trim-pattern-name", "pattern", capitalizeTrimKey(pattern))));
+            slot.setClickHandler((player, info) -> {
+                SoundManager.playClick(player);
+                session.setPatternKey(pattern);
+                openTrimMaterialSelect(player);
+            });
+            slotIndex++;
+            if ((slotIndex + 1) % 9 == 0) slotIndex += 2;
+        }
+
+        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
+        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            openTrimPieceSelect(player, session.getKitSlot(), snapshotArmor(session));
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.trims", LocationFeature.KITS);
+    }
+
+    private void openTrimMaterialSelect(Player p) {
+        TrimSession session = trimSessions.get(p.getUniqueId());
+        if (session == null) return;
+
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimMaterialMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        java.util.List<String> unlocked = dev.noah.perplayerkit.trim.TrimTierConfig.get().unlockedMaterials(p);
+        java.util.List<dev.noah.perplayerkit.trim.TrimTier> tiers = dev.noah.perplayerkit.trim.TrimTierConfig.get().getTiers();
+        int slotIndex = 10;
+        for (dev.noah.perplayerkit.trim.TrimTier tier : tiers) {
+            if (slotIndex >= 44) break;
+            String materialKey = tier.materialKey();
+            boolean unlockedHere = unlocked.contains(materialKey);
+            Material icon = TRIM_MATERIAL_ICONS.getOrDefault(materialKey, Material.PAPER);
+            Slot slot = menu.getSlot(slotIndex);
+            if (unlockedHere) {
+                slot.setItem(createItem(icon, 1, lang("gui.trim-material-name", "material", capitalizeTrimKey(materialKey))));
+                slot.setClickHandler((player, info) -> {
+                    SoundManager.playClick(player);
+                    applyTrimAndReturn(player, materialKey);
+                });
+            } else {
+                slot.setItem(createItem(Material.GRAY_DYE, 1,
+                        lang("gui.trim-material-locked-name", "material", capitalizeTrimKey(materialKey)),
+                        lang("gui.trim-material-locked-lore", "permission", tier.permission())));
+            }
+            slotIndex++;
+            if ((slotIndex + 1) % 9 == 0) slotIndex += 2;
+        }
+
+        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
+        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            openTrimPatternSelect(player);
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.trims", LocationFeature.KITS);
+    }
+
+    private void applyTrimAndReturn(Player p, String materialKey) {
+        TrimSession session = trimSessions.remove(p.getUniqueId());
+        if (session == null) return;
+
+        ItemStack armor = session.getArmorItem(session.getPiece());
+        if (armor != null && dev.noah.perplayerkit.trim.TrimCompat.apply(armor, session.getPatternKey(), materialKey)) {
+            session.setArmorItem(session.getPiece(), armor);
+        }
+
+        ItemStack[] fullKit = KitManager.get().getPlayerKit(p.getUniqueId(), session.getKitSlot());
+        if (fullKit != null) {
+            fullKit[session.getPiece().kitSlotIndex] = session.getArmorItem(session.getPiece());
+            KitManager.get().savekit(p.getUniqueId(), session.getKitSlot(), fullKit, true);
+        }
+
+        Lang.get().send(p, "success.trim-applied");
+        OpenKitMenu(p, session.getKitSlot());
+    }
+
+    private ItemStack[] snapshotArmor(TrimSession session) {
+        return new ItemStack[]{
+                session.getArmorItem(TrimSession.Piece.HELMET),
+                session.getArmorItem(TrimSession.Piece.CHESTPLATE),
+                session.getArmorItem(TrimSession.Piece.LEGGINGS),
+                session.getArmorItem(TrimSession.Piece.BOOTS)
+        };
+    }
+
+    private static String pieceName(TrimSession.Piece piece) {
+        return capitalizeTrimKey(piece.name().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private static String capitalizeTrimKey(String s) {
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     public void OpenPublicKitEditor(Player p, String kitId) {

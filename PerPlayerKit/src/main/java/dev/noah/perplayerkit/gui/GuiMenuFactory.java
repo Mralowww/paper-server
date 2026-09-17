@@ -81,6 +81,18 @@ public final class GuiMenuFactory {
         return chestMenu(title("gui.tutorial-title"));
     }
 
+    public static TitledMenu createTrimPieceMenu() {
+        return chestMenu(title("gui.trim-piece-title"));
+    }
+
+    public static TitledMenu createTrimPatternMenu() {
+        return chestMenu(title("gui.trim-pattern-title"));
+    }
+
+    public static TitledMenu createTrimMaterialMenu() {
+        return chestMenu(title("gui.trim-material-title"));
+    }
+
     public static TitledMenu createMainMenu(Player player, int page, int pages) {
         if (pages <= 1) {
             return chestMenu(title("gui.main-menu-title", "player", player.getName()));

@@ -105,6 +105,7 @@ public final class PerPlayerKit extends JavaPlugin {
 
         new ItemFilter(this);
         new BroadcastManager(this);
+        new dev.noah.perplayerkit.trim.TrimTierConfig(this);
 
         kitManager = new KitManager(this);
         new KitShareManager(this);
