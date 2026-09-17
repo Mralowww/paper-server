@@ -1,0 +1,214 @@
+/*
+ * Copyright 2022-2026 Noah Ross
+ *
+ * This file is part of PerPlayerKit.
+ *
+ * PerPlayerKit is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * PerPlayerKit is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with PerPlayerKit. If not, see <https://www.gnu.org/licenses/>.
+ */
+package dev.noah.perplayerkit.commands.inspect;
+
+import dev.noah.perplayerkit.KitManager;
+import dev.noah.perplayerkit.util.BroadcastManager;
+import dev.noah.perplayerkit.util.KitSlots;
+import dev.noah.perplayerkit.util.Lang;
+import dev.noah.perplayerkit.util.SoundManager;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static dev.noah.perplayerkit.commands.inspect.InspectCommandUtil.errorPrefix;
+import static dev.noah.perplayerkit.commands.inspect.InspectCommandUtil.resolvePlayerIdentifierAsync;
+import static dev.noah.perplayerkit.commands.inspect.InspectCommandUtil.showUsage;
+import static dev.noah.perplayerkit.util.PlayerUtil.getPlayerName;
+
+public abstract class AbstractInspectCommand implements CommandExecutor, TabCompleter {
+    protected final Plugin plugin;
+
+    protected AbstractInspectCommand(Plugin plugin) {
+        this.plugin = plugin;
+    }
+
+    protected abstract String usageCommand();
+
+    protected abstract boolean hasData(UUID targetUuid, int slot);
+
+    protected abstract void openInspectGui(Player inspector, UUID targetUuid, int slot);
+
+    protected abstract void loadSlotFromDB(UUID targetUuid, int slot);
+
+    protected abstract String missingDataKey();
+
+    protected abstract String loadErrorLogMessage();
+
+    protected abstract String loadErrorUserKey();
+
+    @Override
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
+                             @NotNull String label, @NotNull String[] args) {
+        if (!(sender instanceof Player player)) {
+            Lang.get().send(sender, "error.players-only-inspect");
+            return true;
+        }
+
+        if (args.length < 2) {
+            showUsage(player, usageCommand());
+            return true;
+        }
+
+        int slot = parseSlot(args[1], player);
+        if (slot == -1) {
+            return true;
+        }
+
+        UUID senderUuid = player.getUniqueId();
+        CompletableFuture<Void> future = resolvePlayerIdentifierAsync(args[0])
+                .thenCompose(targetUuid -> {
+                    if (targetUuid == null) {
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            Player currentSender = Bukkit.getPlayer(senderUuid);
+                            if (currentSender == null) {
+                                return;
+                            }
+                            showPlayerNotFound(currentSender);
+                        });
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    CompletableFuture<Boolean> targetOnlineFuture = new CompletableFuture<>();
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> targetOnlineFuture.complete(Bukkit.getPlayer(targetUuid) != null));
+
+                    return targetOnlineFuture.thenCompose(targetOnline -> {
+                        CompletableFuture<Void> loadFuture = targetOnline
+                                ? CompletableFuture.completedFuture(null)
+                                : CompletableFuture.runAsync(() -> loadSlotFromDB(targetUuid, slot));
+
+                        return loadFuture.thenRun(() -> Bukkit.getScheduler().runTask(plugin, () -> {
+                            Player currentSender = Bukkit.getPlayer(senderUuid);
+                            if (currentSender == null) {
+                                return;
+                            }
+
+                            Player currentTarget = Bukkit.getPlayer(targetUuid);
+                            showInspectResult(currentSender, currentTarget, targetUuid, slot);
+                        }));
+                    });
+                });
+
+        future.exceptionally(ex -> {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                plugin.getLogger().severe(loadErrorLogMessage() + ": " + ex.getMessage());
+                Player currentSender = Bukkit.getPlayer(senderUuid);
+                if (currentSender == null) {
+                    return;
+                }
+
+                BroadcastManager.get().sendComponentMessage(currentSender,
+                        errorPrefix().append(Lang.get().component(loadErrorUserKey())));
+                SoundManager.playFailure(currentSender);
+            });
+            return null;
+        });
+
+        return true;
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender,
+                                                @NotNull Command command,
+                                                @NotNull String label,
+                                                @NotNull String[] args) {
+        if (!(sender instanceof Player)) {
+            return List.of();
+        }
+
+        if (args.length == 1) {
+            String input = args[0].toLowerCase();
+            List<String> completions = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(name -> name.toLowerCase().startsWith(input))
+                    .toList());
+            if (input.length() >= 4 && input.contains("-")) {
+                completions.addAll(Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getUniqueId)
+                        .map(UUID::toString)
+                        .filter(uuid -> uuid.startsWith(input))
+                        .toList());
+            }
+            return completions;
+        }
+
+        if (args.length == 2) {
+            return IntStream.rangeClosed(KitSlots.MIN_LIMIT, KitSlots.maxKits())
+                    .mapToObj(String::valueOf)
+                    .filter(slot -> slot.startsWith(args[1]))
+                    .collect(Collectors.toList());
+        }
+
+        return new ArrayList<>();
+    }
+
+    private int parseSlot(String slotArg, Player player) {
+        try {
+            int slot = Integer.parseInt(slotArg);
+            // Staff can inspect the absolute slot range, not just the configured
+            // max-kits: the database may hold kits above a lowered limit.
+            if (slot < KitSlots.MIN_LIMIT || slot > KitSlots.MAX_LIMIT) {
+                throw new NumberFormatException();
+            }
+            return slot;
+        } catch (NumberFormatException e) {
+            BroadcastManager.get().sendComponentMessage(player,
+                    errorPrefix().append(Lang.get().component("error.invalid-slot-range",
+                            "min", String.valueOf(KitSlots.MIN_LIMIT), "max", String.valueOf(KitSlots.MAX_LIMIT))));
+            SoundManager.playFailure(player);
+            return -1;
+        }
+    }
+
+    private void showInspectResult(Player inspector, @Nullable Player targetPlayer, UUID targetUuid, int slot) {
+        if (hasData(targetUuid, slot)) {
+            openInspectGui(inspector, targetUuid, slot);
+            return;
+        }
+
+        String targetName = targetPlayer != null ? targetPlayer.getName() : getPlayerName(targetUuid);
+        if (targetName == null) {
+            targetName = targetUuid.toString();
+        }
+        BroadcastManager.get().sendComponentMessage(inspector,
+                errorPrefix().append(Lang.get().component(missingDataKey(),
+                        "player", targetName, "slot", String.valueOf(slot))));
+        SoundManager.playFailure(inspector);
+    }
+
+    private void showPlayerNotFound(Player player) {
+        BroadcastManager.get().sendComponentMessage(player,
+                errorPrefix().append(Lang.get().component("error.player-not-found")));
+        SoundManager.playFailure(player);
+    }
+}

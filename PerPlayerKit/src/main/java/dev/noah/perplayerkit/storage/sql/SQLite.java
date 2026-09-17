@@ -1,0 +1,159 @@
+/*
+ * Copyright 2022-2026 Noah Ross
+ *
+ * This file is part of PerPlayerKit.
+ *
+ * PerPlayerKit is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * PerPlayerKit is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with PerPlayerKit. If not, see <https://www.gnu.org/licenses/>.
+ */
+package dev.noah.perplayerkit.storage.sql;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import org.bukkit.plugin.Plugin;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+public class SQLite implements SQLDatabase {
+
+    private final Plugin plugin;
+    private final String databasePath;
+    private HikariDataSource dataSource;
+
+    public SQLite(Plugin plugin) {
+        this.plugin = plugin;
+        this.databasePath = plugin.getDataFolder().getAbsolutePath().replace('\\', '/') + "/database.db";
+    }
+
+    public boolean isConnected() {
+        return (dataSource != null && !dataSource.isClosed());
+    }
+
+    public void connect() throws ClassNotFoundException, SQLException {
+        if (!isConnected()) {
+            // Ensure plugin data folder exists
+            plugin.getDataFolder().mkdirs();
+
+            HikariConfig config = new HikariConfig();
+
+            // Modern SQLite JDBC URL with optimized parameters (2025 best practices)
+            config.setJdbcUrl("jdbc:sqlite:" + databasePath +
+                    "?journal_mode=WAL" + // WAL mode for better concurrency
+                    "&synchronous=NORMAL" + // Balance between safety and performance
+                    "&cache_size=10000" + // 10MB cache (negative = KB, positive = pages)
+                    "&temp_store=MEMORY" + // Use memory for temp tables
+                    "&mmap_size=268435456" + // 256MB memory-mapped I/O
+                    "&foreign_keys=ON" + // Enable foreign key constraints
+                    "&busy_timeout=30000"); // 30 second busy timeout
+
+            config.setDriverClassName("org.sqlite.JDBC");
+            config.setPoolName("SQLite-Pool");
+
+            // SQLite-specific pool configuration (optimized for single-writer architecture)
+            config.setMaximumPoolSize(1); // SQLite is single-writer, use 1 connection
+            config.setMinimumIdle(1); // Keep one connection alive
+            config.setConnectionTimeout(30000); // 30 seconds connection timeout
+            // No idleTimeout: with maximumPoolSize == minimumIdle the pool is fixed size,
+            // so idle connections are never retired and HikariCP warns if it is set
+            config.setMaxLifetime(1800000); // 30 minutes max connection lifetime
+            config.setLeakDetectionThreshold(60000); // 60 seconds leak detection
+            config.setKeepaliveTime(30000); // 30 seconds keepalive (HikariCP 4.0+)
+
+            // Modern HikariCP settings for better performance
+            config.setInitializationFailTimeout(10000); // 10 seconds initialization timeout
+            config.setValidationTimeout(5000); // 5 seconds validation timeout
+            config.setConnectionTestQuery("SELECT 1"); // Lightweight connection test
+            config.setAutoCommit(true); // SQLite default
+            config.setReadOnly(false); // Allow writes
+            config.setIsolateInternalQueries(false); // Don't isolate internal queries
+            config.setRegisterMbeans(false); // Disable JMX for performance
+            config.setAllowPoolSuspension(true); // Allow pool suspension for maintenance
+
+            // SQLite-specific connection properties (optimized for modern usage)
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "500"); // Increased from 250
+            config.addDataSourceProperty("prepStmtCacheSqlLimit", "4096"); // Increased from 2048
+            config.addDataSourceProperty("useServerPrepStmts", "false"); // SQLite doesn't support server-side prepared
+                                                                         // statements
+            config.addDataSourceProperty("rewriteBatchedStatements", "true"); // Optimize batch operations
+            config.addDataSourceProperty("cacheResultSetMetadata", "true"); // Cache metadata for performance
+            config.addDataSourceProperty("cacheServerConfiguration", "true"); // Cache server config
+            config.addDataSourceProperty("elideSetAutoCommits", "true"); // Optimize auto-commit calls
+            config.addDataSourceProperty("maintainTimeStats", "false"); // Disable time stats for performance
+
+            dataSource = new HikariDataSource(config);
+        }
+    }
+
+    public void disconnect() throws SQLException {
+        if (isConnected()) {
+            dataSource.close();
+        }
+    }
+
+    public Connection getConnection() throws SQLException {
+        if (!isConnected()) {
+            try {
+                connect();
+            } catch (ClassNotFoundException e) {
+                throw new SQLException("Failed to load SQLite driver", e);
+            }
+        }
+        return dataSource.getConnection();
+    }
+
+    @Override
+    public boolean supportsOnlineBackup() {
+        return true;
+    }
+
+    /**
+     * Snapshot the database with {@code VACUUM INTO} (SQLite 3.27+). SQLite reads
+     * the database inside a transaction and writes a fresh, defragmented copy that
+     * already contains everything sitting in the WAL, so the result is consistent
+     * without pausing the server and without copying the -wal/-shm sidecars.
+     */
+    @Override
+    public void backupTo(Path target) throws SQLException {
+        // VACUUM INTO refuses to overwrite, so clear the target first.
+        try {
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.deleteIfExists(target);
+        } catch (IOException e) {
+            throw new SQLException("Failed to prepare SQLite backup target " + target, e);
+        }
+
+        try (Connection conn = getConnection();
+                PreparedStatement ps = conn.prepareStatement("VACUUM INTO ?")) {
+            ps.setString(1, target.toAbsolutePath().toString());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            // Do not leave a half-written snapshot behind for the retention
+            // sweep to hand back to someone as a valid backup.
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        }
+    }
+}

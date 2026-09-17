@@ -1,0 +1,219 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "PerPlayerKit",
+  "description": "Per-player custom PvP kits for Paper and Spigot servers.",
+  "colors": {
+    "primary": "#1F4145",
+    "light": "#A6C2C2",
+    "dark": "#0E1B1E"
+  },
+  "favicon": "/favicon.png",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://perplayerkit.com"
+  },
+  "icons": {
+    "library": "fontawesome"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "icon": "rocket",
+        "pages": [
+          "introduction",
+          "downloads",
+          "installation",
+          "upgrading",
+          "kit-room",
+          "permissions-setup"
+        ]
+      },
+      {
+        "group": "Features",
+        "icon": "layer-group",
+        "pages": [
+          {
+            "group": "Kits",
+            "icon": "backpack",
+            "root": "features/kits",
+            "expanded": false,
+            "pages": [
+              "features/kit-slots"
+            ]
+          },
+          "features/sharing",
+          "features/public-kits",
+          {
+            "group": "Automatic rekit",
+            "icon": "rotate",
+            "root": "features/rekit",
+            "expanded": false,
+            "pages": [
+              "features/rekit-respawn",
+              "features/rekit-kill"
+            ]
+          },
+          "features/regear",
+          "features/anti-exploit"
+        ]
+      },
+      {
+        "group": "Commands",
+        "icon": "terminal",
+        "pages": [
+          "commands/players",
+          "commands/admin",
+          "commands/permissions"
+        ]
+      },
+      {
+        "group": "Settings",
+        "icon": "sliders",
+        "pages": [
+          {
+            "group": "config.yml",
+            "icon": "file-code",
+            "root": "settings/config-reference",
+            "expanded": false,
+            "pages": [
+              "settings/config-kitroom",
+              "settings/config-interface",
+              "settings/config-features"
+            ]
+          },
+          "settings/locations",
+          {
+            "group": "Storage",
+            "icon": "database",
+            "root": "settings/storage",
+            "expanded": false,
+            "pages": [
+              "settings/storage-reference"
+            ]
+          },
+          {
+            "group": "Messages",
+            "icon": "message",
+            "root": "settings/messages",
+            "expanded": false,
+            "pages": [
+              "settings/formatting"
+            ]
+          },
+          "settings/languages"
+        ]
+      },
+      {
+        "group": "Managing data",
+        "icon": "box-archive",
+        "pages": [
+          "data/backups",
+          "data/export-import",
+          "data/storage-migration",
+          "data/purge-items"
+        ]
+      },
+      {
+        "group": "Common issues",
+        "icon": "circle-question",
+        "pages": [
+          {
+            "group": "Troubleshooting",
+            "icon": "wrench",
+            "root": "help/troubleshooting",
+            "expanded": false,
+            "pages": [
+              "help/startup",
+              "help/permissions",
+              "help/kits",
+              "help/features"
+            ]
+          },
+          "help/faq"
+        ]
+      },
+      {
+        "group": "For developers",
+        "icon": "code",
+        "pages": [
+          {
+            "group": "Java API",
+            "icon": "code",
+            "root": "api",
+            "expanded": false,
+            "pages": [
+              "api/setup",
+              "api/reference",
+              "api/example"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "type": "github",
+        "href": "https://github.com/rossnoah/PerPlayerKit"
+      },
+      {
+        "label": "Downloads",
+        "href": "/downloads"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Discord",
+      "href": "https://discord.gg/5djuBSKWuV"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/rossnoah/PerPlayerKit",
+      "discord": "https://discord.gg/5djuBSKWuV",
+      "website": "https://perplayerkit.com"
+    },
+    "links": [
+      {
+        "header": "PerPlayerKit",
+        "items": [
+          {
+            "label": "Modrinth",
+            "href": "https://modrinth.com/plugin/perplayerkit"
+          },
+          {
+            "label": "SpigotMC",
+            "href": "https://www.spigotmc.org/resources/perplayerkit.121437/"
+          },
+          {
+            "label": "Hangar",
+            "href": "https://hangar.papermc.io/noah32/PerPlayerKit"
+          },
+          {
+            "label": "Source code",
+            "href": "https://github.com/rossnoah/PerPlayerKit"
+          }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "seo": {
+    "indexing": "all"
+  }
+}
