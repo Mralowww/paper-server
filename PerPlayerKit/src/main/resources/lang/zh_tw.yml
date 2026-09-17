@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "第 {page} 頁"
+  # 玩家第一次打開 /kit 選單前，會先出現這個新手教學視窗一次
+  tutorial-title: "歡迎！Kit 教學"
+  tutorial-step1-name: "<green>步驟一：建立 Kit"
+  tutorial-step1-lore1: "<gray>打開任一個 Kit 格子，"
+  tutorial-step1-lore2: "<gray>穿上想要的裝備後點擊儲存。"
+  tutorial-step2-name: "<yellow>步驟二：儲存 Kit"
+  tutorial-step2-lore1: "<gray>在 Kit 編輯介面點擊儲存按鈕"
+  tutorial-step2-lore2: "<gray>(鐵砧圖示)，即可存成你的裝備組。"
+  tutorial-step3-name: "<aqua>步驟三：隨時領取"
+  tutorial-step3-lore1: "<gray>左鍵點擊已儲存的 Kit 格子，"
+  tutorial-step3-lore2: "<gray>就能立即穿上該套裝備。"
+  tutorial-start-name: "<green><bold>了解了，開始使用！"
   main-menu-title: "{player} 的套件"
   main-menu-title-paged: "{player} 的套件 ({page}/{pages})"
   kit-editor-title: "套件: {slot}"

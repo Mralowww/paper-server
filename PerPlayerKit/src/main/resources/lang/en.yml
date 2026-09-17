@@ -255,6 +255,18 @@ about:
 
 gui:
   kit-room-page-name: "Page {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Welcome! How Kits Work"
+  tutorial-step1-name: "<green>Step 1: Create a Kit"
+  tutorial-step1-lore1: "<gray>Open a kit slot and gear up"
+  tutorial-step1-lore2: "<gray>the way you want, then hit Save."
+  tutorial-step2-name: "<yellow>Step 2: Save It"
+  tutorial-step2-lore1: "<gray>Click the anvil/save button in the"
+  tutorial-step2-lore2: "<gray>kit editor to store your loadout."
+  tutorial-step3-name: "<aqua>Step 3: Load It Anytime"
+  tutorial-step3-lore1: "<gray>Left-click a saved kit slot to"
+  tutorial-step3-lore2: "<gray>instantly equip everything in it."
+  tutorial-start-name: "<green><bold>Got it, let's go!"
   # Inventory titles
   main-menu-title: "{player}'s Kits"
   main-menu-title-paged: "{player}'s Kits ({page}/{pages})"

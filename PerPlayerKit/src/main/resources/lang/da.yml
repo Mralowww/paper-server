@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Side {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Velkommen! Sådan fungerer Kits"
+  tutorial-step1-name: "<green>Trin 1: Opret et Kit"
+  tutorial-step1-lore1: "<gray>Åbn en kit-plads og udrust dig"
+  tutorial-step1-lore2: "<gray>som du vil, og gem derefter."
+  tutorial-step2-name: "<yellow>Trin 2: Gem det"
+  tutorial-step2-lore1: "<gray>Klik på gem-knappen i"
+  tutorial-step2-lore2: "<gray>kit-editoren for at gemme dit udstyr."
+  tutorial-step3-name: "<aqua>Trin 3: Hent det når som helst"
+  tutorial-step3-lore1: "<gray>Venstreklik på en gemt plads"
+  tutorial-step3-lore2: "<gray>for straks at udstyre alt."
+  tutorial-start-name: "<green><bold>Forstået, lad os gå i gang!"
   main-menu-title: "{player}s Kits"
   main-menu-title-paged: "{player}s Kits ({page}/{pages})"
   kit-editor-title: "Kit: {slot}"

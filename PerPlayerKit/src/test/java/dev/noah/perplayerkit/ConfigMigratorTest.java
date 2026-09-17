@@ -74,7 +74,7 @@ class ConfigMigratorTest {
 
         YamlConfiguration after = YamlConfiguration.loadConfiguration(configFile);
         assertEquals(3, after.getInt("config-version"));
-        assertEquals("en", after.getString("language"));
+        assertEquals("zh_tw", after.getString("language"));
         assertFalse(after.contains("prefix"), "prefix should be stripped from config.yml");
         assertFalse(after.contains("disabled-command-message"), "disabled-command-message should be stripped");
         assertFalse(after.contains("messages.player-repaired.message"), "message key should be stripped");

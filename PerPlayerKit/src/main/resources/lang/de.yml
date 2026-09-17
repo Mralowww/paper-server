@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Seite {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Willkommen! So funktionieren Kits"
+  tutorial-step1-name: "<green>Schritt 1: Kit erstellen"
+  tutorial-step1-lore1: "<gray>Öffne einen Kit-Slot und rüste dich"
+  tutorial-step1-lore2: "<gray>wie gewünscht aus, dann speichern."
+  tutorial-step2-name: "<yellow>Schritt 2: Speichern"
+  tutorial-step2-lore1: "<gray>Klicke im Kit-Editor auf die"
+  tutorial-step2-lore2: "<gray>Speichern-Schaltfläche, um es zu sichern."
+  tutorial-step3-name: "<aqua>Schritt 3: Jederzeit laden"
+  tutorial-step3-lore1: "<gray>Linksklick auf einen gespeicherten"
+  tutorial-step3-lore2: "<gray>Slot, um sofort alles auszurüsten."
+  tutorial-start-name: "<green><bold>Verstanden, los geht's!"
   main-menu-title: "{player}s Kits"
   main-menu-title-paged: "{player}s Kits ({page}/{pages})"
   kit-editor-title: "Kit: {slot}"

@@ -44,7 +44,11 @@ public class MainMenuCommand implements CommandExecutor {
         }
 
         GUI main = new GUI(plugin);
-        main.OpenMainMenu(player);
+        if (!GUI.hasSeenTutorial(player)) {
+            main.OpenTutorial(player);
+        } else {
+            main.OpenMainMenu(player);
+        }
         return true;
     }
 }

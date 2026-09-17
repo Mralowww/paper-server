@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Pagina {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Benvenuto! Come funzionano i Kit"
+  tutorial-step1-name: "<green>Passo 1: Crea un Kit"
+  tutorial-step1-lore1: "<gray>Apri uno slot kit ed equipaggiati"
+  tutorial-step1-lore2: "<gray>come preferisci, poi salva."
+  tutorial-step2-name: "<yellow>Passo 2: Salvalo"
+  tutorial-step2-lore1: "<gray>Clicca sul pulsante di salvataggio"
+  tutorial-step2-lore2: "<gray>nell'editor per salvare il tuo equipaggiamento."
+  tutorial-step3-name: "<aqua>Passo 3: Caricalo quando vuoi"
+  tutorial-step3-lore1: "<gray>Clic sinistro su uno slot salvato"
+  tutorial-step3-lore2: "<gray>per equipaggiare tutto all'istante."
+  tutorial-start-name: "<green><bold>Capito, iniziamo!"
   main-menu-title: "Kit di {player}"
   main-menu-title-paged: "Kit di {player} ({page}/{pages})"
   kit-editor-title: "Kit: {slot}"

@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "第 {page} 页"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "欢迎！套件教学"
+  tutorial-step1-name: "<green>步骤一：建立套件"
+  tutorial-step1-lore1: "<gray>打开任一个套件格子，"
+  tutorial-step1-lore2: "<gray>穿上想要的装备后点击保存。"
+  tutorial-step2-name: "<yellow>步骤二：保存套件"
+  tutorial-step2-lore1: "<gray>在套件编辑界面点击保存按钮"
+  tutorial-step2-lore2: "<gray>(铁砧图标)，即可存成你的装备组。"
+  tutorial-step3-name: "<aqua>步骤三：随时领取"
+  tutorial-step3-lore1: "<gray>左键点击已保存的套件格子，"
+  tutorial-step3-lore2: "<gray>就能立即穿上该套装备。"
+  tutorial-start-name: "<green><bold>了解了，开始使用！"
   main-menu-title: "{player} 的套件"
   main-menu-title-paged: "{player} 的套件 ({page}/{pages})"
   kit-editor-title: "套件: {slot}"

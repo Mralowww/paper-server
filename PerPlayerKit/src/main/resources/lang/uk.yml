@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Сторінка {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Ласкаво просимо! Як працюють набори"
+  tutorial-step1-name: "<green>Крок 1: Створіть набір"
+  tutorial-step1-lore1: "<gray>Відкрийте слот набору та спорядіться"
+  tutorial-step1-lore2: "<gray>як забажаєте, потім збережіть."
+  tutorial-step2-name: "<yellow>Крок 2: Збережіть його"
+  tutorial-step2-lore1: "<gray>Натисніть кнопку збереження в"
+  tutorial-step2-lore2: "<gray>редакторі, щоб зберегти спорядження."
+  tutorial-step3-name: "<aqua>Крок 3: Завантажуйте будь-коли"
+  tutorial-step3-lore1: "<gray>Клацніть лівою кнопкою на збереженому"
+  tutorial-step3-lore2: "<gray>слоті, щоб миттєво спорядитися."
+  tutorial-start-name: "<green><bold>Зрозуміло, почнімо!"
   main-menu-title: "Набори {player}"
   main-menu-title-paged: "Набори {player} ({page}/{pages})"
   kit-editor-title: "Набір: {slot}"

@@ -292,6 +292,51 @@ public class GUI {
         SoundManager.playOpenGui(p);
     }
 
+    public static final org.bukkit.NamespacedKey TUTORIAL_SEEN_KEY =
+            new org.bukkit.NamespacedKey("perplayerkit", "seen_tutorial");
+
+    public static boolean hasSeenTutorial(Player p) {
+        return p.getPersistentDataContainer().has(TUTORIAL_SEEN_KEY, org.bukkit.persistence.PersistentDataType.BYTE);
+    }
+
+    private static void markTutorialSeen(Player p) {
+        p.getPersistentDataContainer().set(TUTORIAL_SEEN_KEY, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+    }
+
+    /** First-run walkthrough for /kit: how to build and save a kit, shown once per player. */
+    public void OpenTutorial(Player p) {
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTutorialMenu();
+        Menu menu = titledMenu.menu();
+        for (int i = 0; i < MENU_SIZE; i++) {
+            menu.getSlot(i).setItem(createGlassPane());
+        }
+
+        menu.getSlot(11).setItem(createItem(Material.CHEST, 1,
+                lang("gui.tutorial-step1-name"),
+                lang("gui.tutorial-step1-lore1"),
+                lang("gui.tutorial-step1-lore2")));
+
+        menu.getSlot(13).setItem(createItem(Material.ANVIL, 1,
+                lang("gui.tutorial-step2-name"),
+                lang("gui.tutorial-step2-lore1"),
+                lang("gui.tutorial-step2-lore2")));
+
+        menu.getSlot(15).setItem(createItem(Material.NETHER_STAR, 1,
+                lang("gui.tutorial-step3-name"),
+                lang("gui.tutorial-step3-lore1"),
+                lang("gui.tutorial-step3-lore2")));
+
+        Slot startSlot = menu.getSlot(31);
+        startSlot.setItem(createItem(Material.LIME_DYE, 1, lang("gui.tutorial-start-name")));
+        startSlot.setClickHandler((player, info) -> {
+            SoundManager.playClick(player);
+            markTutorialSeen(player);
+            OpenMainMenu(player);
+        });
+
+        openMenu(p, titledMenu, "perplayerkit.menu", LocationFeature.MENU);
+    }
+
     public void OpenMainMenu(Player p) {
         OpenMainMenu(p, 0);
     }

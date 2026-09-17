@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Pagina {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Bun venit! Cum funcționează Kiturile"
+  tutorial-step1-name: "<green>Pasul 1: Creează un Kit"
+  tutorial-step1-lore1: "<gray>Deschide un slot de kit și echipează-te"
+  tutorial-step1-lore2: "<gray>cum dorești, apoi salvează."
+  tutorial-step2-name: "<yellow>Pasul 2: Salvează-l"
+  tutorial-step2-lore1: "<gray>Apasă butonul de salvare din"
+  tutorial-step2-lore2: "<gray>editorul de kit pentru a-l păstra."
+  tutorial-step3-name: "<aqua>Pasul 3: Încarcă-l oricând"
+  tutorial-step3-lore1: "<gray>Click stânga pe un slot salvat"
+  tutorial-step3-lore2: "<gray>pentru a te echipa instant."
+  tutorial-start-name: "<green><bold>Am înțeles, să începem!"
   main-menu-title: "Kiturile lui {player}"
   main-menu-title-paged: "Kiturile lui {player} ({page}/{pages})"
   kit-editor-title: "Kit: {slot}"

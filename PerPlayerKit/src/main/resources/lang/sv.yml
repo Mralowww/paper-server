@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Sida {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Välkommen! Så fungerar Kits"
+  tutorial-step1-name: "<green>Steg 1: Skapa ett Kit"
+  tutorial-step1-lore1: "<gray>Öppna en kit-plats och utrusta dig"
+  tutorial-step1-lore2: "<gray>som du vill, spara sedan."
+  tutorial-step2-name: "<yellow>Steg 2: Spara det"
+  tutorial-step2-lore1: "<gray>Klicka på spara-knappen i"
+  tutorial-step2-lore2: "<gray>kit-redigeraren för att spara din utrustning."
+  tutorial-step3-name: "<aqua>Steg 3: Ladda när som helst"
+  tutorial-step3-lore1: "<gray>Vänsterklicka på en sparad plats"
+  tutorial-step3-lore2: "<gray>för att direkt utrusta allt."
+  tutorial-start-name: "<green><bold>Uppfattat, kör igång!"
   main-menu-title: "{player}s Kit"
   main-menu-title-paged: "{player}s Kit ({page}/{pages})"
   kit-editor-title: "Kit: {slot}"

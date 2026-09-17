@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Sivu {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Tervetuloa! Näin Kitit toimivat"
+  tutorial-step1-name: "<green>Vaihe 1: Luo Kit"
+  tutorial-step1-lore1: "<gray>Avaa kit-paikka ja varusta itsesi"
+  tutorial-step1-lore2: "<gray>haluamallasi tavalla, tallenna sitten."
+  tutorial-step2-name: "<yellow>Vaihe 2: Tallenna se"
+  tutorial-step2-lore1: "<gray>Napsauta tallennuspainiketta"
+  tutorial-step2-lore2: "<gray>kit-editorissa varusteidesi tallentamiseksi."
+  tutorial-step3-name: "<aqua>Vaihe 3: Lataa milloin vain"
+  tutorial-step3-lore1: "<gray>Napsauta hiiren vasemmalla painikkeella"
+  tutorial-step3-lore2: "<gray>tallennettua paikkaa varustautuaksesi heti."
+  tutorial-start-name: "<green><bold>Selvä, aloitetaan!"
   main-menu-title: "Pelaajan {player} Kitit"
   main-menu-title-paged: "Pelaajan {player} Kitit ({page}/{pages})"
   kit-editor-title: "Kitti: {slot}"

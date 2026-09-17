@@ -41,7 +41,7 @@ import java.util.Map;
 
 public class Lang {
 
-    public static final List<String> BUNDLED_LANGS = Arrays.asList("en", "zh", "es", "pt", "fr", "uk", "de", "sv", "da", "fi", "it", "pl", "ro", "nl");
+    public static final List<String> BUNDLED_LANGS = Arrays.asList("en", "zh", "zh_tw", "es", "pt", "fr", "uk", "de", "sv", "da", "fi", "it", "pl", "ro", "nl");
     private static final String DEFAULT_LANG = "en";
 
     private static Lang instance;

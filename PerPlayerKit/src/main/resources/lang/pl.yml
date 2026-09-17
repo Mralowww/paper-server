@@ -228,6 +228,18 @@ about:
 
 gui:
   kit-room-page-name: "Strona {page}"
+  # First-run tutorial shown once before a player's very first /kit menu
+  tutorial-title: "Witaj! Jak działają Kity"
+  tutorial-step1-name: "<green>Krok 1: Stwórz Kit"
+  tutorial-step1-lore1: "<gray>Otwórz slot kitu i wyposaż się"
+  tutorial-step1-lore2: "<gray>tak jak chcesz, a następnie zapisz."
+  tutorial-step2-name: "<yellow>Krok 2: Zapisz go"
+  tutorial-step2-lore1: "<gray>Kliknij przycisk zapisu w"
+  tutorial-step2-lore2: "<gray>edytorze kitu, aby zachować ekwipunek."
+  tutorial-step3-name: "<aqua>Krok 3: Wczytaj kiedy chcesz"
+  tutorial-step3-lore1: "<gray>Kliknij lewym przyciskiem zapisany"
+  tutorial-step3-lore2: "<gray>slot, aby natychmiast się wyposażyć."
+  tutorial-start-name: "<green><bold>Zrozumiałem, zaczynajmy!"
   main-menu-title: "Zestawy {player}"
   main-menu-title-paged: "Zestawy {player} ({page}/{pages})"
   kit-editor-title: "Zestaw: {slot}"

@@ -77,6 +77,10 @@ public final class GuiMenuFactory {
         return chestMenu(title("gui.inspect-ec-title", "player", playerName, "slot", String.valueOf(slot)));
     }
 
+    public static TitledMenu createTutorialMenu() {
+        return chestMenu(title("gui.tutorial-title"));
+    }
+
     public static TitledMenu createMainMenu(Player player, int page, int pages) {
         if (pages <= 1) {
             return chestMenu(title("gui.main-menu-title", "player", player.getName()));
