@@ -478,6 +478,15 @@ public class GUI {
         TrimSession session = trimSessions.remove(p.getUniqueId());
         if (session == null) return;
 
+        // Re-checked here, not just when the material menu is drawn: the menu
+        // only skips adding a click handler to locked slots, which is a UI
+        // nicety, not a security boundary. This is the real gate.
+        if (!dev.noah.perplayerkit.trim.TrimTierConfig.get().canUse(p, materialKey)) {
+            Lang.get().send(p, "error.no-permission");
+            openTrimPieceSelect(p, session.getKitSlot(), snapshotArmor(session));
+            return;
+        }
+
         ItemStack armor = session.getArmorItem(session.getPiece());
         if (armor != null && dev.noah.perplayerkit.trim.TrimCompat.apply(armor, session.getPatternKey(), materialKey)) {
             session.setArmorItem(session.getPiece(), armor);

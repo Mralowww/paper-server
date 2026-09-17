@@ -23,6 +23,7 @@ permissions:
     children:
       perplayerkit.staff: true
       perplayerkit.editkitroom: true
+      perplayerkit.trims.admin: true
   perplayerkit.staff:
     default: op
   perplayerkit.editkitroom:
@@ -57,6 +58,11 @@ permissions:
   # are rank permissions an admin grants through a permissions plugin. Each
   # tier a player is given also unlocks every weaker tier automatically.
   perplayerkit.trims:
+    default: op
+  # Bypasses the tier ladder entirely: every configured trim material is
+  # unlocked regardless of which trims.<tier> nodes are held. Granted
+  # automatically to perplayerkit.admin, but can be given on its own too.
+  perplayerkit.trims.admin:
     default: op
   # Anvil editor: enchant/repair/rename any item in a kit. Renaming further
   # needs at least the trims.lt2 tier (see TrimTierConfig#atLeastTier).

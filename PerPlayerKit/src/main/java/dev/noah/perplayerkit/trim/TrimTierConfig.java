@@ -33,6 +33,9 @@ import java.util.List;
  */
 public class TrimTierConfig {
 
+    /** Bypasses every tier: unlocks every configured material regardless of rank. */
+    public static final String ADMIN_PERMISSION = "perplayerkit.trims.admin";
+
     private static TrimTierConfig instance;
 
     private final boolean enabled;
@@ -89,6 +92,14 @@ public class TrimTierConfig {
      * configured permissions.
      */
     public List<String> unlockedMaterials(Player player) {
+        if (player.hasPermission(ADMIN_PERMISSION)) {
+            List<String> all = new ArrayList<>();
+            for (TrimTier tier : tiers) {
+                all.add(tier.materialKey());
+            }
+            return all;
+        }
+
         int highestIndex = -1;
         for (int i = 0; i < tiers.size(); i++) {
             if (player.hasPermission(tiers.get(i).permission())) {
