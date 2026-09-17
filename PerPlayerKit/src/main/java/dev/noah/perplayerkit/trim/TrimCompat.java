@@ -18,6 +18,7 @@
  */
 package dev.noah.perplayerkit.trim;
 
+import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -38,11 +39,15 @@ public final class TrimCompat {
 
     private static final boolean SUPPORTED;
     private static Class<?> armorMetaClass;
+    private static Class<?> armorTrimClass;
     private static Object trimPatternRegistry;
     private static Object trimMaterialRegistry;
     private static Method registryGet;
     private static Constructor<?> armorTrimConstructor;
     private static Method setTrimMethod;
+    private static Method getTrimMethod;
+    private static Method armorTrimGetMaterialMethod;
+    private static Method armorTrimGetPatternMethod;
 
     static {
         boolean ok;
@@ -50,7 +55,7 @@ public final class TrimCompat {
             armorMetaClass = Class.forName("org.bukkit.inventory.meta.ArmorMeta");
             Class<?> trimPatternClass = Class.forName("org.bukkit.inventory.meta.trim.TrimPattern");
             Class<?> trimMaterialClass = Class.forName("org.bukkit.inventory.meta.trim.TrimMaterial");
-            Class<?> armorTrimClass = Class.forName("org.bukkit.inventory.meta.trim.ArmorTrim");
+            armorTrimClass = Class.forName("org.bukkit.inventory.meta.trim.ArmorTrim");
             Class<?> registryClass = Class.forName("org.bukkit.Registry");
 
             Field trimPatternField = registryClass.getField("TRIM_PATTERN");
@@ -60,6 +65,9 @@ public final class TrimCompat {
             registryGet = registryClass.getMethod("get", NamespacedKey.class);
             armorTrimConstructor = armorTrimClass.getConstructor(trimMaterialClass, trimPatternClass);
             setTrimMethod = armorMetaClass.getMethod("setTrim", armorTrimClass);
+            getTrimMethod = armorMetaClass.getMethod("getTrim");
+            armorTrimGetMaterialMethod = armorTrimClass.getMethod("getMaterial");
+            armorTrimGetPatternMethod = armorTrimClass.getMethod("getPattern");
             ok = true;
         } catch (ReflectiveOperationException e) {
             ok = false;
@@ -95,6 +103,44 @@ public final class TrimCompat {
             Object armorTrim = armorTrimConstructor.newInstance(material, pattern);
             setTrimMethod.invoke(meta, armorTrim);
             armor.setItemMeta(meta);
+            return true;
+        } catch (ReflectiveOperationException e) {
+            return false;
+        }
+    }
+
+    /** The trim's material key (e.g. "NETHERITE"), or null if unsupported/no trim applied. */
+    public static String getTrimMaterialKey(ItemStack item) {
+        Object keyed = getTrimPart(item, armorTrimGetMaterialMethod);
+        return keyed instanceof Keyed k ? k.getKey().getKey().toUpperCase(Locale.ROOT) : null;
+    }
+
+    /** The trim's pattern key (e.g. "sentry"), or null if unsupported/no trim applied. */
+    public static String getTrimPatternKey(ItemStack item) {
+        Object keyed = getTrimPart(item, armorTrimGetPatternMethod);
+        return keyed instanceof Keyed k ? k.getKey().getKey() : null;
+    }
+
+    private static Object getTrimPart(ItemStack item, Method extractor) {
+        if (!SUPPORTED || item == null) return null;
+        try {
+            ItemMeta meta = item.getItemMeta();
+            if (!armorMetaClass.isInstance(meta)) return null;
+            Object trim = getTrimMethod.invoke(meta);
+            return trim == null ? null : extractor.invoke(trim);
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    /** Clears any trim on the item, leaving the rest of its meta untouched. */
+    public static boolean removeTrim(ItemStack item) {
+        if (!SUPPORTED || item == null) return false;
+        try {
+            ItemMeta meta = item.getItemMeta();
+            if (!armorMetaClass.isInstance(meta)) return false;
+            setTrimMethod.invoke(meta, (Object) null);
+            item.setItemMeta(meta);
             return true;
         } catch (ReflectiveOperationException e) {
             return false;

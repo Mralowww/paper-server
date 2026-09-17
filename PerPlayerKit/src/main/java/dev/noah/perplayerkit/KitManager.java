@@ -258,6 +258,10 @@ public class KitManager {
         if (!filterReady(player)) return false;
         kit = ItemFilter.get().filterKit(kit, notFoundMessage == null ? null : player);
         if (kit == null) return false;
+        // A kit is saved once but can be loaded any number of times after the
+        // player's rank changes, so trim materials are re-checked on every
+        // load rather than only when the kit was saved.
+        kit = dev.noah.perplayerkit.trim.TrimEnforcer.downgradeUnauthorized(kit, player);
         if (isEnderChest) {
             player.getEnderChest().setContents(kit);
         } else {
