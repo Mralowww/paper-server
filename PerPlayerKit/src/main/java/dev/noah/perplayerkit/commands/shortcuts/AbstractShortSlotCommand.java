@@ -22,6 +22,7 @@ import dev.noah.perplayerkit.util.LocationAccess;
 import dev.noah.perplayerkit.util.LocationFeature;
 import dev.noah.perplayerkit.util.KitSlots;
 import dev.noah.perplayerkit.util.Lang;
+import dev.noah.perplayerkit.util.SoundManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -54,6 +55,7 @@ public abstract class AbstractShortSlotCommand implements CommandExecutor {
         Integer slot = parseSlot(label);
         if (slot == null) {
             Lang.get().send(player, "error.invalid-command-label");
+            SoundManager.playFailure(player);
             return true;
         }
 
@@ -62,6 +64,7 @@ public abstract class AbstractShortSlotCommand implements CommandExecutor {
             // max-kits is lowered below 9, so give a range error, not a label error.
             Lang.get().send(player, "error.invalid-slot-range",
                     "min", String.valueOf(KitSlots.MIN_LIMIT), "max", String.valueOf(KitSlots.maxKits()));
+            SoundManager.playFailure(player);
             return true;
         }
 

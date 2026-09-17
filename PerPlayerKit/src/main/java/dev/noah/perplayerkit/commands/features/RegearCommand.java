@@ -9,6 +9,7 @@ import dev.noah.perplayerkit.gui.ItemUtil;
 import dev.noah.perplayerkit.util.BroadcastManager;
 import dev.noah.perplayerkit.util.CooldownManager;
 import dev.noah.perplayerkit.util.Lang;
+import dev.noah.perplayerkit.util.SoundManager;
 import dev.noah.perplayerkit.util.StyleManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -207,6 +208,7 @@ public class RegearCommand implements CommandExecutor, Listener {
         if (!ActionGuards.dataReady(player)) return false;
         if (KitManager.get().hasLastKit(player.getUniqueId())) return true;
         Lang.get().send(player, "error.no-kit-loaded");
+        SoundManager.playFailure(player);
         return false;
     }
 
@@ -222,6 +224,7 @@ public class RegearCommand implements CommandExecutor, Listener {
         }
 
         Lang.get().send(player, "error.regear-elytra-blocked");
+        SoundManager.playFailure(player);
         return true;
     }
 
@@ -232,6 +235,7 @@ public class RegearCommand implements CommandExecutor, Listener {
 
         int secondsLeft = damageCooldownManager.getTimeLeft(player);
         Lang.get().send(player, "error.regear-combat-cooldown", "seconds", String.valueOf(secondsLeft));
+        SoundManager.playFailure(player);
         return true;
     }
 
@@ -242,6 +246,7 @@ public class RegearCommand implements CommandExecutor, Listener {
 
         int secondsLeft = commandCooldownManager.getTimeLeft(player);
         Lang.get().send(player, "error.regear-command-cooldown", "seconds", String.valueOf(secondsLeft));
+        SoundManager.playFailure(player);
         return true;
     }
 

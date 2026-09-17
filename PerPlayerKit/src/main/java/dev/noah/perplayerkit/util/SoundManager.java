@@ -3,6 +3,7 @@ package dev.noah.perplayerkit.util;
 import dev.noah.perplayerkit.PerPlayerKit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 /**
  * Manages playing configurable sounds for plugin feedback (success, error, UI interactions).
@@ -11,8 +12,14 @@ public class SoundManager {
     private static final String BASE_KEY = "sounds.";
 
     private static Sound getSound(String key, String defaultName) {
+        Plugin plugin = PerPlayerKit.getPlugin();
+        if (plugin == null) {
+            // Not yet enabled (e.g. a unit test exercising command logic
+            // without a running plugin instance): fall back silently.
+            return Sound.valueOf(defaultName);
+        }
         String path = BASE_KEY + key;
-        String soundName = PerPlayerKit.getPlugin().getConfig().getString(path, defaultName);
+        String soundName = plugin.getConfig().getString(path, defaultName);
         try {
             return Sound.valueOf(soundName);
         } catch (IllegalArgumentException ex) {
@@ -58,8 +65,9 @@ public class SoundManager {
     }
 
     private static void play(Player player, Sound sound) {
-        // exit if sounds are disabled
-        if (!PerPlayerKit.getPlugin().getConfig().getBoolean("sounds.enabled", true)) {
+        Plugin plugin = PerPlayerKit.getPlugin();
+        // exit if sounds are disabled, or there's no running plugin instance to read the setting from
+        if (plugin != null && !plugin.getConfig().getBoolean("sounds.enabled", true)) {
             return;
         }
         player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
