@@ -180,7 +180,9 @@ public final class PerPlayerKit extends JavaPlugin {
         // REGISTER THINGS START
         KitSlotTabCompleter kitSlotTabCompleter = new KitSlotTabCompleter();
 
-        this.getCommand("kit").setExecutor(new MainMenuCommand(plugin));
+        MainMenuCommand mainMenuCommand = new MainMenuCommand(plugin);
+        this.getCommand("kit").setExecutor(mainMenuCommand);
+        this.getCommand("kit").setTabCompleter(mainMenuCommand);
 
         this.getCommand("sharekit").setExecutor(new ShareKitCommand());
         this.getCommand("sharekit").setTabCompleter(new KitSlotTabCompleter(true));

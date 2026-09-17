@@ -646,7 +646,11 @@ public class GUI {
         p.getPersistentDataContainer().set(TUTORIAL_SEEN_KEY, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
     }
 
-    /** First-run walkthrough for /kit: how to build and save a kit, shown once per player. */
+    /**
+     * Walkthrough for /kit: how to build, save, and style a kit. Shown once
+     * automatically on a player's first /kit, and any time after that via
+     * /kit tutorial.
+     */
     public void OpenTutorial(Player p) {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTutorialMenu();
         Menu menu = titledMenu.menu();
@@ -654,22 +658,37 @@ public class GUI {
             menu.getSlot(i).setItem(createGlassPane());
         }
 
-        menu.getSlot(11).setItem(createItem(Material.CHEST, 1,
+        menu.getSlot(10).setItem(createItem(Material.CHEST, 1,
                 lang("gui.tutorial-step1-name"),
                 lang("gui.tutorial-step1-lore1"),
                 lang("gui.tutorial-step1-lore2")));
 
-        menu.getSlot(13).setItem(createItem(Material.ANVIL, 1,
+        menu.getSlot(12).setItem(createItem(Material.HOPPER, 1,
                 lang("gui.tutorial-step2-name"),
                 lang("gui.tutorial-step2-lore1"),
                 lang("gui.tutorial-step2-lore2")));
 
-        menu.getSlot(15).setItem(createItem(Material.NETHER_STAR, 1,
+        menu.getSlot(14).setItem(createItem(Material.NETHER_STAR, 1,
                 lang("gui.tutorial-step3-name"),
                 lang("gui.tutorial-step3-lore1"),
                 lang("gui.tutorial-step3-lore2")));
 
-        Slot startSlot = menu.getSlot(31);
+        menu.getSlot(16).setItem(createItem(Material.ENDER_CHEST, 1,
+                lang("gui.tutorial-step4-name"),
+                lang("gui.tutorial-step4-lore1"),
+                lang("gui.tutorial-step4-lore2")));
+
+        menu.getSlot(29).setItem(createItem(Material.SHIELD, 1,
+                lang("gui.tutorial-step5-name"),
+                lang("gui.tutorial-step5-lore1"),
+                lang("gui.tutorial-step5-lore2")));
+
+        menu.getSlot(31).setItem(createItem(Material.ANVIL, 1,
+                lang("gui.tutorial-step6-name"),
+                lang("gui.tutorial-step6-lore1"),
+                lang("gui.tutorial-step6-lore2")));
+
+        Slot startSlot = menu.getSlot(49);
         startSlot.setItem(createItem(Material.LIME_DYE, 1, lang("gui.tutorial-start-name")));
         startSlot.setClickHandler((player, info) -> {
             SoundManager.playClick(player);

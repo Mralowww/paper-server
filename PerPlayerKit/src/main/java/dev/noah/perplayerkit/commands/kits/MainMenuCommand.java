@@ -24,11 +24,15 @@ import dev.noah.perplayerkit.gui.GUI;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public class MainMenuCommand implements CommandExecutor {
+import java.util.List;
+
+public class MainMenuCommand implements CommandExecutor, TabCompleter {
 
     private final Plugin plugin;
 
@@ -44,11 +48,21 @@ public class MainMenuCommand implements CommandExecutor {
         }
 
         GUI main = new GUI(plugin);
-        if (!GUI.hasSeenTutorial(player)) {
+        if (strings.length >= 1 && strings[0].equalsIgnoreCase("tutorial")) {
+            main.OpenTutorial(player);
+        } else if (!GUI.hasSeenTutorial(player)) {
             main.OpenTutorial(player);
         } else {
             main.OpenMainMenu(player);
         }
         return true;
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        if (args.length == 1) {
+            return List.of("tutorial");
+        }
+        return List.of();
     }
 }
