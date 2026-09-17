@@ -3,6 +3,7 @@ package dev.advancedkit.advancedkit.command;
 import dev.advancedkit.advancedkit.AdvancedKitPlugin;
 import dev.advancedkit.advancedkit.KitManager;
 import dev.advancedkit.advancedkit.gui.KitMenuGUI;
+import dev.advancedkit.advancedkit.kitroom.KitRoomGUI;
 import dev.advancedkit.advancedkit.model.Kit;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -39,6 +40,7 @@ public class KitCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase();
         switch (sub) {
+            case "room", "kitroom" -> handleRoom(sender);
             case "create" -> handleCreate(sender, args);
             case "save" -> handleSave(sender, args);
             case "delete" -> handleDelete(sender, args);
@@ -48,6 +50,18 @@ public class KitCommand implements CommandExecutor, TabCompleter {
             default -> sendUsage(sender);
         }
         return true;
+    }
+
+    private void handleRoom(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("僅限玩家使用");
+            return;
+        }
+        if (!player.hasPermission("advancedkit.kitroom.use")) {
+            player.sendMessage(Component.text("你沒有權限進入 Kit 房間").color(NamedTextColor.RED));
+            return;
+        }
+        player.openInventory(new KitRoomGUI(plugin.getKitRoomManager()).build(player));
     }
 
     private void handleCreate(CommandSender sender, String[] args) {
@@ -208,7 +222,8 @@ public class KitCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.reloadConfig();
-        sender.sendMessage(Component.text("AdvancedKit 設定已重新載入").color(NamedTextColor.GREEN));
+        plugin.getKitRoomManager().reload();
+        sender.sendMessage(Component.text("AdvancedKit 設定已重新載入(含 kitroom.yml)").color(NamedTextColor.GREEN));
     }
 
     private int parseCooldown(String[] args, int index, int fallback) {
@@ -225,6 +240,7 @@ public class KitCommand implements CommandExecutor, TabCompleter {
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(Component.text("=== AdvancedKit 指令 ===").color(NamedTextColor.AQUA));
         sender.sendMessage(Component.text("/kit - 開啟 Kit 選單").color(NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("/kit room - 開啟 Kit 房間(無限資源，拿取後用 create/save 存成 Kit)").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit create <名稱> [冷卻秒數] - 以目前物品欄建立新 Kit").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit save <名稱> - 更新既有 Kit 內容").color(NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/kit delete <名稱> - 刪除 Kit").color(NamedTextColor.GRAY));
@@ -239,7 +255,7 @@ public class KitCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> options = new ArrayList<>();
         if (args.length == 1) {
-            options.addAll(List.of("create", "save", "delete", "give"));
+            options.addAll(List.of("room", "create", "save", "delete", "give"));
             if (sender.hasPermission("advancedkit.admin")) {
                 options.addAll(List.of("admin", "reload"));
             }

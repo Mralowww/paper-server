@@ -11,12 +11,15 @@ description: >
 commands:
   kit:
     description: AdvancedKit 主指令
-    usage: /kit [create|save|delete|give|admin|reload]
+    usage: /kit [room|create|save|delete|give|admin|reload]
     permission: advancedkit.use
 
 permissions:
   advancedkit.use:
     description: 允許使用 /kit 指令建立與領取個人 Kit
+    default: true
+  advancedkit.kitroom.use:
+    description: 允許進入 Kit 房間拿取無限資源裝備
     default: true
   advancedkit.admin:
     description: 允許管理伺服器共用 Kit 與重新載入設定

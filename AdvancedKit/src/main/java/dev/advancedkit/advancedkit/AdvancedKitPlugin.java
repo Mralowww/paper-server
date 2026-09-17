@@ -1,6 +1,8 @@
 package dev.advancedkit.advancedkit;
 
 import dev.advancedkit.advancedkit.command.KitCommand;
+import dev.advancedkit.advancedkit.kitroom.KitRoomListener;
+import dev.advancedkit.advancedkit.kitroom.KitRoomManager;
 import dev.advancedkit.advancedkit.listener.KitGuiListener;
 import dev.advancedkit.advancedkit.storage.KitDatabase;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -9,6 +11,7 @@ public class AdvancedKitPlugin extends JavaPlugin {
 
     private KitDatabase database;
     private KitManager kitManager;
+    private KitRoomManager kitRoomManager;
 
     @Override
     public void onEnable() {
@@ -19,6 +22,9 @@ public class AdvancedKitPlugin extends JavaPlugin {
 
         kitManager = new KitManager(this, database);
 
+        kitRoomManager = new KitRoomManager(this);
+        kitRoomManager.load();
+
         KitCommand kitCommand = new KitCommand(this);
         var command = getCommand("kit");
         if (command != null) {
@@ -27,6 +33,7 @@ public class AdvancedKitPlugin extends JavaPlugin {
         }
 
         getServer().getPluginManager().registerEvents(new KitGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new KitRoomListener(), this);
 
         getLogger().info("AdvancedKit 已啟用");
     }
@@ -45,5 +52,9 @@ public class AdvancedKitPlugin extends JavaPlugin {
 
     public KitDatabase getDatabase() {
         return database;
+    }
+
+    public KitRoomManager getKitRoomManager() {
+        return kitRoomManager;
     }
 }
