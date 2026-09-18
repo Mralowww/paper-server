@@ -627,6 +627,10 @@ public class GUI {
      * /kit tutorial.
      */
     public void OpenTutorial(Player p) {
+        if (openTutorialDialog(p)) {
+            return;
+        }
+
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTutorialMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < MENU_SIZE; i++) {
@@ -672,6 +676,57 @@ public class GUI {
         });
 
         openMenu(p, titledMenu, "perplayerkit.menu", LocationFeature.MENU);
+    }
+
+    /** Tries the native Paper Dialog first (Paper 1.21.6+); returns false to fall back to the chest menu. */
+    private boolean openTutorialDialog(Player p) {
+        if (!dev.noah.perplayerkit.dialog.DialogCompat.isSupported()) {
+            return false;
+        }
+        java.util.List<dev.noah.perplayerkit.dialog.DialogCompat.Line> lines = java.util.List.of(
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.CHEST),
+                        miniMessage("gui.tutorial-step1-name") .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step1-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step1-lore2"))),
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.HOPPER),
+                        miniMessage("gui.tutorial-step2-name").append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step2-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step2-lore2"))),
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.NETHER_STAR),
+                        miniMessage("gui.tutorial-step3-name").append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step3-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step3-lore2"))),
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.ENDER_CHEST),
+                        miniMessage("gui.tutorial-step4-name").append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step4-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step4-lore2"))),
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.SHIELD),
+                        miniMessage("gui.tutorial-step5-name").append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step5-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step5-lore2"))),
+                new dev.noah.perplayerkit.dialog.DialogCompat.Line(new ItemStack(Material.ANVIL),
+                        miniMessage("gui.tutorial-step6-name").append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step6-lore1"))
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(miniMessage("gui.tutorial-step6-lore2")))
+        );
+
+        return dev.noah.perplayerkit.dialog.DialogCompat.showNotice(
+                p, miniMessage("gui.tutorial-title"), lines, miniMessage("gui.tutorial-start-name"),
+                () -> {
+                    markTutorialSeen(p);
+                    SoundManager.playClick(p);
+                    OpenMainMenu(p);
+                });
+    }
+
+    private net.kyori.adventure.text.Component miniMessage(String key) {
+        return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(lang(key));
     }
 
     public void OpenMainMenu(Player p) {
