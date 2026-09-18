@@ -207,6 +207,8 @@ public class GUI {
                 info.setResult(org.bukkit.event.Event.Result.DENY);
                 ItemStack current = kitMenu.getSlot(itemIndex).getItem();
                 if (current == null || current.getType() == Material.AIR) {
+                    SoundManager.playFailure(player);
+                    Lang.get().send(player, "error.kit-not-found-display");
                     return;
                 }
                 SoundManager.playClick(player);
@@ -319,30 +321,42 @@ public class GUI {
         int level = dev.noah.perplayerkit.anvil.EnchantEditor.currentLevel(session.getItem(), enchantment);
         String name = enchantment.getKey().getKey().replace('_', ' ');
         slot.setItem(createItem(level > 0 ? Material.ENCHANTED_BOOK : Material.BOOK, 1,
-                lang("gui.anvil-enchant-name", "enchant", name, "level", String.valueOf(level), "max", String.valueOf(enchantment.getMaxLevel())),
+                lang("gui.anvil-enchant-name", "enchant", name),
+                lang("gui.lore-anvil-enchant-current", "level", String.valueOf(level)),
+                lang("gui.lore-anvil-enchant-max", "max", String.valueOf(enchantment.getMaxLevel())),
                 lang("gui.lore-anvil-enchant-add"),
-                level > 0 ? lang("gui.lore-anvil-enchant-remove") : ""));
+                lang("gui.lore-anvil-enchant-subtract"),
+                lang("gui.lore-anvil-enchant-set-max"),
+                lang("gui.lore-anvil-enchant-remove")));
         slot.setClickHandler((player, info) -> {
-            if (info.getClickType().isShiftClick()) {
-                dev.noah.perplayerkit.anvil.EnchantEditor.removeEnchant(session.getItem(), enchantment);
-                SoundManager.playClick(player);
-                openAnvilEnchantEditor(player);
-                return;
-            }
-            var result = dev.noah.perplayerkit.anvil.EnchantEditor.increaseLevel(session.getItem(), enchantment);
-            switch (result) {
-                case ADDED -> SoundManager.playClick(player);
-                case MAX_LEVEL -> {
-                    Lang.get().send(player, "error.anvil-max-level");
-                    SoundManager.playFailure(player);
+            switch (info.getClickType()) {
+                case SHIFT_RIGHT -> {
+                    dev.noah.perplayerkit.anvil.EnchantEditor.removeEnchant(session.getItem(), enchantment);
+                    SoundManager.playClick(player);
                 }
-                case CONFLICT -> {
-                    Lang.get().send(player, "error.anvil-enchant-conflict");
-                    SoundManager.playFailure(player);
+                case SHIFT_LEFT -> applyEnchantResult(player, dev.noah.perplayerkit.anvil.EnchantEditor.setMaxLevel(session.getItem(), enchantment));
+                case RIGHT -> {
+                    dev.noah.perplayerkit.anvil.EnchantEditor.decreaseLevel(session.getItem(), enchantment);
+                    SoundManager.playClick(player);
                 }
+                default -> applyEnchantResult(player, dev.noah.perplayerkit.anvil.EnchantEditor.increaseLevel(session.getItem(), enchantment));
             }
             openAnvilEnchantEditor(player);
         });
+    }
+
+    private void applyEnchantResult(Player player, dev.noah.perplayerkit.anvil.EnchantEditor.AddResult result) {
+        switch (result) {
+            case ADDED -> SoundManager.playClick(player);
+            case MAX_LEVEL -> {
+                Lang.get().send(player, "error.anvil-max-level");
+                SoundManager.playFailure(player);
+            }
+            case CONFLICT -> {
+                Lang.get().send(player, "error.anvil-enchant-conflict");
+                SoundManager.playFailure(player);
+            }
+        }
     }
 
     private void promptRename(Player p, dev.noah.perplayerkit.anvil.EnchantSession session) {

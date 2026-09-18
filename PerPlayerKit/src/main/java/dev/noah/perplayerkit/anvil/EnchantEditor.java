@@ -88,6 +88,35 @@ public final class EnchantEditor {
         return AddResult.ADDED;
     }
 
+    /** Lowers the enchant by one level; removes it entirely once it reaches 0. No-op if it isn't applied. */
+    public static void decreaseLevel(ItemStack item, Enchantment enchantment) {
+        int current = currentLevel(item, enchantment);
+        if (current <= 0) {
+            return;
+        }
+        if (current == 1) {
+            removeEnchant(item, enchantment);
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        meta.addEnchant(enchantment, current - 1, true);
+        item.setItemMeta(meta);
+    }
+
+    /** Jumps straight to the enchant's vanilla max level, refusing conflicts the same way {@link #increaseLevel} does. */
+    public static AddResult setMaxLevel(ItemStack item, Enchantment enchantment) {
+        if (currentLevel(item, enchantment) == 0) {
+            Enchantment conflict = findConflict(item, enchantment);
+            if (conflict != null) {
+                return AddResult.CONFLICT;
+            }
+        }
+        ItemMeta meta = item.getItemMeta();
+        meta.addEnchant(enchantment, enchantment.getMaxLevel(), true);
+        item.setItemMeta(meta);
+        return AddResult.ADDED;
+    }
+
     public static void removeEnchant(ItemStack item, Enchantment enchantment) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return;
