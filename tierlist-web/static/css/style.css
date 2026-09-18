@@ -1,0 +1,355 @@
+:root {
+    color-scheme: light dark;
+    --bg: #14161b;
+    --panel: #1b1e24;
+    --panel-2: #21242b;
+    --text: #e4e6ea;
+    --muted: #8b909a;
+    --accent: #4c6ef5;
+    --border: #2c2f37;
+    --danger: #d9534f;
+    --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+.topnav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px clamp(16px, 4vw, 32px);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+
+.topnav .brand {
+    color: var(--text);
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.nav-links a:hover {
+    color: var(--text);
+    background: var(--panel-2);
+}
+
+main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 28px 16px 60px;
+}
+
+h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 6px;
+}
+
+h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.page-subtitle {
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-size: 0.92rem;
+}
+
+/* ---- 卡片 / 面板 ---- */
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+}
+
+/* ---- 表格 ---- */
+
+.table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.tier-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    min-width: 480px;
+}
+
+.tier-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    background: var(--panel-2);
+    padding: 10px 14px;
+    white-space: nowrap;
+}
+
+.tier-table td {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.tier-table tbody tr:hover {
+    background: var(--panel-2);
+}
+
+.rank-row td:first-child {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    width: 1%;
+    white-space: nowrap;
+}
+
+/* ---- 頭像 ---- */
+
+.mc-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    display: block;
+    image-rendering: pixelated;
+    border: 1px solid var(--border);
+}
+
+/* ---- Tier 徽章 ---- */
+
+.tier-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 3px;
+    color: #14161b;
+    font-weight: 700;
+    font-size: 0.78rem;
+    background: var(--accent);
+}
+
+.tier-HT1 { background: #e8b84b; }
+.tier-LT1 { background: #f0cf82; }
+.tier-HT2 { background: #4c6ef5; }
+.tier-LT2 { background: #a4b4fa; }
+.tier-HT3 { background: #2fb08a; }
+.tier-LT3 { background: #8fd9c1; }
+.tier-HT4 { background: #9aa3b0; }
+.tier-LT4 { background: #cbd0d8; }
+.tier-HT5 { background: #a3764f; }
+.tier-LT5 { background: #cba887; }
+
+/* ---- 驗證碼 / 提示卡 ---- */
+
+.verify-box {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-top: 16px;
+}
+
+.verify-box pre {
+    font-size: 1.05rem;
+    font-weight: 700;
+    background: #0b0d10;
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 4px;
+    display: inline-block;
+    margin: 8px 0 0;
+    letter-spacing: 0.04em;
+}
+
+/* ---- 表單元件 ---- */
+
+.inline-form {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin: 8px 8px 8px 0;
+    flex-wrap: wrap;
+}
+
+input, select, button, textarea {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+input::placeholder { color: var(--muted); }
+
+button, .btn {
+    display: inline-block;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+button:hover, .btn:hover {
+    filter: brightness(1.1);
+}
+
+button.danger {
+    background: var(--danger);
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+.empty-state-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+}
+
+a { color: var(--accent); }
+
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--panel-2);
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+.panel pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    background: #0b0d10;
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.panel ol {
+    padding-left: 20px;
+    margin: 0;
+}
+
+.panel ol li {
+    margin-bottom: 6px;
+}
+
+/* ---- 玩家個人頁 ---- */
+
+.player-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.player-skin {
+    width: 88px;
+    height: auto;
+    image-rendering: pixelated;
+    flex: 0 0 auto;
+}
+
+.player-header-info h1 {
+    margin-bottom: 4px;
+}
+
+.player-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ---- 手機版排版 ---- */
+
+@media (max-width: 640px) {
+    .topnav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 16px;
+    }
+
+    .nav-links {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-links a {
+        flex: 0 0 auto;
+    }
+
+    main {
+        padding-top: 16px;
+    }
+
+    h1 {
+        font-size: 1.3rem;
+    }
+
+    .panel {
+        padding: 14px;
+    }
+
+    .inline-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .inline-form input,
+    .inline-form select,
+    .inline-form button,
+    .inline-form .btn {
+        width: 100%;
+    }
+}

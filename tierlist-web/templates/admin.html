@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}管理後台 - 華人原版水晶{% endblock %}
+{% block content %}
+<h1>管理後台</h1>
+
+<p class="page-subtitle">只有 Discord 伺服器 Administrator 權限的人看得到這個頁面。</p>
+
+<h2>玩家資料編輯</h2>
+<form method="post" action="{{ url_for('admin_create_player') }}" class="inline-form">
+    <input type="text" name="mc_username" placeholder="MC 帳號" required>
+    <select name="tier">
+        <option value="">未評級</option>
+        {% for t in tiers %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+    </select>
+    <select name="region">
+        <option value="">地區(可留空)</option>
+        {% for r in regions %}
+        <option value="{{ r }}">{{ r }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">手動新增玩家</button>
+</form>
+<p class="muted">這是給還沒走完 Discord 綁定流程、想先手動加進排名的情況用,之後這個人真的用 Discord 登入 + /verify 綁定的話會自動接手這筆資料。</p>
+{% if players %}
+<div class="table-wrap">
+<table class="tier-table">
+    <thead>
+        <tr><th>Discord</th><th>已回報模組</th><th>編輯</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for p in players %}
+        {% set mods_record = get_player_mods(p.mc_uuid) if p.mc_uuid else None %}
+        <tr>
+            <td>{{ p.discord_username }}</td>
+            <td>
+                {% if mods_record %}
+                <span title="{{ mods_record.mods | map(attribute='id') | join(', ') }}">
+                    {{ mods_record.mods | length }} 個({{ mods_record.updated_at | timestamp_to_date }})
+                </span>
+                {% else %}
+                <span class="muted">尚未回報</span>
+                {% endif %}
+            </td>
+            <td>
+                <form method="post" action="{{ url_for('admin_edit_player', player_id=p.id) }}" class="inline-form">
+                    <input type="text" name="mc_username" placeholder="MC 帳號" value="{{ p.mc_username or '' }}">
+                    <select name="tier">
+                        <option value="">未評級</option>
+                        {% for t in tiers %}
+                        <option value="{{ t }}" {% if p.vanilla_tier == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="region">
+                        <option value="">未設定</option>
+                        {% for r in regions %}
+                        <option value="{{ r }}" {% if p.region == r %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">更新</button>
+                </form>
+            </td>
+            <td>
+                <form method="post" action="{{ url_for('admin_delete_player', player_id=p.id) }}" class="inline-form"
+                      onsubmit="return confirm('確定要刪除 {{ p.discord_username }} 的所有資料嗎?');">
+                    <button type="submit" class="danger">刪除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">目前還沒有任何玩家資料。</div>
+{% endif %}
+
+<h2>API Key 管理</h2>
+<p class="page-subtitle">
+    <code>read</code>:只能查排名/測試紀錄等唯讀資料。
+    <code>control</code>:額外可以叫 Discord bot 發訊息(<code>/api/v1/discord/announce</code>),請只發給信任的程式。
+</p>
+<form method="post" action="{{ url_for('admin_create_api_key') }}" class="inline-form">
+    <input type="text" name="label" placeholder="用途說明,例如:某某 mod" required>
+    <select name="scope">
+        <option value="read">read(唯讀)</option>
+        <option value="control">control(可控制 Discord bot)</option>
+    </select>
+    <button type="submit">建立新的 API Key</button>
+</form>
+{% if api_keys %}
+<div class="table-wrap" style="margin-top:12px;">
+<table class="tier-table">
+    <thead>
+        <tr><th>Key</th><th>用途</th><th>權限</th><th>狀態</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for k in api_keys %}
+        <tr>
+            <td><code>{{ k.key }}</code></td>
+            <td>{{ k.label }}</td>
+            <td>{{ k.scope }}</td>
+            <td>{{ '已停用' if k.revoked else '啟用中' }}</td>
+            <td>
+                {% if not k.revoked %}
+                <form method="post" action="{{ url_for('admin_revoke_api_key') }}" class="inline-form">
+                    <input type="hidden" name="key" value="{{ k.key }}">
+                    <button type="submit">停用</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+
+<h2>模組下載管理</h2>
+<form method="post" action="{{ url_for('admin_upload_download') }}" class="inline-form" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".jar" required>
+    <input type="text" name="version" placeholder="模組版本號,例如 1.0.0" required style="width:140px;">
+    <select name="mc_version_min" required>
+        {% for v in mc_versions %}
+        <option value="{{ v }}">{{ v }}</option>
+        {% endfor %}
+    </select>
+    <span class="muted">～</span>
+    <select name="mc_version_max" required>
+        {% for v in mc_versions %}
+        <option value="{{ v }}" {% if loop.last %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="description" placeholder="說明(可留空)" style="min-width:200px;">
+    <button type="submit">上傳新版本</button>
+</form>
+<p class="muted">上面兩個下拉是這包 jar 支援的 Minecraft 版本範圍(例如 1.21 ～ 1.21.11),玩家在下載頁可以照自己的遊戲版本篩選。</p>
+{% if downloads %}
+<div class="table-wrap" style="margin-top:12px;">
+<table class="tier-table">
+    <thead>
+        <tr><th>版本</th><th>支援 MC 版本</th><th>說明</th><th>發布時間</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for d in downloads %}
+        <tr>
+            <td>{{ d.version }}</td>
+            <td>{{ d.mc_version_min }} ～ {{ d.mc_version_max }}</td>
+            <td>{{ d.description or '-' }}</td>
+            <td class="muted">{{ d.created_at | timestamp_to_date }}</td>
+            <td>
+                <form method="post" action="{{ url_for('admin_delete_download', download_id=d.id) }}" class="inline-form"
+                      onsubmit="return confirm('確定要刪除版本 {{ d.version }} 嗎?');">
+                    <button type="submit" class="danger">刪除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
