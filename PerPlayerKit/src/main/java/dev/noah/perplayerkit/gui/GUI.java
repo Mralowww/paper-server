@@ -198,7 +198,7 @@ public class GUI {
         kitMenu.getSlot(buttonSlot).setItem(createItem(Material.SHIELD, 1,
                 lang("gui.trim-button"), lang("gui.lore-trim-button")));
         kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
-            if (!ActionGuards.allowed(player, "perplayerkit.trims")) return;
+            if (!ActionGuards.allowed(player, "perplayerkit.trims", LocationFeature.KITS)) return;
             SoundManager.playClick(player);
             ItemStack[] armor = new ItemStack[]{
                     kitMenu.getSlot(39).getItem(),
@@ -214,7 +214,7 @@ public class GUI {
         kitMenu.getSlot(buttonSlot).setItem(createItem(Material.ANVIL, 1,
                 lang("gui.anvil-button"), lang("gui.lore-anvil-button")));
         kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
-            if (!ActionGuards.allowed(player, "perplayerkit.anvil")) return;
+            if (!ActionGuards.allowed(player, "perplayerkit.anvil", LocationFeature.KITS)) return;
             SoundManager.playClick(player);
             ItemStack[] snapshot = new ItemStack[KIT_CONTENT_END];
             for (int i = 0; i < KIT_CONTENT_END; i++) {
