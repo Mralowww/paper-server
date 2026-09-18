@@ -1,0 +1,22 @@
+name: TotemCounter
+version: '${version}'
+main: dev.opopjjjidj.totemcounter.TotemCounterPlugin
+api-version: '1.21'
+folia-supported: true
+author: opopjjjidj
+description: >
+  統計玩家使用不死圖騰(Totem of Undying)復活的次數，死亡時重置本命計數，
+  並提供 PlaceholderAPI 變數顯示個人圖騰數與圖騰爆最多排行榜。
+softdepend: [PlaceholderAPI]
+
+commands:
+  totemcounter:
+    description: TotemCounter 管理指令
+    usage: /totemcounter reload|reset <player>
+    aliases: [tc]
+    permission: totemcounter.admin
+
+permissions:
+  totemcounter.admin:
+    description: 管理 TotemCounter 設定與重置資料
+    default: op

@@ -1,0 +1,39 @@
+package dev.opopjjjidj.totemcounter;
+
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class TotemCounterPlugin extends JavaPlugin {
+
+    private DataManager dataManager;
+
+    @Override
+    public void onEnable() {
+        dataManager = new DataManager(this);
+        dataManager.load();
+
+        getServer().getPluginManager().registerEvents(new TotemListener(dataManager), this);
+
+        var totemCounterCommand = getCommand("totemcounter");
+        if (totemCounterCommand != null) {
+            totemCounterCommand.setExecutor(new TotemCounterCommand(this));
+        }
+
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new TotemPlaceholderExpansion(this).register();
+            getLogger().info("已註冊 PlaceholderAPI 變數 (%totem_pop%, %totem_pop_top1~9%)。");
+        } else {
+            getLogger().warning("找不到 PlaceholderAPI，圖騰相關 Placeholder 將無法使用。");
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        if (dataManager != null) {
+            dataManager.save();
+        }
+    }
+
+    public DataManager getDataManager() {
+        return dataManager;
+    }
+}
