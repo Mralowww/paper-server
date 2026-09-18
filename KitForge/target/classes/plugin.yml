@@ -1,0 +1,49 @@
+name: KitForge
+version: '${project.version}'
+main: dev.kitforge.KitForgePlugin
+api-version: '1.21'
+author: opopjjjidj
+
+commands:
+  kit:
+    description: KitForge 主指令
+    usage: /kit [tutorial|room]
+    permission: kitforge.use
+    aliases: [k]
+
+permissions:
+  kitforge.use:
+    description: 允許使用 /kit 建立與領取個人套裝
+    default: true
+  kitforge.admin:
+    description: 管理員權限，繞過所有樣式 tier 限制、可編輯 Kit 房間
+    default: op
+    children:
+      kitforge.kitroom.edit: true
+      kitforge.trims.admin: true
+  kitforge.kitroom.edit:
+    description: 允許用 /kit room edit 編輯 Kit 房間內容
+    default: op
+  kitforge.trims.admin:
+    description: 繞過盔甲樣式 tier 限制，可使用所有材料
+    default: op
+  kitforge.trims.lt5:
+    default: true
+  kitforge.trims.ht5:
+    default: false
+  kitforge.trims.lt4:
+    default: false
+  kitforge.trims.ht4:
+    default: false
+  kitforge.trims.lt3:
+    default: false
+  kitforge.trims.ht3:
+    default: false
+  kitforge.trims.lt2:
+    default: false
+  kitforge.trims.ht2:
+    default: false
+  kitforge.trims.lt1:
+    default: false
+  kitforge.trims.ht1:
+    default: false

@@ -1,0 +1,44 @@
+language: zh_tw
+
+kits:
+  max-slots: 9
+
+kitroom:
+  title: "&8&lKit 房間 &7- 無限資源"
+  size: 54
+
+heal-on-load: true
+
+broadcasts:
+  heal: false
+  regear: false
+
+# Armor trim material tiers, worst to strongest:
+# lt5 < ht5 < lt4 < ht4 < lt3 < ht3 < lt2 < ht2 < lt1 < ht1
+# 玩家擁有較高 tier 權限時自動解鎖以下所有較弱 tier。
+trims:
+  enabled: true
+  tiers:
+    - permission: "kitforge.trims.lt5"
+      material: "QUARTZ"
+    - permission: "kitforge.trims.ht5"
+      material: "IRON"
+    - permission: "kitforge.trims.lt4"
+      material: "COPPER"
+    - permission: "kitforge.trims.ht4"
+      material: "GOLD"
+    - permission: "kitforge.trims.lt3"
+      material: "REDSTONE"
+    - permission: "kitforge.trims.ht3"
+      material: "LAPIS"
+    - permission: "kitforge.trims.lt2"
+      material: "AMETHYST"
+    - permission: "kitforge.trims.ht2"
+      material: "EMERALD"
+    - permission: "kitforge.trims.lt1"
+      material: "DIAMOND"
+    - permission: "kitforge.trims.ht1"
+      material: "NETHERITE"
+
+# 改名需要的最低 tier(見上方 trims.tiers 的 permission suffix)
+rename-min-tier: "lt2"
