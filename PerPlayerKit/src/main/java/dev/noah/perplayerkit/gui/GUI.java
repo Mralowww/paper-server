@@ -296,6 +296,10 @@ public class GUI {
         } else {
             menu.getSlot(50).setItem(createItem(Material.BARRIER, 1,
                     lang("gui.anvil-rename-locked-name"), lang("gui.anvil-rename-locked-lore")));
+            menu.getSlot(50).setClickHandler((player, info) -> {
+                SoundManager.playFailure(player);
+                Lang.get().send(player, "error.no-permission");
+            });
         }
 
         menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-and-save-button")));
@@ -324,8 +328,14 @@ public class GUI {
             var result = dev.noah.perplayerkit.anvil.EnchantEditor.increaseLevel(session.getItem(), enchantment);
             switch (result) {
                 case ADDED -> SoundManager.playClick(player);
-                case MAX_LEVEL -> Lang.get().send(player, "error.anvil-max-level");
-                case CONFLICT -> Lang.get().send(player, "error.anvil-enchant-conflict");
+                case MAX_LEVEL -> {
+                    Lang.get().send(player, "error.anvil-max-level");
+                    SoundManager.playFailure(player);
+                }
+                case CONFLICT -> {
+                    Lang.get().send(player, "error.anvil-enchant-conflict");
+                    SoundManager.playFailure(player);
+                }
             }
             openAnvilEnchantEditor(player);
         });
@@ -389,6 +399,7 @@ public class GUI {
         Slot slot = menu.getSlot(slotIndex);
         if (armor == null || armor.getType() == Material.AIR || !dev.noah.perplayerkit.trim.TrimCompat.isArmorPiece(armor)) {
             slot.setItem(createItem(Material.BARRIER, 1, lang("gui.trim-piece-empty", "piece", pieceName(piece))));
+            slot.setClickHandler((player, info) -> SoundManager.playFailure(player));
             return;
         }
         slot.setItem(addHideFlags(armor.clone()));
@@ -460,6 +471,10 @@ public class GUI {
                 slot.setItem(createItem(Material.GRAY_DYE, 1,
                         lang("gui.trim-material-locked-name", "material", capitalizeTrimKey(materialKey)),
                         lang("gui.trim-material-locked-lore", "permission", tier.permission())));
+                slot.setClickHandler((player, info) -> {
+                    SoundManager.playFailure(player);
+                    Lang.get().send(player, "error.no-permission");
+                });
             }
             slotIndex++;
             if ((slotIndex + 1) % 9 == 0) slotIndex += 2;
