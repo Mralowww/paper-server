@@ -220,7 +220,7 @@ public class GUI {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createItemActionMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < 27; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
+            menu.getSlot(i).setItem(ItemUtil.createRainbowGlassPane(i));
         }
 
         menu.getSlot(11).setItem(addHideFlags(item.clone()));
@@ -265,7 +265,7 @@ public class GUI {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createAnvilEnchantMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < MENU_SIZE; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
+            menu.getSlot(i).setItem(ItemUtil.createRainbowGlassPane(i));
         }
 
         menu.getSlot(4).setItem(addHideFlags(session.getItem().clone()));
@@ -379,7 +379,7 @@ public class GUI {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimPatternMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < MENU_SIZE; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
+            menu.getSlot(i).setItem(ItemUtil.createRainbowGlassPane(i));
         }
 
         int slotIndex = 10;
@@ -412,7 +412,7 @@ public class GUI {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimMaterialMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < MENU_SIZE; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
+            menu.getSlot(i).setItem(ItemUtil.createRainbowGlassPane(i));
         }
 
         java.util.List<String> unlocked = dev.noah.perplayerkit.trim.TrimTierConfig.get().unlockedMaterials(p);

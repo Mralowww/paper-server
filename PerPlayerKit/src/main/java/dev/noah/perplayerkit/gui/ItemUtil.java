@@ -67,6 +67,26 @@ public class ItemUtil {
         return item;
     }
 
+    private static final Material[] RAINBOW_PANES = {
+            Material.MAGENTA_STAINED_GLASS_PANE, Material.PINK_STAINED_GLASS_PANE,
+            Material.PURPLE_STAINED_GLASS_PANE, Material.LIGHT_BLUE_STAINED_GLASS_PANE,
+            Material.CYAN_STAINED_GLASS_PANE, Material.LIME_STAINED_GLASS_PANE,
+            Material.YELLOW_STAINED_GLASS_PANE, Material.ORANGE_STAINED_GLASS_PANE
+    };
+
+    /** A brighter alternative to {@link #createGlassPane()} for feature menus (item actions, trims, anvil) that want a livelier backdrop. */
+    public static ItemStack createRainbowGlassPane(int slotIndex) {
+        ItemStack item = new ItemStack(RAINBOW_PANES[Math.floorMod(slotIndex, RAINBOW_PANES.length)]);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            if (!GuiCompat.hideTooltip(meta)) {
+                meta.setDisplayName(" ");
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     public static ItemStack createItem(Material material, String name) {
         return createItem(material, 1, name);
     }
