@@ -19,6 +19,10 @@ commands:
     description: 開啟 GUI 查看指定玩家身上的圖騰與 pop 總數
     usage: /totem <player>
     permission: totemcounter.view
+  totemactionbar:
+    description: 切換 Actionbar 顯示目前剩餘圖騰數量
+    usage: /totemactionbar toggle
+    permission: totemcounter.actionbar
 
 permissions:
   totemcounter.admin:
@@ -27,3 +31,6 @@ permissions:
   totemcounter.view:
     description: 查看其他玩家身上的圖騰與 pop 統計
     default: op
+  totemcounter.actionbar:
+    description: 切換自己的圖騰 Actionbar 顯示
+    default: true
