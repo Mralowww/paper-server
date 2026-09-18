@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ActionBarManager {
 
     private static final String TEMPLATE =
-            "<yellow>剩餘圖騰 <sprite:\"minecraft:items\":item/totem_of_undying> <white>x<count>";
+            "<head:%s> <white>x<count> <sprite:\"minecraft:items\":item/totem_of_undying>";
 
     private final TotemCounterPlugin plugin;
     private final Set<UUID> enabled = ConcurrentHashMap.newKeySet();
@@ -67,7 +67,8 @@ public class ActionBarManager {
                 continue;
             }
             int count = countHeldTotems(player);
-            Component message = miniMessage.deserialize(TEMPLATE,
+            String template = String.format(TEMPLATE, player.getName());
+            Component message = miniMessage.deserialize(template,
                     Placeholder.unparsed("count", String.valueOf(count)));
             player.sendActionBar(message);
         }
