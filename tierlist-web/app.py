@@ -60,7 +60,7 @@ def add_security_headers(resp):
     resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "img-src 'self' https://crafatar.com data:; "
+        "img-src 'self' https://mc-heads.net data:; "
         "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
         "font-src https://fonts.gstatic.com; "
         "script-src 'self'; "
@@ -89,13 +89,13 @@ def gen_code(length: int = 8) -> str:
 def mc_avatar_url(mc_uuid):
     if not mc_uuid:
         return None
-    return f"https://crafatar.com/avatars/{mc_uuid}?size=64&overlay"
+    return f"https://mc-heads.net/avatar/{mc_uuid}/64"
 
 
 def mc_body_url(mc_uuid):
     if not mc_uuid:
         return None
-    return f"https://crafatar.com/renders/body/{mc_uuid}?scale=6&overlay"
+    return f"https://mc-heads.net/body/{mc_uuid}/right"
 
 
 def namemc_url(mc_username):
@@ -156,12 +156,6 @@ def downloads_file(download_id):
         DOWNLOADS_DIR, item["stored_filename"],
         as_attachment=True, download_name=item["original_filename"],
     )
-
-
-@app.route("/tests")
-def tests():
-    results = models.list_test_results(limit=100)
-    return render_template("tests.html", results=results)
 
 
 @app.route("/player/<mc_username>")

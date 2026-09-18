@@ -143,8 +143,8 @@ Header: X-API-Key: <你的 key>
 - 通過後自動在 `TICKET_CATEGORY_ID` 分類底下建立一個只有申請人 + 考官身份組看得到的私密頻道(考試單),頻道內有「🔒 關閉考試單」按鈕
 - 考官在考試單頻道內打 `/result`,跳出表單填寫伺服器地區、遊戲名稱、比分(勝-敗)、取得段位,送出後會:
   - 更新玩家的段位與本次測試時間(影響下次冷卻判定)
-  - 在考試單頻道 + `RESULTS_CHANNEL_ID`(若有設定)發布考試結果 Embed,附上玩家的 Minecraft 頭像(crafatar)
-  - 寫入資料庫,網站的 `/tests` 頁面會顯示完整測試紀錄(含頭像)
+  - 在考試單頻道 + `RESULTS_CHANNEL_ID`(若有設定)發布考試結果 Embed,附上玩家的 Minecraft 頭像(mc-heads.net)
+  - 寫入資料庫,玩家個人頁(`/player/<username>`)會顯示完整測試紀錄
 
 需要的環境變數(`.env.example` 已列出):`EXAMINER_ROLE_ID`(考官身份組)、`TICKET_CATEGORY_ID`(考試單分類頻道)、`RESULTS_CHANNEL_ID`(結果公告頻道,可留空)。
 

@@ -43,7 +43,7 @@ _last_seen_tiers: dict[str, str | None] = {}
 def mc_avatar_url(mc_uuid: str | None) -> str | None:
     if not mc_uuid:
         return None
-    return f"https://crafatar.com/avatars/{mc_uuid}?size=128&overlay"
+    return f"https://mc-heads.net/avatar/{mc_uuid}/128"
 
 
 def namemc_url(mc_username: str | None) -> str | None:
