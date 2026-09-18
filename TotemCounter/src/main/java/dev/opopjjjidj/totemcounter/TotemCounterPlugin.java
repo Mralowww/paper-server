@@ -12,10 +12,16 @@ public class TotemCounterPlugin extends JavaPlugin {
         dataManager.load();
 
         getServer().getPluginManager().registerEvents(new TotemListener(dataManager), this);
+        getServer().getPluginManager().registerEvents(new TotemGuiListener(), this);
 
         var totemCounterCommand = getCommand("totemcounter");
         if (totemCounterCommand != null) {
             totemCounterCommand.setExecutor(new TotemCounterCommand(this));
+        }
+
+        var totemCommand = getCommand("totem");
+        if (totemCommand != null) {
+            totemCommand.setExecutor(new TotemGuiCommand(this));
         }
 
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
