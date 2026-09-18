@@ -630,7 +630,7 @@ public class GUI {
         GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTutorialMenu();
         Menu menu = titledMenu.menu();
         for (int i = 0; i < MENU_SIZE; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
+            menu.getSlot(i).setItem(ItemUtil.createRainbowGlassPane(i));
         }
 
         menu.getSlot(10).setItem(createItem(Material.CHEST, 1,
