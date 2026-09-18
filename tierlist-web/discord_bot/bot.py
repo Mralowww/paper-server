@@ -177,7 +177,10 @@ class ResultModal(discord.ui.Modal, title="發布考試結果"):
     game_name = discord.ui.TextInput(label="遊戲名稱 / 測試項目", placeholder="例如 Sumo / Battle", required=True, max_length=64)
     score = discord.ui.TextInput(label="比分紀錄 (勝-敗)", placeholder="例如 3-0", required=True, max_length=16)
     tier_after = discord.ui.TextInput(
-        label=f"取得段位 ({'/'.join(models.TIERS)})", placeholder="例如 HT3", required=True, max_length=8
+        label="取得段位",
+        placeholder=f"例如 HT3(可選:{'/'.join(models.TIERS)})",
+        required=True,
+        max_length=8,
     )
 
     def __init__(self, ticket: dict, examiner: discord.Member):
