@@ -33,13 +33,12 @@ Fabric 客戶端模組(Minecraft 1.21.x),在遊戲裡玩家名稱旁邊(頭頂�
 
 改完存檔後重開遊戲生效。
 
-## 建置(需要你自己的電腦,這裡沒辦法幫你編譯)
+## 建置
 
-這個 sandbox 環境沒有對外連線去下載 Minecraft 本體、Yarn mappings、Fabric API 等建置素材,
-所以**這份程式碼還沒有實際編譯測試過**,是照 Fabric 官方範例模組的標準寫法寫的。你在自己電腦上建置：
+已經實際編譯成功過(Gradle 8.14.3 + Fabric Loom 1.9.2),沒有 `gradlew` wrapper,直接用系統的 Gradle:
 
 ```bash
-./gradlew build
+gradle build
 ```
 
 建置產物在 `build/libs/tierbadge-1.0.0.jar`,丟進客戶端的 `mods/` 資料夾(需要先裝 [Fabric Loader](https://fabricmc.net/use/) + [Fabric API](https://modrinth.com/mod/fabric-api))。

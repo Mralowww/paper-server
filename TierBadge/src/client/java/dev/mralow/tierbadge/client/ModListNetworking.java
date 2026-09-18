@@ -3,16 +3,14 @@ package dev.mralow.tierbadge.client;
 import dev.mralow.tierbadge.TierBadgeConfig;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.util.Identifier;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.List;
+import java.util.Collection;
 
 /**
  * 進伺服器時把目前裝的所有 Fabric 模組清單,透過自訂插件頻道送給伺服器端的 TierVerify 插件看。
@@ -21,27 +19,25 @@ import java.util.List;
  */
 public final class ModListNetworking {
 
-    public static final Identifier CHANNEL = Identifier.of("tierbadge", "modlist");
-
     private ModListNetworking() {
     }
 
     public static void register(TierBadgeConfig config) {
+        PayloadTypeRegistry.playC2S().register(ModListPayload.ID, ModListPayload.CODEC);
+
         if (!config.sendModList) {
             return;
         }
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            if (!ClientPlayNetworking.canSend(CHANNEL)) {
+            if (!ClientPlayNetworking.canSend(ModListPayload.ID)) {
                 return;
             }
             byte[] payload = buildPayload();
             if (payload == null) {
                 return;
             }
-            PacketByteBuf buf = PacketByteBufs.create();
-            buf.writeBytes(payload);
-            ClientPlayNetworking.send(CHANNEL, buf);
+            ClientPlayNetworking.send(new ModListPayload(payload));
         });
     }
 
@@ -51,7 +47,7 @@ public final class ModListNetworking {
      * 伺服器端的 TierVerify 插件用 DataInputStream 原樣讀回來就好。
      */
     private static byte[] buildPayload() {
-        List<ModContainer> mods = FabricLoader.getInstance().getAllMods();
+        Collection<ModContainer> mods = FabricLoader.getInstance().getAllMods();
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
              DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeInt(mods.size());

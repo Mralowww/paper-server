@@ -1,5 +1,6 @@
 package dev.mralow.tierbadge;
 
+import dev.mralow.tierbadge.client.TierBadgeClient;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
