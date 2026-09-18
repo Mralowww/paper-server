@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Редактор Ковадла"
   lore-anvil-button: "<gray>Зачаруйте, відремонтуйте або перейменуйте предмет"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Ковадло: Виберіть Предмет</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Дії з Предметом</gradient>"
+  lore-shift-right-click: "<gold>Shift+ПКМ по предмету, щоб зачарувати, відремонтувати, перейменувати або оздобити"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Ковадло: Зачарування</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Клацніть, щоб додати рівень"

@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Alasin-editori"
   lore-anvil-button: "<gray>Lumoa, korjaa tai nimeä esine uudelleen"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Alasin: Valitse Esine</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Esinetoiminnot</gradient>"
+  lore-shift-right-click: "<gold>Shift+oikea klikkaus esineeseen lumotaksesi, korjataksesi, nimetäksesi tai koristellaksesi"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Alasin: Lumoukset</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Klikkaa lisätäksesi tason"

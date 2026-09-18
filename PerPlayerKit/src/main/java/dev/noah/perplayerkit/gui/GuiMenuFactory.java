@@ -45,11 +45,15 @@ public final class GuiMenuFactory {
     }
 
     private static TitledMenu chestMenu(String title) {
+        return chestMenu(title, 6);
+    }
+
+    private static TitledMenu chestMenu(String title, int rows) {
         // Redraw makes canvas swap menus inside the already-open inventory, so
         // the client keeps its cursor position instead of recentering on a
         // reopen. The reused inventory keeps its old title, which GUI fixes up
         // afterwards — only possible when the server has InventoryView#setTitle.
-        Menu menu = ChestMenu.builder(6).title(title).redraw(GuiCompat.supportsTitleUpdate()).build();
+        Menu menu = ChestMenu.builder(rows).title(title).redraw(GuiCompat.supportsTitleUpdate()).build();
         return new TitledMenu(menu, title);
     }
 
@@ -81,16 +85,12 @@ public final class GuiMenuFactory {
         return chestMenu(title("gui.tutorial-title"));
     }
 
-    public static TitledMenu createAnvilItemPickerMenu() {
-        return chestMenu(title("gui.anvil-picker-title"));
+    public static TitledMenu createItemActionMenu() {
+        return chestMenu(title("gui.item-action-title"), 3);
     }
 
     public static TitledMenu createAnvilEnchantMenu() {
         return chestMenu(title("gui.anvil-enchant-title"));
-    }
-
-    public static TitledMenu createTrimPieceMenu() {
-        return chestMenu(title("gui.trim-piece-title"));
     }
 
     public static TitledMenu createTrimPatternMenu() {

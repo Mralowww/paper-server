@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Éditeur d'Enclume"
   lore-anvil-button: "<gray>Enchantez, réparez ou renommez un objet"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Enclume : Choisissez un Objet</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Actions sur l'Objet</gradient>"
+  lore-shift-right-click: "<gold>Shift+clic droit sur un objet pour enchanter, réparer, renommer ou décorer"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Enclume : Enchantements</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Cliquez pour ajouter un niveau"

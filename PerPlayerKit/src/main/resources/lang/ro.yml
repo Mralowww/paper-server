@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Editor Nicovală"
   lore-anvil-button: "<gray>Vrăjește, repară sau redenumește un obiect"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Nicovală: Alege un Obiect</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Acțiuni Obiect</gradient>"
+  lore-shift-right-click: "<gold>Shift+click dreapta pe un obiect pentru a vrăji, repara, redenumi sau decora"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Nicovală: Vrăji</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Click pentru a adăuga un nivel"

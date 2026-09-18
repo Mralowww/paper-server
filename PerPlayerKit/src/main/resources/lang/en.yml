@@ -298,6 +298,8 @@ gui:
   anvil-button: "<aqua>Anvil Editor"
   lore-anvil-button: "<gray>Enchant, repair, or rename an item"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Anvil: Choose an Item</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Item Actions</gradient>"
+  lore-shift-right-click: "<gold>Shift+Right-click an item to enchant, repair, rename or style it"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Anvil: Enchantments</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Click to add a level"

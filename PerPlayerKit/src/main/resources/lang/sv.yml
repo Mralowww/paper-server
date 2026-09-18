@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Städ-redigerare"
   lore-anvil-button: "<gray>Förtrolla, reparera eller döp om ett föremål"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Städ: Välj ett Föremål</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Föremålsåtgärder</gradient>"
+  lore-shift-right-click: "<gold>Shift+högerklicka på ett föremål för att förtrolla, reparera, döpa om eller dekorera"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Städ: Förtrollningar</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Klicka för att lägga till en nivå"

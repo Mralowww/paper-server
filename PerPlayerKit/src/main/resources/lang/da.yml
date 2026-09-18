@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Ambolt-editor"
   lore-anvil-button: "<gray>Fortryl, reparer eller omdøb en genstand"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Ambolt: Vælg en Genstand</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Genstandshandlinger</gradient>"
+  lore-shift-right-click: "<gold>Shift+højreklik på en genstand for at fortrylle, reparere, omdøbe eller dekorere"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Ambolt: Fortryllelser</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Klik for at tilføje et niveau"

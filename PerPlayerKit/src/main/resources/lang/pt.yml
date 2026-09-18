@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Editor de Bigorna"
   lore-anvil-button: "<gray>Encante, repare ou renomeie um item"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Bigorna: Escolha um Item</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Ações do Item</gradient>"
+  lore-shift-right-click: "<gold>Shift+clique direito num item para encantar, reparar, renomear ou decorar"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Bigorna: Encantamentos</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Clique para adicionar um nível"

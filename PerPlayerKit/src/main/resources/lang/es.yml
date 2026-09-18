@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Editor de Yunque"
   lore-anvil-button: "<gray>Encanta, repara o renombra un objeto"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Yunque: Elige un Objeto</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Acciones del Objeto</gradient>"
+  lore-shift-right-click: "<gold>Shift+clic derecho en un objeto para encantar, reparar, renombrar o decorar"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Yunque: Encantamientos</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Clic para añadir un nivel"

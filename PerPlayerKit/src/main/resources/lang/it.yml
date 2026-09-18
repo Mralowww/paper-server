@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Editor Incudine"
   lore-anvil-button: "<gray>Incanta, ripara o rinomina un oggetto"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Incudine: Scegli un Oggetto</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Azioni Oggetto</gradient>"
+  lore-shift-right-click: "<gold>Shift+clic destro su un oggetto per incantare, riparare, rinominare o decorare"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Incudine: Incantesimi</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Clicca per aggiungere un livello"

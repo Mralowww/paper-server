@@ -21,10 +21,10 @@ package dev.noah.perplayerkit.trim;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Holds the state of an in-progress trim edit between the piece/pattern/material
- * steps of the GUI: which kit slot to write back to, the armor snapshot taken
- * the moment the player opened the editor, which piece they picked, and the
- * pattern once chosen. Kept per-player in {@link TrimGUI}.
+ * In-progress trim edit, opened directly from a shift-right-click on an
+ * armor piece in the kit editor: which kit slot and item index to write
+ * back to, the piece it corresponds to, the item itself, and the pattern
+ * once chosen.
  */
 public class TrimSession {
 
@@ -36,37 +36,43 @@ public class TrimSession {
         Piece(int kitSlotIndex) {
             this.kitSlotIndex = kitSlotIndex;
         }
+
+        /** The piece whose kit slot matches, or null if this index isn't one of the four armor slots. */
+        public static Piece fromKitSlotIndex(int kitSlotIndex) {
+            for (Piece piece : values()) {
+                if (piece.kitSlotIndex == kitSlotIndex) {
+                    return piece;
+                }
+            }
+            return null;
+        }
     }
 
     private final int kitSlot;
-    private final ItemStack[] armorSnapshot;
-    private Piece piece;
+    private final Piece piece;
+    private ItemStack item;
     private String patternKey;
 
-    public TrimSession(int kitSlot, ItemStack[] armorSnapshot) {
+    public TrimSession(int kitSlot, Piece piece, ItemStack item) {
         this.kitSlot = kitSlot;
-        this.armorSnapshot = armorSnapshot;
+        this.piece = piece;
+        this.item = item;
     }
 
     public int getKitSlot() {
         return kitSlot;
     }
 
-    public ItemStack getArmorItem(Piece piece) {
-        ItemStack item = armorSnapshot[piece.ordinal()];
-        return item == null ? null : item.clone();
-    }
-
-    public void setArmorItem(Piece piece, ItemStack item) {
-        armorSnapshot[piece.ordinal()] = item;
-    }
-
     public Piece getPiece() {
         return piece;
     }
 
-    public void setPiece(Piece piece) {
-        this.piece = piece;
+    public ItemStack getItem() {
+        return item;
+    }
+
+    public void setItem(ItemStack item) {
+        this.item = item;
     }
 
     public String getPatternKey() {

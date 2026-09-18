@@ -183,75 +183,79 @@ public class GUI {
         addMainButton(menu.getSlot(BACK_SLOT), KitSlots.pageOf(slot));
         addClear(menu.getSlot(CLEAR_SLOT));
         addImport(menu.getSlot(IMPORT_SLOT));
-        addTrimButton(menu, TRIM_BUTTON_SLOT, slot);
-        addAnvilButton(menu, ANVIL_BUTTON_SLOT, slot);
+        menu.getSlot(47).setItem(createItem(Material.NETHER_STAR, 1,
+                lang("gui.item-action-title"), lang("gui.lore-shift-right-click")));
+        attachItemContextMenu(menu, 0, KIT_CONTENT_END, slot);
         menu.setCursorDropHandler(Menu.ALLOW_CURSOR_DROPPING);
 
         openMenu(p, titledMenu, "perplayerkit.kit", LocationFeature.KITS);
         setEditorContext(p, new EditorContext(EditorType.KIT, slot, null, null, null));
     }
 
-    private void addTrimButton(Menu kitMenu, int buttonSlot, int kitSlot) {
-        if (!dev.noah.perplayerkit.trim.TrimCompat.isSupported() || !dev.noah.perplayerkit.trim.TrimTierConfig.get().isEnabled()) {
-            return;
+    /**
+     * Shift+right-click on any non-empty item in the kit editor (not a fixed
+     * button, so ClickOptions.ALLOW_ALL already lets every other click type
+     * through untouched) pops the action menu for that exact item.
+     */
+    private void attachItemContextMenu(Menu kitMenu, int startInclusive, int endExclusive, int kitSlot) {
+        for (int i = startInclusive; i < endExclusive; i++) {
+            int itemIndex = i;
+            kitMenu.getSlot(i).setClickHandler((player, info) -> {
+                if (info.getClickType() != ClickType.SHIFT_RIGHT) {
+                    return;
+                }
+                info.setResult(org.bukkit.event.Event.Result.DENY);
+                ItemStack current = kitMenu.getSlot(itemIndex).getItem();
+                if (current == null || current.getType() == Material.AIR) {
+                    return;
+                }
+                SoundManager.playClick(player);
+                openItemActionMenu(player, kitSlot, itemIndex, current.clone());
+            });
         }
-        kitMenu.getSlot(buttonSlot).setItem(createItem(Material.SHIELD, 1,
-                lang("gui.trim-button"), lang("gui.lore-trim-button")));
-        kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
-            if (!ActionGuards.allowed(player, "perplayerkit.trims", LocationFeature.KITS)) return;
-            SoundManager.playClick(player);
-            ItemStack[] armor = new ItemStack[]{
-                    kitMenu.getSlot(39).getItem(),
-                    kitMenu.getSlot(38).getItem(),
-                    kitMenu.getSlot(37).getItem(),
-                    kitMenu.getSlot(36).getItem()
-            };
-            openTrimPieceSelect(player, kitSlot, armor);
-        });
     }
 
-    private void addAnvilButton(Menu kitMenu, int buttonSlot, int kitSlot) {
-        kitMenu.getSlot(buttonSlot).setItem(createItem(Material.ANVIL, 1,
-                lang("gui.anvil-button"), lang("gui.lore-anvil-button")));
-        kitMenu.getSlot(buttonSlot).setClickHandler((player, info) -> {
-            if (!ActionGuards.allowed(player, "perplayerkit.anvil", LocationFeature.KITS)) return;
-            SoundManager.playClick(player);
-            ItemStack[] snapshot = new ItemStack[KIT_CONTENT_END];
-            for (int i = 0; i < KIT_CONTENT_END; i++) {
-                snapshot[i] = kitMenu.getSlot(i).getItem();
-            }
-            openAnvilItemPicker(player, kitSlot, snapshot);
-        });
-    }
-
-    /** Shows every non-empty item currently in the kit editor at its own slot; click one to enchant/repair/rename it. */
-    public void openAnvilItemPicker(Player p, int kitSlot, ItemStack[] itemsFromEditor) {
-        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createAnvilItemPickerMenu();
+    /** Small popup offering Anvil (enchant/repair/rename) and, for an armor piece, Armor Trim. */
+    private void openItemActionMenu(Player p, int kitSlot, int itemIndex, ItemStack item) {
+        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createItemActionMenu();
         Menu menu = titledMenu.menu();
-        for (int i = 0; i < MENU_SIZE; i++) {
+        for (int i = 0; i < 27; i++) {
             menu.getSlot(i).setItem(createGlassPane());
         }
 
-        for (int i = 0; i < itemsFromEditor.length && i < MENU_SIZE - 9; i++) {
-            ItemStack item = itemsFromEditor[i];
-            if (item == null || item.getType() == Material.AIR) continue;
-            final int itemIndex = i;
-            Slot slot = menu.getSlot(i);
-            slot.setItem(addHideFlags(item.clone()));
-            slot.setClickHandler((player, info) -> {
+        menu.getSlot(11).setItem(addHideFlags(item.clone()));
+
+        menu.getSlot(13).setItem(createItem(Material.ANVIL, 1,
+                lang("gui.anvil-button"), lang("gui.lore-anvil-button")));
+        menu.getSlot(13).setClickHandler((player, info) -> {
+            if (!ActionGuards.allowed(player, "perplayerkit.anvil", LocationFeature.KITS)) return;
+            SoundManager.playClick(player);
+            anvilSessions.put(player.getUniqueId(), new dev.noah.perplayerkit.anvil.EnchantSession(kitSlot, itemIndex, item.clone()));
+            openAnvilEnchantEditor(player);
+        });
+
+        TrimSession.Piece piece = TrimSession.Piece.fromKitSlotIndex(itemIndex);
+        boolean trimEligible = piece != null && dev.noah.perplayerkit.trim.TrimCompat.isSupported()
+                && dev.noah.perplayerkit.trim.TrimTierConfig.get().isEnabled()
+                && dev.noah.perplayerkit.trim.TrimCompat.isArmorPiece(item);
+        if (trimEligible) {
+            menu.getSlot(15).setItem(createItem(Material.SHIELD, 1,
+                    lang("gui.trim-button"), lang("gui.lore-trim-button")));
+            menu.getSlot(15).setClickHandler((player, info) -> {
+                if (!ActionGuards.allowed(player, "perplayerkit.trims", LocationFeature.KITS)) return;
                 SoundManager.playClick(player);
-                anvilSessions.put(player.getUniqueId(), new dev.noah.perplayerkit.anvil.EnchantSession(kitSlot, itemIndex, item.clone()));
-                openAnvilEnchantEditor(player);
+                trimSessions.put(player.getUniqueId(), new TrimSession(kitSlot, piece, item.clone()));
+                openTrimPatternSelect(player);
             });
         }
 
-        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
-        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
+        menu.getSlot(22).setItem(createItem(Material.BARRIER, 1, lang("gui.back-button")));
+        menu.getSlot(22).setClickHandler((player, info) -> {
             SoundManager.playClick(player);
             OpenKitMenu(player, kitSlot);
         });
 
-        openMenu(p, titledMenu, "perplayerkit.anvil", LocationFeature.KITS);
+        openMenu(p, titledMenu, "perplayerkit.kit", LocationFeature.KITS);
     }
 
     private void openAnvilEnchantEditor(Player p) {
@@ -368,48 +372,6 @@ public class GUI {
         OpenKitMenu(p, session.getKitSlot());
     }
 
-    /** Snapshot taken; opens the piece picker (helmet/chestplate/leggings/boots). */
-    public void openTrimPieceSelect(Player p, int kitSlot, ItemStack[] armorFromEditor) {
-        TrimSession session = new TrimSession(kitSlot, armorFromEditor);
-        trimSessions.put(p.getUniqueId(), session);
-
-        GuiMenuFactory.TitledMenu titledMenu = GuiMenuFactory.createTrimPieceMenu();
-        Menu menu = titledMenu.menu();
-        for (int i = 0; i < MENU_SIZE; i++) {
-            menu.getSlot(i).setItem(createGlassPane());
-        }
-
-        placeTrimPieceIcon(menu, 11, session, TrimSession.Piece.HELMET);
-        placeTrimPieceIcon(menu, 13, session, TrimSession.Piece.CHESTPLATE);
-        placeTrimPieceIcon(menu, 15, session, TrimSession.Piece.LEGGINGS);
-        placeTrimPieceIcon(menu, 17, session, TrimSession.Piece.BOOTS);
-
-        menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
-        menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
-            SoundManager.playClick(player);
-            trimSessions.remove(player.getUniqueId());
-            OpenKitMenu(player, session.getKitSlot());
-        });
-
-        openMenu(p, titledMenu, "perplayerkit.trims", LocationFeature.KITS);
-    }
-
-    private void placeTrimPieceIcon(Menu menu, int slotIndex, TrimSession session, TrimSession.Piece piece) {
-        ItemStack armor = session.getArmorItem(piece);
-        Slot slot = menu.getSlot(slotIndex);
-        if (armor == null || armor.getType() == Material.AIR || !dev.noah.perplayerkit.trim.TrimCompat.isArmorPiece(armor)) {
-            slot.setItem(createItem(Material.BARRIER, 1, lang("gui.trim-piece-empty", "piece", pieceName(piece))));
-            slot.setClickHandler((player, info) -> SoundManager.playFailure(player));
-            return;
-        }
-        slot.setItem(addHideFlags(armor.clone()));
-        slot.setClickHandler((player, info) -> {
-            SoundManager.playClick(player);
-            session.setPiece(piece);
-            openTrimPatternSelect(player);
-        });
-    }
-
     private void openTrimPatternSelect(Player p) {
         TrimSession session = trimSessions.get(p.getUniqueId());
         if (session == null) return;
@@ -436,7 +398,8 @@ public class GUI {
         menu.getSlot(BACK_SLOT).setItem(createItem(Material.OAK_DOOR, 1, lang("gui.back-button")));
         menu.getSlot(BACK_SLOT).setClickHandler((player, info) -> {
             SoundManager.playClick(player);
-            openTrimPieceSelect(player, session.getKitSlot(), snapshotArmor(session));
+            trimSessions.remove(player.getUniqueId());
+            OpenKitMenu(player, session.getKitSlot());
         });
 
         openMenu(p, titledMenu, "perplayerkit.trims", LocationFeature.KITS);
@@ -498,36 +461,24 @@ public class GUI {
         // nicety, not a security boundary. This is the real gate.
         if (!dev.noah.perplayerkit.trim.TrimTierConfig.get().canUse(p, materialKey)) {
             Lang.get().send(p, "error.no-permission");
-            openTrimPieceSelect(p, session.getKitSlot(), snapshotArmor(session));
+            SoundManager.playFailure(p);
+            OpenKitMenu(p, session.getKitSlot());
             return;
         }
 
-        ItemStack armor = session.getArmorItem(session.getPiece());
+        ItemStack armor = session.getItem();
         if (armor != null && dev.noah.perplayerkit.trim.TrimCompat.apply(armor, session.getPatternKey(), materialKey)) {
-            session.setArmorItem(session.getPiece(), armor);
+            session.setItem(armor);
         }
 
         ItemStack[] fullKit = KitManager.get().getPlayerKit(p.getUniqueId(), session.getKitSlot());
         if (fullKit != null) {
-            fullKit[session.getPiece().kitSlotIndex] = session.getArmorItem(session.getPiece());
+            fullKit[session.getPiece().kitSlotIndex] = session.getItem();
             KitManager.get().savekit(p.getUniqueId(), session.getKitSlot(), fullKit, true);
         }
 
         Lang.get().send(p, "success.trim-applied");
         OpenKitMenu(p, session.getKitSlot());
-    }
-
-    private ItemStack[] snapshotArmor(TrimSession session) {
-        return new ItemStack[]{
-                session.getArmorItem(TrimSession.Piece.HELMET),
-                session.getArmorItem(TrimSession.Piece.CHESTPLATE),
-                session.getArmorItem(TrimSession.Piece.LEGGINGS),
-                session.getArmorItem(TrimSession.Piece.BOOTS)
-        };
-    }
-
-    private static String pieceName(TrimSession.Piece piece) {
-        return capitalizeTrimKey(piece.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static String capitalizeTrimKey(String s) {

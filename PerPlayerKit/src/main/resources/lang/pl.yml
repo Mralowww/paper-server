@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Edytor Kowadła"
   lore-anvil-button: "<gray>Zaklinaj, napraw lub zmień nazwę przedmiotu"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Kowadło: Wybierz Przedmiot</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Akcje Przedmiotu</gradient>"
+  lore-shift-right-click: "<gold>Shift+PPM na przedmiocie, aby zaklinać, naprawić, zmienić nazwę lub ozdobić"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Kowadło: Zaklęcia</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Kliknij, aby dodać poziom"

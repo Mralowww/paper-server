@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Aambeeld-editor"
   lore-anvil-button: "<gray>Betover, repareer of hernoem een voorwerp"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Aambeeld: Kies een Voorwerp</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Voorwerpacties</gradient>"
+  lore-shift-right-click: "<gold>Shift+rechtsklik op een voorwerp om te betoveren, repareren, hernoemen of versieren"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Aambeeld: Betoveringen</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Klik om een niveau toe te voegen"

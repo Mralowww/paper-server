@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>铁砧编辑"
   lore-anvil-button: "<gray>附魔、修复或改名此物品"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>铁砧：选择物品</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>物品操作</gradient>"
+  lore-shift-right-click: "<gold>Shift+右键点击物品可附魔、修复、改名或设计花纹"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>铁砧：附魔</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>点击增加等级"

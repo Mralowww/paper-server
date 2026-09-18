@@ -271,6 +271,8 @@ gui:
   anvil-button: "<aqua>Amboss-Editor"
   lore-anvil-button: "<gray>Verzaubere, repariere oder benenne einen Gegenstand um"
   anvil-picker-title: "<gradient:#AAAAAA:#FFAA00>Amboss: Gegenstand wählen</gradient>"
+  item-action-title: "<gradient:#FFD700:#FF69B4>Gegenstandsaktionen</gradient>"
+  lore-shift-right-click: "<gold>Shift+Rechtsklick auf einen Gegenstand zum Verzaubern, Reparieren, Umbenennen oder Verzieren"
   anvil-enchant-title: "<gradient:#AAAAAA:#FFAA00>Amboss: Verzauberungen</gradient>"
   anvil-enchant-name: "<yellow>{enchant} <gray>({level}/{max})"
   lore-anvil-enchant-add: "<green>Klicken, um eine Stufe hinzuzufügen"
