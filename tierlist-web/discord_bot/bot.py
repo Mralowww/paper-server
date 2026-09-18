@@ -173,7 +173,9 @@ class CloseView(discord.ui.View):
 
 
 class ResultModal(discord.ui.Modal, title="發布考試結果"):
-    region = discord.ui.TextInput(label="伺服器地區", placeholder="例如 TW", required=True, max_length=32)
+    region = discord.ui.TextInput(
+        label="伺服器地區", placeholder=f"{'/'.join(models.REGIONS)}", required=True, max_length=32
+    )
     game_name = discord.ui.TextInput(label="遊戲名稱 / 測試項目", placeholder="例如 Sumo / Battle", required=True, max_length=64)
     score = discord.ui.TextInput(label="比分紀錄 (勝-敗)", placeholder="例如 3-0", required=True, max_length=16)
     tier_after = discord.ui.TextInput(
@@ -196,6 +198,13 @@ class ResultModal(discord.ui.Modal, title="發布考試結果"):
             )
             return
 
+        region_value = self.region.value.strip()
+        if region_value not in models.REGIONS:
+            await interaction.response.send_message(
+                f"地區格式錯誤,必須是這些其中之一:{', '.join(models.REGIONS)}", ephemeral=True
+            )
+            return
+
         try:
             wins_str, losses_str = self.score.value.strip().split("-", 1)
             wins, losses = int(wins_str.strip()), int(losses_str.strip())
@@ -214,7 +223,7 @@ class ResultModal(discord.ui.Modal, title="發布考試結果"):
             mc_username=self.ticket.get("mc_username") or "unknown",
             examiner_discord_id=str(self.examiner.id),
             examiner_username=str(self.examiner),
-            region=self.region.value.strip(),
+            region=region_value,
             game_name=self.game_name.value.strip(),
             score_wins=wins,
             score_losses=losses,
@@ -230,7 +239,7 @@ class ResultModal(discord.ui.Modal, title="發布考試結果"):
             color=discord.Color.green(),
         )
         embed.add_field(name="考官", value=self.examiner.mention, inline=False)
-        embed.add_field(name="伺服器地區", value=self.region.value.strip(), inline=False)
+        embed.add_field(name="伺服器地區", value=region_value, inline=False)
         embed.add_field(name="遊戲名稱", value=self.game_name.value.strip(), inline=False)
         embed.add_field(name="比分紀錄", value=f"{wins} 勝 - {losses} 敗", inline=False)
         embed.add_field(name="考前段位", value=models.tier_display_name(tier_before), inline=False)
@@ -276,8 +285,14 @@ async def result_command(interaction: discord.Interaction):
 @tree.command(name="admin_set_tier", description="[管理員] 直接設定任何玩家的 Tier / 地區")
 @app_commands.describe(mc_username="Minecraft 帳號", tier=f"新的段位({'/'.join(models.TIERS)}),留空表示清除段位",
                         region="地區,留空表示不變更")
+@app_commands.choices(region=[
+    app_commands.Choice(name=r, value=r) for r in models.REGIONS
+])
 @app_commands.checks.has_permissions(administrator=True)
-async def admin_set_tier(interaction: discord.Interaction, mc_username: str, tier: str = "", region: str = ""):
+async def admin_set_tier(
+    interaction: discord.Interaction, mc_username: str, tier: str = "",
+    region: app_commands.Choice[str] | None = None,
+):
     tier_value = tier.strip().upper() or None
     if tier_value and tier_value not in models.TIERS:
         await interaction.response.send_message(
@@ -290,10 +305,11 @@ async def admin_set_tier(interaction: discord.Interaction, mc_username: str, tie
         await interaction.response.send_message(f"找不到已綁定 `{mc_username}` 的玩家。", ephemeral=True)
         return
 
-    models.set_tier(mc_username, tier_value, region.strip() or None)
+    region_value = region.value if region else None
+    models.set_tier(mc_username, tier_value, region_value)
     await interaction.response.send_message(
         f"已更新 **{player['mc_username']}**:段位 → {models.tier_display_name(tier_value)}"
-        + (f",地區 → {region.strip()}" if region.strip() else "")
+        + (f",地區 → {region_value}" if region_value else "")
     )
 
 

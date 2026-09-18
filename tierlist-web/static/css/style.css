@@ -1,58 +1,42 @@
 :root {
     color-scheme: light dark;
-    --bg: #0b0d12;
-    --bg-soft: #11141b;
-    --panel: #171b24;
-    --panel-2: #1e232f;
-    --text: #eef0f4;
-    --muted: #8a92a3;
-    --accent: #7c8cff;
-    --accent-2: #22d3b8;
-    --border: #262c3a;
-    --danger: #ef5966;
-    --radius: 12px;
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    --bg: #14161b;
+    --panel: #1b1e24;
+    --panel-2: #21242b;
+    --text: #e4e6ea;
+    --muted: #8b909a;
+    --accent: #4c6ef5;
+    --border: #2c2f37;
+    --danger: #d9534f;
+    --radius: 6px;
 }
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
-
 body {
     margin: 0;
-    background:
-        radial-gradient(1200px 600px at 15% -10%, rgba(124, 140, 255, 0.16), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(34, 211, 184, 0.10), transparent 55%),
-        var(--bg);
+    background: var(--bg);
     color: var(--text);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", Roboto, sans-serif;
-    line-height: 1.55;
+    font-size: 15px;
+    line-height: 1.5;
     min-height: 100vh;
 }
 
 .topnav {
-    position: sticky;
-    top: 0;
-    z-index: 10;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px clamp(16px, 4vw, 40px);
-    background: rgba(11, 13, 18, 0.75);
-    backdrop-filter: blur(10px);
+    padding: 14px clamp(16px, 4vw, 32px);
+    background: var(--panel);
     border-bottom: 1px solid var(--border);
 }
 
 .topnav .brand {
     color: var(--text);
-    font-weight: 800;
+    font-weight: 700;
     text-decoration: none;
-    font-size: 1.25rem;
-    letter-spacing: -0.02em;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-size: 1.1rem;
 }
 
 .nav-links {
@@ -64,11 +48,9 @@ body {
 .nav-links a {
     color: var(--muted);
     text-decoration: none;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 0.92rem;
-    font-weight: 600;
-    transition: color 0.15s ease, background 0.15s ease;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
 }
 
 .nav-links a:hover {
@@ -77,73 +59,60 @@ body {
 }
 
 main {
-    max-width: 980px;
+    max-width: 960px;
     margin: 0 auto;
-    padding: clamp(20px, 4vw, 40px) 16px 60px;
+    padding: 28px 16px 60px;
 }
 
 h1 {
-    font-size: clamp(1.6rem, 4vw, 2.2rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font-size: 1.5rem;
+    font-weight: 700;
     margin: 0 0 6px;
 }
 
 h2 {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     font-weight: 700;
-    margin: 40px 0 14px;
+    margin: 32px 0 12px;
     padding-top: 8px;
     border-top: 1px solid var(--border);
 }
 
 .page-subtitle {
     color: var(--muted);
-    margin: 0 0 28px;
-    font-size: 0.98rem;
+    margin: 0 0 20px;
+    font-size: 0.92rem;
 }
 
-/* ---- Hero / 首頁統計 ---- */
+/* ---- 首頁統計 ---- */
 
 .hero {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
 }
 
 .stat-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 14px;
-    margin-top: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
 }
 
 .stat-tile {
-    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
-    box-shadow: var(--shadow);
-    transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.stat-tile:hover {
-    transform: translateY(-2px);
-    border-color: var(--accent);
+    padding: 14px 16px;
 }
 
 .stat-value {
-    font-size: 1.8rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-size: 1.4rem;
+    font-weight: 700;
 }
 
 .stat-label {
     color: var(--muted);
-    font-size: 0.82rem;
-    margin-top: 4px;
+    font-size: 0.8rem;
+    margin-top: 2px;
 }
 
 /* ---- 卡片 / 面板 ---- */
@@ -152,8 +121,7 @@ h2 {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 20px 22px;
+    padding: 18px 20px;
 }
 
 /* ---- 表格 ---- */
@@ -162,7 +130,6 @@ h2 {
     overflow-x: auto;
     border-radius: var(--radius);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
 }
 
 .tier-table {
@@ -174,27 +141,23 @@ h2 {
 
 .tier-table th {
     text-align: left;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     color: var(--muted);
     background: var(--panel-2);
-    padding: 12px 16px;
+    padding: 10px 14px;
     white-space: nowrap;
 }
 
 .tier-table td {
-    padding: 12px 16px;
+    padding: 10px 14px;
     border-top: 1px solid var(--border);
     vertical-align: middle;
 }
 
-.tier-table tbody tr {
-    transition: background 0.12s ease;
-}
-
 .tier-table tbody tr:hover {
-    background: rgba(124, 140, 255, 0.06);
+    background: var(--panel-2);
 }
 
 .rank-row td:first-child {
@@ -204,97 +167,60 @@ h2 {
     white-space: nowrap;
 }
 
-/* ---- 玩家個人頁 ---- */
-
-.player-header {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-bottom: 32px;
-}
-
-.player-skin {
-    width: 96px;
-    height: auto;
-    image-rendering: pixelated;
-    flex: 0 0 auto;
-}
-
-.player-header-info h1 {
-    margin-bottom: 4px;
-}
-
-.player-badges {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
 /* ---- 頭像 ---- */
 
 .mc-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 7px;
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
     display: block;
     image-rendering: pixelated;
     border: 1px solid var(--border);
-}
-
-.player-cell {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
 }
 
 /* ---- Tier 徽章 ---- */
 
 .tier-badge {
     display: inline-block;
-    padding: 3px 12px;
-    border-radius: 999px;
-    color: #0b0d12;
-    font-weight: 800;
-    font-size: 0.8rem;
-    letter-spacing: 0.02em;
+    padding: 2px 10px;
+    border-radius: 3px;
+    color: #14161b;
+    font-weight: 700;
+    font-size: 0.78rem;
     background: var(--accent);
 }
 
-.tier-HT1 { background: linear-gradient(135deg, #ffd76a, #ff9f43); }
-.tier-LT1 { background: linear-gradient(135deg, #ffe8a8, #ffc773); }
-.tier-HT2 { background: linear-gradient(135deg, #b9c2ff, #7c8cff); }
-.tier-LT2 { background: linear-gradient(135deg, #d3d9ff, #a6b0ff); }
-.tier-HT3 { background: linear-gradient(135deg, #7ff0d8, #22d3b8); }
-.tier-LT3 { background: linear-gradient(135deg, #bdf5e8, #7ff0d8); }
-.tier-HT4 { background: linear-gradient(135deg, #cfd6e6, #9aa6c2); }
-.tier-LT4 { background: linear-gradient(135deg, #e3e7f0, #cfd6e6); }
-.tier-HT5 { background: linear-gradient(135deg, #d9b48f, #b98a63); }
-.tier-LT5 { background: linear-gradient(135deg, #e8cdb0, #d9b48f); }
+.tier-HT1 { background: #e8b84b; }
+.tier-LT1 { background: #f0cf82; }
+.tier-HT2 { background: #4c6ef5; }
+.tier-LT2 { background: #a4b4fa; }
+.tier-HT3 { background: #2fb08a; }
+.tier-LT3 { background: #8fd9c1; }
+.tier-HT4 { background: #9aa3b0; }
+.tier-LT4 { background: #cbd0d8; }
+.tier-HT5 { background: #a3764f; }
+.tier-LT5 { background: #cba887; }
 
 /* ---- 驗證碼 / 提示卡 ---- */
 
 .verify-box {
-    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px 22px;
-    margin-top: 18px;
-    box-shadow: var(--shadow);
+    padding: 16px 18px;
+    margin-top: 16px;
 }
 
 .verify-box pre {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     font-weight: 700;
-    background: #000;
-    color: var(--accent-2);
-    padding: 10px 16px;
-    border-radius: 8px;
+    background: #0b0d10;
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 4px;
     display: inline-block;
-    margin: 10px 0 0;
-    letter-spacing: 0.06em;
+    margin: 8px 0 0;
+    letter-spacing: 0.04em;
 }
 
 /* ---- 表單元件 ---- */
@@ -311,73 +237,48 @@ input, select, button, textarea {
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 0.92rem;
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 0.9rem;
     font-family: inherit;
 }
 
 input::placeholder { color: var(--muted); }
 
-button {
-    cursor: pointer;
-    background: var(--accent);
-    color: #0b0d12;
-    border: none;
-    font-weight: 700;
-    transition: filter 0.12s ease, transform 0.05s ease;
-}
-
-button:hover { filter: brightness(1.08); }
-button:active { transform: translateY(1px); }
-
-.btn {
+button, .btn {
     display: inline-block;
     cursor: pointer;
     background: var(--accent);
-    color: #0b0d12;
+    color: #fff;
     border: none;
-    font-weight: 700;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 0.92rem;
+    font-weight: 600;
     text-decoration: none;
-    transition: filter 0.12s ease;
 }
 
-.btn:hover {
-    filter: brightness(1.08);
+button:hover, .btn:hover {
+    filter: brightness(1.1);
 }
 
 button.danger {
     background: var(--danger);
-    color: #1a0506;
 }
 
 .muted {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
 }
 
 .empty-state {
     text-align: center;
-    padding: 48px 20px;
+    padding: 40px 20px;
     color: var(--muted);
     border: 1px dashed var(--border);
     border-radius: var(--radius);
 }
 
 .empty-state-icon {
-    font-size: 2.4rem;
-    margin-bottom: 10px;
-}
-
-.rank-row td:first-child {
-    box-shadow: inset 3px 0 0 transparent;
-}
-
-.rank-row:hover td:first-child {
-    box-shadow: inset 3px 0 0 var(--accent);
+    font-size: 2rem;
+    margin-bottom: 8px;
 }
 
 a { color: var(--accent); }
@@ -386,17 +287,17 @@ code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85em;
     background: var(--panel-2);
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 2px 5px;
+    border-radius: 3px;
 }
 
 .panel pre {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85rem;
-    background: #000;
-    color: var(--accent-2);
-    padding: 14px 16px;
-    border-radius: 8px;
+    background: #0b0d10;
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 4px;
     overflow-x: auto;
     white-space: pre;
 }
@@ -410,136 +311,32 @@ code {
     margin-bottom: 6px;
 }
 
-/* ---- 進場動畫 ---- */
+/* ---- 玩家個人頁 ---- */
 
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.player-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.player-skin {
+    width: 88px;
+    height: auto;
+    image-rendering: pixelated;
+    flex: 0 0 auto;
 }
 
-main > * {
-    animation: fadeInUp 0.45s ease both;
+.player-header-info h1 {
+    margin-bottom: 4px;
 }
 
-main > *:nth-child(2) { animation-delay: 0.05s; }
-main > *:nth-child(3) { animation-delay: 0.1s; }
-main > *:nth-child(4) { animation-delay: 0.15s; }
-main > *:nth-child(n+5) { animation-delay: 0.2s; }
-
-.topnav {
-    animation: fadeIn 0.3s ease both;
-}
-
-.tier-table tbody tr {
-    animation: fadeIn 0.4s ease both;
-}
-
-.tier-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
-.tier-table tbody tr:nth-child(2) { animation-delay: 0.05s; }
-.tier-table tbody tr:nth-child(3) { animation-delay: 0.08s; }
-.tier-table tbody tr:nth-child(4) { animation-delay: 0.11s; }
-.tier-table tbody tr:nth-child(5) { animation-delay: 0.14s; }
-.tier-table tbody tr:nth-child(n+6) { animation-delay: 0.16s; }
-
-.stat-tile {
-    animation: fadeInUp 0.45s ease both;
-}
-
-.stat-row .stat-tile:nth-child(2) { animation-delay: 0.08s; }
-.stat-row .stat-tile:nth-child(3) { animation-delay: 0.16s; }
-
-/* ---- 額外互動動畫 ---- */
-
-.nav-links a {
-    position: relative;
-}
-
-.nav-links a::after {
-    content: "";
-    position: absolute;
-    left: 14px;
-    right: 14px;
-    bottom: 4px;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    border-radius: 2px;
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.2s ease;
-}
-
-.nav-links a:hover::after {
-    transform: scaleX(1);
-}
-
-.topnav .brand {
-    background-size: 200% auto;
-    animation: brandShift 6s ease-in-out infinite;
-}
-
-@keyframes brandShift {
-    0%, 100% { background-position: 0% center; }
-    50% { background-position: 100% center; }
-}
-
-.mc-avatar, .player-skin {
-    transition: transform 0.2s ease;
-}
-
-.rank-row:hover .mc-avatar {
-    transform: scale(1.15);
-}
-
-.player-skin:hover {
-    transform: translateY(-4px);
-}
-
-.tier-badge {
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.rank-row:hover .tier-badge,
-.player-header .tier-badge:hover {
-    transform: scale(1.08);
-    box-shadow: 0 4px 14px rgba(124, 140, 255, 0.35);
-}
-
-.verify-box pre {
-    animation: pulseGlow 2s ease-in-out infinite;
-}
-
-@keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 0 rgba(34, 211, 184, 0); }
-    50% { box-shadow: 0 0 16px rgba(34, 211, 184, 0.35); }
-}
-
-.btn, button {
-    transition: filter 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
-}
-
-.btn:hover, button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(124, 140, 255, 0.25);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.001s !important;
-        animation-delay: 0s !important;
-        transition-duration: 0.001s !important;
-        scroll-behavior: auto !important;
-    }
+.player-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 /* ---- 手機版排版 ---- */
@@ -548,8 +345,8 @@ main > *:nth-child(n+5) { animation-delay: 0.2s; }
     .topnav {
         flex-direction: column;
         align-items: flex-start;
-        gap: 10px;
-        padding: 12px 16px;
+        gap: 8px;
+        padding: 10px 16px;
     }
 
     .nav-links {
@@ -557,13 +354,10 @@ main > *:nth-child(n+5) { animation-delay: 0.2s; }
         overflow-x: auto;
         flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 2px;
     }
 
     .nav-links a {
         flex: 0 0 auto;
-        padding: 8px 12px;
-        font-size: 0.88rem;
     }
 
     main {
@@ -571,24 +365,15 @@ main > *:nth-child(n+5) { animation-delay: 0.2s; }
     }
 
     h1 {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
     }
 
     .stat-row {
-        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-        gap: 10px;
-    }
-
-    .stat-tile {
-        padding: 14px 16px;
-    }
-
-    .stat-value {
-        font-size: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     }
 
     .panel {
-        padding: 16px;
+        padding: 14px;
     }
 
     .inline-form {
@@ -601,9 +386,5 @@ main > *:nth-child(n+5) { animation-delay: 0.2s; }
     .inline-form button,
     .inline-form .btn {
         width: 100%;
-    }
-
-    .table-wrap {
-        -webkit-overflow-scrolling: touch;
     }
 }

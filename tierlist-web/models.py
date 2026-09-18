@@ -8,6 +8,7 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data" / "tierlist.db"
 
 TIERS = ["HT1", "LT1", "HT2", "LT2", "HT3", "LT3", "HT4", "LT4", "HT5", "LT5"]
+REGIONS = ["台灣", "大陸", "新加坡", "日本", "柬埔寨"]
 
 # 目前段位是 HT3 或更好(HT1/LT1/HT2/LT2/HT3)算高階測試,30 天冷卻
 # 其餘(LT3 以下)或尚未評級算普通測試,7 天冷卻

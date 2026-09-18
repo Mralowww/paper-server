@@ -400,7 +400,7 @@ def admin_home():
     api_keys = models.list_api_keys()
     download_items = models.list_downloads()
     return render_template(
-        "admin.html", players=players, tiers=models.TIERS, api_keys=api_keys,
+        "admin.html", players=players, tiers=models.TIERS, regions=models.REGIONS, api_keys=api_keys,
         downloads=download_items, mc_versions=SUPPORTED_MC_VERSIONS,
     )
 
@@ -410,11 +410,13 @@ def admin_create_player():
     require_admin()
     mc_username = request.form.get("mc_username", "").strip()[:32]
     tier = request.form.get("tier", "").strip() or None
-    region = request.form.get("region", "").strip()[:64] or None
+    region = request.form.get("region", "").strip() or None
 
     if not mc_username:
         abort(400)
     if tier and tier not in models.TIERS:
+        abort(400)
+    if region and region not in models.REGIONS:
         abort(400)
 
     models.create_manual_player(mc_username, tier, region)
@@ -425,10 +427,12 @@ def admin_create_player():
 def admin_edit_player(player_id):
     require_admin()
     mc_username = request.form.get("mc_username", "").strip()[:32] or None
-    region = request.form.get("region", "").strip()[:64] or None
+    region = request.form.get("region", "").strip() or None
     tier_raw = request.form.get("tier", "__unset__")
     tier = None if tier_raw == "" else (tier_raw if tier_raw != "__unset__" else "__unset__")
     if tier not in ("__unset__", None) and tier not in models.TIERS:
+        abort(400)
+    if region and region not in models.REGIONS:
         abort(400)
     ok = models.update_player(player_id, mc_username=mc_username, region=region, tier=tier)
     if not ok:
