@@ -121,12 +121,7 @@ def timestamp_to_date(ts):
 @app.route("/")
 def index():
     players = models.list_ranked_players()
-    stats = {
-        "total": len(players),
-        "top_tier": sum(1 for p in players if p["vanilla_tier"] == "HT1"),
-        "regions": len({p["region"] for p in players if p.get("region")}),
-    }
-    return render_template("index.html", players=players, tiers=models.TIERS, stats=stats)
+    return render_template("index.html", players=players, tiers=models.TIERS)
 
 
 @app.route("/docs")
