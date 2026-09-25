@@ -28,11 +28,11 @@
 
     // ---- home
     'hero.eyebrow': ['Vanilla PvP · Taiwan', 'Vanilla PvP · Taiwan', 'Vanilla PvP · Đài Loan'],
-    'hero.title': ['亞洲最強<br><span class="gold-text">Vanilla PvP</span><br>排行榜', 'The<br><span class="gold-text">Vanilla PvP</span><br>Tier List', 'Bảng xếp hạng<br><span class="gold-text">Vanilla PvP</span><br>hàng đầu'],
+    'hero.title': ['Vanilla PvP <span class="gold">Tier 排行榜</span>', 'Vanilla PvP <span class="gold">Tier List</span>', 'Bảng xếp hạng <span class="gold">Vanilla PvP</span>'],
     'hero.lead': [
-      'Mc.Tierlist.Asia 以公開透明的考試制度評定每位玩家的 Tier。查看即時排名、玩家資料，或透過 API 把資料接到你的機器人與網站。',
-      'Mc.Tierlist.Asia ranks every player through a transparent testing process. Browse live rankings and player profiles, or plug the data into your bots and sites with our API.',
-      'Mc.Tierlist.Asia xếp hạng mỗi người chơi qua quy trình kiểm tra minh bạch. Xem bảng xếp hạng trực tiếp, hồ sơ người chơi, hoặc kết nối dữ liệu vào bot và website qua API.',
+      '華人原版水晶 V2 的 Vanilla 排名，所有段位皆由考官實際測試評定。',
+      'Vanilla rankings for 華人原版水晶 V2 — every tier is decided by a live test with our testers.',
+      'Bảng xếp hạng Vanilla của 華人原版水晶 V2 — mọi tier đều do giám khảo kiểm tra trực tiếp.',
     ],
     'hero.cta': ['查看排行榜', 'View rankings', 'Xem bảng xếp hạng'],
     'stat.players': ['排名玩家', 'Ranked players', 'Người chơi xếp hạng'],
