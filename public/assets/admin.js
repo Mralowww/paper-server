@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['keys', 'tab.keys', perms.manageKeys, '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/>'],
     ['team', 'tab.team', true, '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'],
     ['settings', 'tab.settings', perms.manageSettings, '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'],
+    ['site', 'tab.site', perms.manageSettings, '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/>'],
     ['storage', 'tab.storage', true, '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'],
     ['audit', 'tab.audit', true, '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>'],
   ].filter(([, , allowed]) => allowed);
@@ -631,6 +632,154 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { saved(await api('/applications', { method: 'PUT', body: { open: !a.open } })); go('settings'); }
         catch (err) { toast(err.message, 'err'); }
       });
+    },
+
+    async site(panel) {
+      const { state, pages } = await api('/site');
+      const st = structuredClone(state);
+      const toLocal = (ms) => { if (!ms) return ''; const d = new Date(ms); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+      const fromLocal = (v) => (v ? new Date(v).getTime() : null);
+      const annState = (a) => {
+        const now = Date.now();
+        if (a.endAt && now >= a.endAt) return ['expired', ''];
+        if (a.startAt && now < a.startAt) return ['scheduled', ''];
+        return ['showing', 'on'];
+      };
+      const maintRow = (key, m, label, cls = '') => `
+        <div class="maint-row ${cls} ${m.on ? 'on' : ''}" data-m="${key}">
+          <label class="check"><input type="checkbox" data-f="on" ${m.on ? 'checked' : ''}><b style="color:var(--text)">${label}</b></label>
+          <input class="input" data-f="reason" maxlength="200" value="${esc(m.reason)}" placeholder="${t('site.reason')}">
+          <input class="input mono" data-f="until" type="datetime-local" value="${toLocal(m.until)}" title="${t('site.until')}">
+        </div>`;
+      const annHtml = (a, i) => {
+        const [k, cls] = annState(a);
+        return `<div class="ann-admin-row">
+          <div class="ann ann-${a.style}"><div class="ann-inner" style="padding:8px 12px">
+            <span class="ann-text">${esc(a.text)}${a.link ? ` <a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.linkText || a.link)} →</a>` : ''}</span>
+            ${a.dismissible ? '<span class="ann-x" style="cursor:default">✕</span>' : ''}</div></div>
+          <div class="meta"><span class="pill ${cls}">${t(`site.${k}`)}</span>${a.dismissible ? '' : `<span class="muted">${t('site.noX')}</span>`}
+            ${a.startAt || a.endAt ? `<span class="muted">${a.startAt ? esc(fmtDate(a.startAt)) : '…'} → ${a.endAt ? esc(fmtDate(a.endAt)) : '…'}</span>` : ''}</div>
+          <div class="actions"><button class="btn btn-sm" data-edit="${i}">${t('common.edit')}</button><button class="btn btn-sm btn-danger" data-del="${i}">${t('common.delete')}</button></div>
+        </div>`;
+      };
+
+      async function save(msg = t('site.saved')) {
+        try {
+          const r = await api('/site', { method: 'PUT', body: st });
+          Object.assign(st, r.state);
+          toast(msg);
+          draw();
+        } catch (err) { toast(err.message, 'err'); }
+      }
+
+      function draw() {
+        const pending = st.launchAt && st.launchAt > Date.now();
+        panel.innerHTML = `
+          <div class="panel">
+            <div class="panel-head"><div><h2>${t('tab.site')}</h2><p>${t('site.subtitle')}</p></div></div>
+            <div class="site-grid">
+              <div class="card card-pad site-card">
+                <h3>${t('site.launchT')} <span class="pill ${pending ? 'off' : 'on'}" style="margin-left:6px">● ${t(pending ? 'site.pending' : 'site.live')}</span></h3>
+                <p class="desc">${t('site.launchD')}</p>
+                <div class="launch-row">
+                  <input class="input mono" id="launchAt" type="datetime-local" value="${toLocal(st.launchAt)}">
+                  <button class="btn" id="launchClear">${t('site.clear')}</button>
+                  <button class="btn btn-gold" data-save>${t('common.save')}</button>
+                  ${pending ? `<span class="muted" style="font-size:13px">${esc(fmtRelative(st.launchAt))}</span>` : ''}
+                </div>
+              </div>
+
+              <div class="card card-pad site-card">
+                <h3>${t('site.maintT')}</h3>
+                <p class="desc">${t('site.maintD')}</p>
+                <div class="maint-list">
+                  ${maintRow('all', st.maintenance.all, t('site.all'), 'all')}
+                  ${pages.map((p) => maintRow(p, st.maintenance.pages[p], t(`site.page.${p}`))).join('')}
+                </div>
+                <div class="site-save"><button class="btn btn-gold" data-save>${t('common.save')}</button></div>
+              </div>
+
+              <div class="card card-pad site-card">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                  <div><h3>${t('site.annT')}</h3><p class="desc">${t('site.annD')}</p></div>
+                  <button class="btn btn-gold" id="annAdd" ${st.announcements.length >= 10 ? 'disabled' : ''}>${t('site.annAdd')}</button>
+                </div>
+                <div class="ann-admin">${st.announcements.length ? st.announcements.map(annHtml).join('') : `<div class="muted">${t('site.annEmpty')}</div>`}</div>
+              </div>
+            </div>
+          </div>`;
+
+        $('#launchAt', panel).addEventListener('change', (e) => { st.launchAt = fromLocal(e.target.value); });
+        $('#launchClear', panel).addEventListener('click', () => { $('#launchAt', panel).value = ''; st.launchAt = null; });
+        $$('[data-m]', panel).forEach((row) => {
+          const m = row.dataset.m === 'all' ? st.maintenance.all : st.maintenance.pages[row.dataset.m];
+          row.addEventListener('input', (e) => {
+            const f = e.target.dataset.f;
+            if (f === 'on') { m.on = e.target.checked; row.classList.toggle('on', m.on); }
+            if (f === 'reason') m.reason = e.target.value;
+            if (f === 'until') m.until = fromLocal(e.target.value);
+          });
+        });
+        $$('[data-save]', panel).forEach((b) => b.addEventListener('click', () => save()));
+        $('#annAdd', panel).addEventListener('click', () => editAnn());
+        panel.querySelector('.ann-admin').addEventListener('click', async (e) => {
+          const ed = e.target.closest('[data-edit]');
+          if (ed) return editAnn(Number(ed.dataset.edit));
+          const del = e.target.closest('[data-del]');
+          if (del && await confirmDialog(t('common.delete'), esc(st.announcements[del.dataset.del].text))) {
+            st.announcements.splice(Number(del.dataset.del), 1);
+            save();
+          }
+        });
+      }
+
+      function editAnn(i) {
+        const a = i === undefined ? { text: '', style: 'gold', dismissible: true, link: '', linkText: '', startAt: null, endAt: null } : st.announcements[i];
+        modal(`
+          <h3>${t(i === undefined ? 'site.annAdd' : 'site.annEdit')}</h3>
+          <form id="annForm">
+            <div class="field"><label>${t('site.annText')}</label><textarea class="input" name="text" maxlength="300" rows="3" required>${esc(a.text)}</textarea></div>
+            <div class="row2">
+              <div class="field"><label>${t('site.annStyle')}</label><select class="input" name="style">
+                ${['gold', 'info', 'warn'].map((s) => `<option value="${s}" ${a.style === s ? 'selected' : ''}>${t(`site.style.${s}`)}</option>`).join('')}</select></div>
+              <div class="field" style="display:flex;align-items:flex-end"><label class="check"><input type="checkbox" name="dismissible" ${a.dismissible ? 'checked' : ''}>${t('site.dismissible')}</label></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>${t('site.link')}</label><input class="input mono" name="link" maxlength="300" value="${esc(a.link)}" placeholder="https://… /discord"></div>
+              <div class="field"><label>${t('site.linkText')}</label><input class="input" name="linkText" maxlength="40" value="${esc(a.linkText)}"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>${t('site.start')}</label><input class="input mono" name="startAt" type="datetime-local" value="${toLocal(a.startAt)}"></div>
+              <div class="field"><label>${t('site.end')}</label><input class="input mono" name="endAt" type="datetime-local" value="${toLocal(a.endAt)}"></div>
+            </div>
+            <div class="field"><label>${t('site.preview')}</label><div class="ann-admin" id="annPrev"></div></div>
+            <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-gold">${t('common.save')}</button></div>
+          </form>`, (bg, close) => {
+          const form = $('#annForm', bg);
+          const read = () => ({ ...a, text: form.text.value.trim(), style: form.style.value, dismissible: form.dismissible.checked,
+            link: form.link.value.trim(), linkText: form.linkText.value.trim(), startAt: fromLocal(form.startAt.value), endAt: fromLocal(form.endAt.value) });
+          const preview = () => {
+            const d = read();
+            $('#annPrev', bg).innerHTML = `<div class="ann ann-${d.style}"><div class="ann-inner" style="padding:8px 12px"><span class="ann-text">${esc(d.text || '…')}${d.link ? ` <a>${esc(d.linkText || d.link)} →</a>` : ''}</span>${d.dismissible ? '<span class="ann-x">✕</span>' : ''}</div></div>`;
+          };
+          form.addEventListener('input', preview);
+          form.addEventListener('change', preview);
+          preview();
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const d = read();
+            const prev = [...st.announcements];
+            if (i === undefined) st.announcements.push(d); else st.announcements[i] = d;
+            try {
+              const r = await api('/site', { method: 'PUT', body: st });
+              Object.assign(st, r.state);
+              close(); toast(t('site.saved')); draw();
+            } catch (err) { st.announcements = prev; toast(err.message, 'err'); }
+          });
+        });
+      }
+
+      draw();
     },
 
     async audit(panel) {

@@ -60,6 +60,8 @@ CF_ZONE_ID = os.environ.get("CF_ZONE_ID", "")
 CF_DNS_RECORDS = _list("CF_DNS_RECORDS", "tierlist.asia,www.tierlist.asia")
 DDNS_INTERVAL = max(60, _int("DDNS_INTERVAL", 300))
 
+# Site opens to the public at this time (ISO 8601, e.g. 2026-09-26T15:00:00+08:00); editable later in Settings.
+LAUNCH_AT = os.environ.get("LAUNCH_AT", "")
 DEFAULT_DISCORD_INVITE = os.environ.get("DISCORD_INVITE", "https://discord.gg/dYP9xdyq5v")
 SERVER_ADDRESS = os.environ.get("SERVER_ADDRESS", "Mc.Tierlist.Asia")
 UPLOAD_DIR = DATA_DIR / "uploads"

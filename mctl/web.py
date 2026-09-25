@@ -19,6 +19,7 @@ from . import config as C
 from . import db as D
 from . import ddns
 from . import panel as P
+from . import site as S
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$", re.I)
@@ -717,10 +718,65 @@ def audit_list():
 
 
 # ---------------------------------------------------------------- pages & static files
+def gated(key):
+    """The countdown/maintenance page when `key` is closed to the public; staff pass through in preview."""
+    gate = S.gate(S.load(db()), key)
+    if not gate or permissions(current_user())["viewStaff"]:
+        return None
+    payload = json.dumps({**gate, "now": D.now_ms(), "page": key}, ensure_ascii=False).replace("<", "\\u003c")
+    html = (C.PUBLIC / "gate.html").read_text(encoding="utf-8").replace("<!--GATE-->", f"<script>window.GATE={payload}</script>")
+    resp = app.response_class(html, status=503, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-store"
+    if gate["until"]:
+        resp.headers["Retry-After"] = str(max(1, (gate["until"] - D.now_ms()) // 1000))
+    return resp
+
+
 def page(name, status=200):
+    key = "home" if name == "index.html" else name.removesuffix(".html")
+    if status == 200 and key in S.PAGES:
+        blocked = gated(key)
+        if blocked:
+            return blocked
     resp = send_from_directory(C.PUBLIC, name, max_age=0)
     resp.status_code = status
+    resp.headers["Cache-Control"] = "private, no-cache"
     return resp
+
+
+@app.get("/api/status")
+def site_status():
+    """Public: announcements plus whether a page is closed (launch countdown / maintenance)."""
+    state = S.load(db())
+    key = request.args.get("page", "")
+    gate = S.gate(state, key) if key in S.PAGES else None
+    anns = [{k: a[k] for k in ("id", "rev", "text", "style", "dismissible", "link", "linkText")}
+            for a in S.active_announcements(state)]
+    resp = jsonify({"now": D.now_ms(), "launchAt": state["launchAt"], "gate": gate,
+                    "preview": bool(gate and permissions(current_user())["viewStaff"]), "announcements": anns})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@route("/api/admin/site", perm="manageSettings")
+def get_site_state():
+    return jsonify({"state": S.load(db()), "pages": S.PAGES, "now": D.now_ms()})
+
+
+@route("/api/admin/site", methods=["PUT"], perm="manageSettings")
+def put_site_state():
+    try:
+        state = S.validate(body())
+    except ValueError as exc:
+        return bad(str(exc), "設定內容不正確")
+    conn = db()
+    S.save(conn, state)
+    closed = [p for p, m in state["maintenance"]["pages"].items() if m["on"]]
+    D.audit(conn, current_user(), "site_update",
+            f"launch={state['launchAt'] or '-'} all={'on' if state['maintenance']['all']['on'] else 'off'} "
+            f"pages={','.join(closed) or '-'} announcements={len(state['announcements'])}")
+    conn.commit()
+    return jsonify({"ok": True, "state": state})
 
 
 @app.get("/")
@@ -787,6 +843,9 @@ MANAGE_BLOCK_RE = re.compile(r"<!--MANAGE-->.*?<!--/MANAGE-->", re.S)
 @app.get("/docs")
 def docs_page():
     """The Management API section is only sent to staff and testers who can hold account keys."""
+    blocked = gated("docs")
+    if blocked:
+        return blocked
     html = (C.PUBLIC / "docs.html").read_text(encoding="utf-8")
     if not key_eligible(current_user()):
         html = MANAGE_BLOCK_RE.sub("", html)

@@ -86,6 +86,47 @@
     return chips.join(' ') + badgesHtml(user.badges);
   }
 
+  // ---------- Announcements + staff preview bar (top of every page) ----------
+  const ANN_KEY = 'mctl-ann-dismissed';
+  const dismissed = () => { try { return JSON.parse(localStorage.getItem(ANN_KEY)) || []; } catch { return []; } };
+  const annIcon = {
+    gold: '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>',
+    warn: '<path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  };
+  async function renderBanners(page) {
+    let st;
+    try { st = await request(`/api/status?page=${encodeURIComponent(page || '')}`); } catch { return; }
+    const box = document.createElement('div');
+    box.className = 'ann-stack';
+    const gone = dismissed();
+    const bars = st.announcements.filter((a) => !(a.dismissible && gone.includes(`${a.id}:${a.rev}`)));
+    if (st.preview) {
+      const when = st.gate.until ? fmtDate(st.gate.until) : '—';
+      bars.unshift({ style: 'preview', text: t(st.gate.kind === 'launch' ? 'preview.launch' : 'preview.maint', { time: when }) });
+    }
+    if (!bars.length) return;
+    box.innerHTML = bars.map((a) => `
+      <div class="ann ann-${a.style}" data-ann="${a.id ? esc(`${a.id}:${a.rev}`) : ''}">
+        <div class="container ann-inner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${annIcon[a.style] || annIcon.info}</svg>
+          <span class="ann-text">${esc(a.text)}${a.link ? ` <a href="${esc(a.link)}"${a.link.startsWith('/') ? '' : ' target="_blank" rel="noopener"'}>${esc(a.linkText || a.link)} →</a>` : ''}</span>
+          ${a.dismissible ? `<button class="ann-x" aria-label="${t('ann.close')}" title="${t('ann.close')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}
+        </div>
+      </div>`).join('');
+    document.body.prepend(box);
+    box.addEventListener('click', (e) => {
+      const x = e.target.closest('.ann-x');
+      if (!x) return;
+      const bar = x.closest('.ann');
+      const keep = dismissed().filter((k) => st.announcements.some((a) => `${a.id}:${a.rev}` === k)); // prune old entries
+      try { localStorage.setItem(ANN_KEY, JSON.stringify([...keep, bar.dataset.ann])); } catch { /* ignore */ }
+      bar.style.height = `${bar.offsetHeight}px`;
+      requestAnimationFrame(() => bar.classList.add('closing'));
+      setTimeout(() => bar.remove(), 320);
+    });
+  }
+
   // ---------- Chrome (nav + footer) ----------
   const SERVER = 'Mc.Tierlist.Asia';
   const brandHtml = '<img class="brand-cube" src="/assets/cube.svg" alt=""><span class="brand-text"><span class="brand-title">TIERLIST</span><span class="brand-sub">MC · ASIA</span></span>';
@@ -893,6 +934,7 @@
     window.I18N.apply();
     const page = document.body.dataset.page;
     renderChrome(page);
+    renderBanners(page);
     initSpotlight();
     if (pages[page]) pages[page]();
     else initReveal();
