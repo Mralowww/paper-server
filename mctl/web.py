@@ -662,6 +662,7 @@ def settings():
         "applyChannel": D.get_setting(conn, "apply_channel_id"),
         "ticketCategory": D.get_setting(conn, "ticket_category_id"),
         "cooldownDays": C.TEST_COOLDOWN_DAYS,
+        "discordInvite": discord_invite(conn),
         "ddns": {"enabled": ddns.enabled(), **ddns.state},
     })
 
@@ -690,6 +691,33 @@ def home():
 @app.get("/player/<path:_name>")
 def player_page(_name):
     return page("player.html")
+
+
+INVITE_RE = re.compile(r"^https://(discord\.gg|discord\.com/invite)/[A-Za-z0-9-]{2,32}$")
+
+
+def discord_invite(conn):
+    return D.get_setting(conn, "discord_invite") or C.DEFAULT_DISCORD_INVITE
+
+
+@app.get("/discord")
+def discord_redirect():
+    """Short link tierlist.asia/discord → the current Discord invite (editable in Settings)."""
+    resp = redirect(discord_invite(db()), code=302)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@route("/api/admin/discord-invite", methods=["PUT"], perm="manageSettings")
+def set_discord_invite():
+    url = str(body().get("url") or "").strip()
+    if not INVITE_RE.match(url):
+        return bad("invalid_invite", "邀請連結格式不正確（例如 https://discord.gg/xxxx）")
+    conn = db()
+    D.set_setting(conn, "discord_invite", url)
+    D.audit(conn, current_user(), "discord_invite_update", url)
+    conn.commit()
+    return jsonify({"ok": True})
 
 
 @app.get("/heads/<kind>/<ident>/<int:size>.png")

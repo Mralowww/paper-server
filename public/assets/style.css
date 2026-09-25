@@ -1049,3 +1049,7 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--gold)
 .dc-inline { display: flex; gap: 40px; }
 .dc-field.inline { margin-top: 10px; }
 .dc-mention { background: rgba(88, 101, 242, 0.3); color: #c9cdfb; border-radius: 3px; padding: 0 2px; }
+.invite-form { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.invite-form h3 { margin: 0; font-size: 17px; }
+.invite-row { display: flex; gap: 8px; flex: 1; min-width: 280px; max-width: 460px; }
+.invite-row .input { flex: 1; }

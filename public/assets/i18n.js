@@ -510,6 +510,12 @@
     'title.novice': ['戰鬥新手', 'Combat Novice', 'Tân binh chiến đấu'],
     'title.rookie': ['新人', 'Rookie', 'Người mới'],
 
+    'invite.title': ['Discord 邀請連結', 'Discord invite link', 'Liên kết mời Discord'],
+    'invite.desc': ['短網址會轉到這個邀請連結：', 'The short link redirects here:', 'Liên kết rút gọn chuyển tới đây:'],
+    'invite.saved': ['已儲存，短網址已指向新的邀請連結', 'Saved — the short link now points here', 'Đã lưu — liên kết rút gọn đã trỏ tới đây'],
+    'error.invalid_invite': ['邀請連結格式不正確（例如 https://discord.gg/xxxx）', 'Invalid invite link (e.g. https://discord.gg/xxxx)', 'Liên kết mời không hợp lệ (vd. https://discord.gg/xxxx)'],
+    'action.discord_invite_update': ['修改 Discord 邀請連結', 'changed the Discord invite', 'đã đổi liên kết mời Discord'],
+
     // ---- docs
     'docs.title': ['開發者 API', 'Developer API', 'API cho nhà phát triển'],
     'docs.intro': ['透過 REST API 讀取 Mc.Tierlist.Asia 的排行榜與玩家資料。所有回應皆為 JSON。', 'Read Mc.Tierlist.Asia rankings and player data through a REST API. All responses are JSON.', 'Đọc bảng xếp hạng và dữ liệu người chơi Mc.Tierlist.Asia qua REST API. Mọi phản hồi đều là JSON.'],

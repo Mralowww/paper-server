@@ -510,6 +510,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                  <div class="muted" style="font-size:12px;margin-top:4px">IP <span class="mono">${esc(s.ddns.ip || '—')}</span> · ${t('ddns.checked')} ${esc(fmtDate(s.ddns.checkedAt))}${s.ddns.updatedAt ? ` · ${t('ddns.updated')} ${esc(fmtDate(s.ddns.updatedAt))}` : ''}</div></div>`)}
           </div>
 
+          <form class="card card-pad invite-form" id="inviteForm" style="margin-bottom:20px">
+            <div><h3>${t('invite.title')}</h3><p class="muted" style="margin:4px 0 0;font-size:13px">${t('invite.desc')} <a class="mono" href="/discord" target="_blank" rel="noopener" style="color:var(--gold-2)">${location.host}/discord</a></p></div>
+            <div class="invite-row"><input class="input mono" name="url" value="${esc(s.discordInvite)}" placeholder="https://discord.gg/xxxx" required><button class="btn btn-gold">${t('common.save')}</button></div>
+          </form>
+
           <div class="apps-toggle card card-pad ${a.open ? 'is-open' : 'is-paused'}" style="margin-bottom:20px">
             <div><h3>${t('apps.title')}</h3><span class="st-pill ${a.open ? 'open' : 'closed'}"><i></i>${t(a.open ? 'apps.open' : 'apps.paused')}</span>
               <p class="muted" style="margin:8px 0 0;font-size:13px">${t('apps.pausedHint')}</p></div>
@@ -550,6 +555,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <p class="muted" style="font-size:14px;margin-top:14px">${t('settings.howto')}</p>
         </div>`;
+      $('#inviteForm', panel).addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try { await api('/discord-invite', { method: 'PUT', body: { url: e.target.url.value.trim() } }); toast(t('invite.saved')); }
+        catch (err) { toast(err.message, 'err'); }
+      });
       const rtForm = $('#rtForm', panel);
       const rtKeys = Object.keys(rt.defaults);
       const rtValues = () => Object.fromEntries(rtKeys.map((k) => [k, rtForm[k].value]));
