@@ -9,8 +9,15 @@ def running():
 
 
 def submit(coro_fn, *args):
-    """Schedules bot coroutine `coro_fn(*args)`; silently skipped when the bot is offline."""
+    """Schedules bot coroutine `coro_fn(*args)` without waiting; skipped when the bot is offline."""
     if not running():
         return False
     asyncio.run_coroutine_threadsafe(coro_fn(*args), bot.loop)
     return True
+
+
+def call(coro_fn, *args, timeout=20):
+    """Runs a bot coroutine and waits for its result. Raises RuntimeError when the bot is offline."""
+    if not running():
+        raise RuntimeError("bot_offline")
+    return asyncio.run_coroutine_threadsafe(coro_fn(*args), bot.loop).result(timeout=timeout)

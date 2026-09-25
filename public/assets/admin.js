@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['players', 'tab.players', true, '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>'],
     ['bans', 'tab.bans', true, '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'],
     ['support', 'tab.support', true, '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'],
+    ['tickets', 'tab.tickets', true, '<path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/>'],
     ['tests', 'tab.tests', true, '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>'],
     ['keys', 'tab.keys', perms.manageKeys, '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/>'],
     ['team', 'tab.team', true, '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'],
@@ -363,7 +364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     async keys(panel) {
-      const { keys } = await api('/keys');
+      const [{ keys }, { keys: accountKeys }] = await Promise.all([api('/keys'), api('/account-keys')]);
       panel.innerHTML = `
         <div class="panel">
           <div class="panel-head">
@@ -387,6 +388,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </tr>`).join('')}</tbody>
             </table></div>` : `<div class="empty" style="border:0"><div><h3>${t('keys.emptyT')}</h3><p>${t('keys.emptyD')}</p></div></div>`}
           </div>
+          <div class="panel-head" style="margin-top:26px"><h2 style="font-size:19px">${t('akey.all')}</h2></div>
+          <div class="card">${accountKeys.length ? accountKeys.map((k) => `
+            <div class="ticket-row"><span class="mono muted">${esc(k.prefix)}…</span>
+              <span class="ticket-title"><b>${esc(k.name)}</b><span class="muted">${esc(k.username || k.user_id)} · ${t('col.lastUsed')} ${esc(fmtDate(k.last_used_at))} · ${t('col.calls')} ${k.usage_count}</span></span>
+              <button class="btn btn-sm btn-danger" data-revokeacct="${k.id}">${t('akey.revoke')}</button></div>`).join('') : `<div class="card-pad muted">${t('akey.empty')}</div>`}</div>
         </div>`;
       $('#addKey').addEventListener('click', () => modal(`
         <h3>${t('keys.createTitle')}</h3>
@@ -406,7 +412,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       panel.addEventListener('click', async (e) => {
         const tg = e.target.closest('[data-toggle]');
         const del = e.target.closest('[data-del]');
+        const acct = e.target.closest('[data-revokeacct]');
         try {
+          if (acct && await confirmDialog(t('akey.deleteT'), t('akey.deleteD'))) {
+            await api(`/account-keys/${acct.dataset.revokeacct}`, { method: 'DELETE' });
+            return go('keys');
+          }
           if (tg) {
             const revoke = tg.dataset.revoked === '0';
             await api(`/keys/${tg.dataset.toggle}`, { method: 'PATCH', body: { revoked: revoke } });
@@ -437,22 +448,124 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>`;
     },
 
+    async tickets(panel, arg) {
+      const filter = ['open', 'tested', 'closed'].includes(arg) ? arg : (arg === 'all' ? 'all' : 'open');
+      const d = await api(`/tickets?status=${filter}`);
+      const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
+      const seg = [...['open', 'tested', 'closed'].map((st) => [st, t(`tickets.status.${st}`), d.counts[st] || 0]), ['all', t('support.filterAll'), total]];
+      const canEdit = perms.manageTickets;
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head"><div><h2>${t('tab.tickets')}</h2><p>${t('tickets.subtitle')}</p></div></div>
+          <div class="seg" style="margin-bottom:14px">${seg.map(([st, label, n]) => `<button class="${st === filter ? 'active' : ''}" data-go="tickets/${st}">${label} (${n})</button>`).join('')}</div>
+          <div class="card">${d.tickets.length ? `<div class="table-wrap"><table class="data">
+            <thead><tr><th>${t('col.player')}</th><th>${t('col.type')}</th><th>${t('col.status')}</th><th>${t('col.result')}</th><th>${t('col.date')}</th><th></th></tr></thead>
+            <tbody>${d.tickets.map((x, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
+              <td><div class="cell-player"><img src="${avatarUrl(x.mc_name, 32)}" alt="">${esc(x.mc_name)}</div><div class="muted" style="font-size:12px">${esc(x.applicant_name || x.applicant_id)}</div></td>
+              <td><span class="pill ${x.kind === 'high' ? 'high' : 'on'}">${t(`kind.${x.kind}`)}</span></td>
+              <td><span class="st-pill ${x.status === 'open' ? 'open' : x.status === 'tested' ? 'in_progress' : 'closed'}"><i></i>${t(`tickets.status.${x.status}`)}</span></td>
+              <td>${x.new_tier ? `${resultCell({ prev_tier: x.prev_tier, new_tier: x.new_tier })} <span class="muted" style="font-size:12px">${esc(x.tester_name || '')}</span>` : '<span class="muted">—</span>'}</td>
+              <td class="muted" style="font-size:13px">${esc(fmtDate(x.created_at))}</td>
+              <td><div class="actions">
+                ${d.guildId && x.status !== 'closed' ? `<a class="btn btn-sm" href="https://discord.com/channels/${d.guildId}/${x.channel_id}" target="_blank" rel="noopener">↗</a>` : ''}
+                ${canEdit && x.status === 'open' ? `<button class="btn btn-sm" data-kind="${x.channel_id}" data-to="${x.kind === 'high' ? 'normal' : 'high'}">${t(x.kind === 'high' ? 'tickets.toNormal' : 'tickets.toHigh')}</button>` : ''}
+                ${canEdit && x.status === 'tested' ? `<button class="btn btn-sm" data-reopen="${x.channel_id}">${t('tickets.reopen')}</button>` : ''}
+                ${canEdit && x.status !== 'closed' ? `<button class="btn btn-sm btn-danger" data-close="${x.channel_id}" data-name="${esc(x.mc_name)}">${t('tickets.close')}</button>` : ''}
+              </div></td></tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('tickets.empty')}</div>`}</div>
+        </div>`;
+      panel.addEventListener('click', async (e) => {
+        const g = e.target.closest('[data-go]');
+        if (g) return go(g.dataset.go);
+        try {
+          const k = e.target.closest('[data-kind]');
+          if (k) { await api(`/tickets/${k.dataset.kind}/kind`, { method: 'POST', body: { kind: k.dataset.to } }); toast(t('tickets.done')); return go(`tickets/${filter}`); }
+          const r = e.target.closest('[data-reopen]');
+          if (r) { await api(`/tickets/${r.dataset.reopen}/reopen`, { method: 'POST' }); toast(t('tickets.done')); return go(`tickets/${filter}`); }
+          const c = e.target.closest('[data-close]');
+          if (c && await confirmDialog(t('tickets.close'), t('tickets.closeD', { name: esc(c.dataset.name) }))) {
+            await api(`/tickets/${c.dataset.close}/close`, { method: 'POST' }); toast(t('tickets.done')); go(`tickets/${filter}`);
+          }
+        } catch (err) { toast(err.message, 'err'); }
+      });
+    },
+
     async settings(panel) {
-      const s = await api('/settings');
+      const [s, a] = await Promise.all([api('/settings'), api('/applications')]);
       const ch = (id) => (id ? `<span class="mono">#${esc(id)}</span>${s.guildId ? ` <a class="btn btn-sm" href="https://discord.com/channels/${s.guildId}/${id}" target="_blank" rel="noopener">↗</a>` : ''}` : `<span class="muted">${t('settings.notSet')}</span>`);
       const row = (label, value) => `<div class="set-row"><span>${label}</span><div>${value}</div></div>`;
+      const field = (key, multi) => `<div class="field"><label>${t(`panel.f.${key}`)}</label>${multi
+        ? `<textarea class="input" name="${key}" rows="4">${esc(a.panel[key])}</textarea>`
+        : `<input class="input" name="${key}" value="${esc(a.panel[key])}">`}</div>`;
       panel.innerHTML = `
         <div class="panel">
           <div class="panel-head"><div><h2>${t('tab.settings')}</h2><p>${t('settings.subtitle')}</p></div></div>
-          <div class="card card-pad">
+          <div class="card card-pad" style="margin-bottom:20px">
             ${row(t('settings.bot'), s.botConfigured ? `<span class="pill ${s.botOnline ? 'on' : 'off'}">● ${t(s.botOnline ? 'admin.botOnline' : 'admin.botOffline')}</span>` : `<span class="pill off">${t('settings.notConfigured')}</span>`)}
             ${row(t('settings.resultChannel'), ch(s.resultChannel))}
             ${row(t('settings.applyChannel'), ch(s.applyChannel))}
             ${row(t('settings.category'), s.ticketCategory ? `<span class="mono">${esc(s.ticketCategory)}</span>` : `<span class="muted">${t('settings.notSet')}</span>`)}
             ${row(t('settings.cooldown'), t('settings.days', { n: s.cooldownDays }))}
           </div>
+
+          <div class="apps-toggle card card-pad ${a.open ? 'is-open' : 'is-paused'}" style="margin-bottom:20px">
+            <div><h3>${t('apps.title')}</h3><span class="st-pill ${a.open ? 'open' : 'closed'}"><i></i>${t(a.open ? 'apps.open' : 'apps.paused')}</span>
+              <p class="muted" style="margin:8px 0 0;font-size:13px">${t('apps.pausedHint')}</p></div>
+            <button class="btn ${a.open ? 'btn-danger' : 'btn-gold'}" id="toggleApps">${t(a.open ? 'apps.pause' : 'apps.resume')}</button>
+          </div>
+
+          <div class="panel-head"><div><h2 style="font-size:20px">${t('panel.title')}</h2><p>${t('panel.desc')}</p></div></div>
+          <div class="panel-editor">
+            <form class="card card-pad" id="panelForm">
+              ${field('title')}${field('description', true)}
+              <div class="row2">${field('rules_title')}${field('types_title')}</div>
+              ${field('rules', true)}${field('types', true)}
+              <div class="row2">${field('button')}${field('paused_button')}</div>
+              <div class="field"><label>${t('panel.f.color')}</label><div class="color-row"><input type="color" name="colorPick" value="${esc(a.panel.color)}"><input class="input mono" name="color" value="${esc(a.panel.color)}" maxlength="7"></div></div>
+              <div class="modal-actions"><button type="button" class="btn" id="resetPanel">${t('panel.reset')}</button><button class="btn btn-gold">${t('common.save')}</button></div>
+            </form>
+            <div class="dc-preview-wrap"><div class="muted" style="font-size:12px;font-weight:700;letter-spacing:.12em;margin-bottom:8px">${t('panel.preview').toUpperCase()}</div><div id="dcPreview"></div></div>
+          </div>
           <p class="muted" style="font-size:14px;margin-top:14px">${t('settings.howto')}</p>
         </div>`;
+      const form = $('#panelForm', panel);
+      const md = (x) => esc(x.replaceAll('{cooldown}', s.cooldownDays)).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^- /gm, '• ').replace(/\n/g, '<br>');
+      const values = () => Object.fromEntries(['title', 'description', 'rules_title', 'rules', 'types_title', 'types', 'button', 'paused_button', 'color'].map((k) => [k, form[k].value]));
+      const preview = () => {
+        const v = values();
+        $('#dcPreview', panel).innerHTML = `
+          <div class="dc-msg"><img class="dc-avatar" src="/assets/cube.svg" alt=""><div class="dc-body">
+            <div class="dc-name">TierTest <span class="dc-bot">BOT</span></div>
+            <div class="dc-embed" style="border-left-color:${esc(v.color)}">
+              <div class="dc-title">${esc(v.title)}</div>
+              ${v.description ? `<div class="dc-text">${md(v.description)}</div>` : ''}
+              ${v.rules ? `<div class="dc-field"><b>${esc(v.rules_title)}</b><div class="dc-text">${md(v.rules)}</div></div>` : ''}
+              ${v.types ? `<div class="dc-field"><b>${esc(v.types_title)}</b><div class="dc-text">${md(v.types)}</div></div>` : ''}
+              <div class="dc-footer">Mc.Tierlist.Asia</div>
+            </div>
+            <button type="button" class="dc-button ${a.open ? '' : 'off'}">${esc(a.open ? v.button : v.paused_button)}</button>
+          </div></div>`;
+      };
+      form.addEventListener('input', (e) => {
+        if (e.target.name === 'colorPick') form.color.value = e.target.value.toUpperCase();
+        if (e.target.name === 'color' && /^#[0-9a-f]{6}$/i.test(e.target.value)) form.colorPick.value = e.target.value;
+        preview();
+      });
+      preview();
+      const saved = (r) => toast(r.botError ? t('panel.savedBotOff') : r.panelUpdated ? t('panel.saved') : t('panel.savedNoPanel'), r.botError ? 'err' : 'ok');
+      $('#resetPanel', panel).addEventListener('click', () => {
+        Object.entries(a.defaults).forEach(([k, v]) => { if (form[k]) form[k].value = v; });
+        form.colorPick.value = a.defaults.color;
+        preview();
+      });
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try { saved(await api('/applications', { method: 'PUT', body: { panel: values() } })); go('settings'); }
+        catch (err) { toast(err.message, 'err'); }
+      });
+      $('#toggleApps', panel).addEventListener('click', async () => {
+        try { saved(await api('/applications', { method: 'PUT', body: { open: !a.open } })); go('settings'); }
+        catch (err) { toast(err.message, 'err'); }
+      });
     },
 
     async audit(panel) {

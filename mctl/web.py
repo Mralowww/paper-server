@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import bridge
 from . import config as C
 from . import db as D
+from . import panel as P
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$", re.I)
@@ -121,12 +122,30 @@ def body():
 
 
 # ---------------------------------------------------------------- current user
+USER_KEY_PREFIX = "mctlu_"
+
+
+def request_api_key():
+    auth = request.headers.get("Authorization", "")
+    return (request.headers.get("X-API-Key") or (auth[7:] if auth.startswith("Bearer ") else "")).strip()
+
+
 def current_user():
-    """The signed-in Discord user with access info, or None. Roles come from the local member cache."""
+    """The signed-in Discord user with access info, or None. Roles come from the local member cache.
+
+    Staff can also authenticate with a personal account API key (mctlu_…) instead of the session cookie.
+    """
     if "user" in g:
         return g.user
     g.user = None
+    g.via_key = None
     uid = session.get("user_id")
+    if not uid:
+        key = request_api_key()
+        if key.startswith(USER_KEY_PREFIX):
+            row = db().execute("SELECT id, user_id FROM user_keys WHERE key_hash = ?", (sha256(key),)).fetchone()
+            if row:
+                uid, g.via_key = row["user_id"], row["id"]
     if uid:
         m = D.member(db(), uid)
         roles = m["roles"] if m and m["in_guild"] else []
@@ -137,7 +156,20 @@ def current_user():
             "inGuild": bool(m and m["in_guild"]),
             **C.access_for(uid, roles),
         }
+        if g.via_key:
+            # A key stops working as soon as its owner loses their staff/tester roles.
+            if not key_eligible(g.user):
+                g.user = None
+                return None
+            g.user["username"] = f"{g.user['username']} (API)"
+            db().execute("UPDATE user_keys SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?",
+                         (D.now_ms(), g.via_key))
+            db().commit()
     return g.user
+
+
+def key_eligible(user):
+    return bool(user and (user["level"] >= C.LEVEL_HELPER or user["tester"]))
 
 
 def permissions(user):
@@ -148,6 +180,9 @@ def permissions(user):
         "manageKeys": lvl >= C.LEVEL_ADMIN,
         "manageSettings": lvl >= C.LEVEL_ADMIN,
         "testerPanel": bool(user and (user["tester"] or lvl >= C.LEVEL_ADMIN)),
+        "giveResults": bool(user and (user["tester"] or lvl >= C.LEVEL_ADMIN)),
+        "manageTickets": lvl >= C.LEVEL_MODERATOR,
+        "accountKeys": key_eligible(user),
     }
 
 
@@ -167,9 +202,14 @@ def route(rule, methods=("GET",), level=None, perm=None, login=True):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            if not same_origin():
-                return error(403, "bad_origin")
             user = current_user()
+            if g.via_key:
+                allowed, headers = api_limiter.hit(f"ukey:{g.via_key}")
+                g.extra_headers = headers
+                if not allowed:
+                    return error(429, "rate_limited", "Too many requests, slow down.")
+            elif not same_origin():
+                return error(403, "bad_origin")
             if login and not user:
                 return error(401, "unauthorized")
             if level and user["level"] < level:
@@ -1067,6 +1107,242 @@ def cleanup_storage():
     D.audit(conn, current_user(), "image_cleanup", f"{len(rows)} images from closed tickets")
     conn.commit()
     return jsonify({"ok": True, "deleted": len(rows)})
+
+
+# ================================================================ account API keys
+@route("/api/me/keys", perm="accountKeys")
+def my_keys():
+    rows = db().execute("SELECT id, name, prefix, created_at, last_used_at, usage_count FROM user_keys "
+                        "WHERE user_id = ? ORDER BY id DESC", (current_user()["id"],)).fetchall()
+    return jsonify({"keys": [dict(r) for r in rows]})
+
+
+@route("/api/me/keys", methods=["POST"], perm="accountKeys")
+def create_my_key():
+    if g.via_key:
+        return error(403, "forbidden", "Account keys cannot create other keys")
+    name = str(body().get("name") or "").strip()
+    if not name or len(name) > 48:
+        return bad("invalid_key_name", "請輸入 1–48 字的名稱")
+    user = current_user()
+    conn = db()
+    if conn.execute("SELECT COUNT(*) FROM user_keys WHERE user_id = ?", (user["id"],)).fetchone()[0] >= 5:
+        return bad("too_many_keys", "每個帳號最多 5 把 API Key")
+    key = f"{USER_KEY_PREFIX}{secrets.token_urlsafe(30)}"
+    conn.execute("INSERT INTO user_keys (user_id, name, prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                 (user["id"], name, key[:12], sha256(key), D.now_ms()))
+    D.audit(conn, user, "account_key_create", name)
+    conn.commit()
+    return jsonify({"key": key}), 201
+
+
+@route("/api/me/keys/<int:kid>", methods=["DELETE"], perm="accountKeys")
+def delete_my_key(kid):
+    user = current_user()
+    conn = db()
+    row = conn.execute("SELECT * FROM user_keys WHERE id = ? AND user_id = ?", (kid, user["id"])).fetchone()
+    if not row:
+        return error(404, "not_found")
+    conn.execute("DELETE FROM user_keys WHERE id = ?", (kid,))
+    D.audit(conn, user, "account_key_delete", row["name"])
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/account-keys", perm="manageKeys")
+def all_account_keys():
+    rows = db().execute("""SELECT k.id, k.user_id, k.name, k.prefix, k.created_at, k.last_used_at, k.usage_count, m.username
+                           FROM user_keys k LEFT JOIN members m ON m.discord_id = k.user_id ORDER BY k.id DESC""").fetchall()
+    return jsonify({"keys": [dict(r) for r in rows]})
+
+
+@route("/api/admin/account-keys/<int:kid>", methods=["DELETE"], perm="manageKeys")
+def revoke_account_key(kid):
+    conn = db()
+    row = conn.execute("SELECT * FROM user_keys WHERE id = ?", (kid,)).fetchone()
+    if not row:
+        return error(404, "not_found")
+    conn.execute("DELETE FROM user_keys WHERE id = ?", (kid,))
+    D.audit(conn, current_user(), "account_key_revoke", f"{row['name']} ({row['user_id']})")
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+# ================================================================ applications, panel, tickets
+def bot_call(fn_name, *args):
+    """Runs a bot coroutine from the web thread. Returns (result, error response)."""
+    async def run(*a):
+        from . import bot
+        return await getattr(bot, fn_name)(*a)
+    try:
+        return bridge.call(run, *args), None
+    except RuntimeError:
+        return None, error(503, "bot_offline", "Discord 機器人目前離線")
+    except Exception as exc:  # timeout or Discord error
+        print(f"[bot] {fn_name} failed: {exc}")
+        return None, error(502, "bot_failed", "Discord 機器人執行失敗")
+
+
+@route("/api/admin/applications", perm="viewStaff")
+def get_applications():
+    conn = db()
+    return jsonify({"open": P.applications_open(conn), "panel": P.load(conn), "defaults": P.DEFAULTS,
+                    "cooldownDays": C.TEST_COOLDOWN_DAYS,
+                    "panelPosted": bool(D.get_setting(conn, "apply_message_id")),
+                    "applyChannel": D.get_setting(conn, "apply_channel_id")})
+
+
+@route("/api/admin/applications", methods=["PUT"], perm="manageSettings")
+def set_applications():
+    data = body()
+    conn = db()
+    user = current_user()
+    if "panel" in data:
+        panel, bad_field = P.validate(data.get("panel") or {})
+        if bad_field:
+            return bad("invalid_panel", f"欄位格式不正確：{bad_field}")
+        P.save(conn, panel)
+        D.audit(conn, user, "panel_update", panel["title"])
+    if "open" in data:
+        is_open = bool(data.get("open"))
+        D.set_setting(conn, "applications_open", "1" if is_open else "0")
+        D.audit(conn, user, "applications_open" if is_open else "applications_pause", None)
+    conn.commit()
+    posted, err = bot_call("refresh_apply_panel")
+    return jsonify({"ok": True, "panelUpdated": bool(posted), "botError": bool(err)})
+
+
+@route("/api/admin/tickets", perm="viewStaff")
+def list_tickets():
+    status = request.args.get("status", "open")
+    sql = """SELECT t.*, m.username AS applicant_name, x.tester_name, x.new_tier, x.wins, x.losses
+             FROM tickets t LEFT JOIN members m ON m.discord_id = t.applicant_id
+             LEFT JOIN tests x ON x.id = t.test_id"""
+    args = ()
+    if status in ("open", "tested", "closed"):
+        sql += " WHERE t.status = ?"
+        args = (status,)
+    rows = db().execute(sql + " ORDER BY t.created_at DESC LIMIT 300", args).fetchall()
+    counts = {r["status"]: r["n"] for r in db().execute("SELECT status, COUNT(*) AS n FROM tickets GROUP BY status")}
+    return jsonify({"tickets": [dict(r) for r in rows], "counts": counts, "guildId": str(C.GUILD_ID) if C.GUILD_ID else None})
+
+
+def load_test_ticket(channel_id):
+    return db().execute("SELECT * FROM tickets WHERE channel_id = ?", (str(channel_id),)).fetchone()
+
+
+@route("/api/admin/tickets/<channel_id>/close", methods=["POST"], perm="manageTickets")
+def close_test_ticket(channel_id):
+    t = load_test_ticket(channel_id)
+    if not t:
+        return error(404, "not_found")
+    user = current_user()
+    conn = db()
+    conn.execute("UPDATE tickets SET status = 'closed', closed_at = ?, closed_by = ? WHERE channel_id = ?",
+                 (D.now_ms(), user["id"], t["channel_id"]))
+    D.audit(conn, user, "ticket_force_close", t["mc_name"])
+    conn.commit()
+    _, err = bot_call("delete_ticket_channel", int(t["channel_id"]), user["username"])
+    return jsonify({"ok": True, "botError": bool(err)})
+
+
+@route("/api/admin/tickets/<channel_id>/reopen", methods=["POST"], perm="manageTickets")
+def reopen_test_ticket(channel_id):
+    t = load_test_ticket(channel_id)
+    if not t:
+        return error(404, "not_found")
+    exists, err = bot_call("ticket_channel_exists", int(t["channel_id"]))
+    if err:
+        return err
+    if not exists:
+        return bad("channel_gone", "考試頻道已被刪除，無法重新開啟")
+    conn = db()
+    conn.execute("UPDATE tickets SET status = 'open', closed_at = NULL, closed_by = NULL WHERE channel_id = ?", (t["channel_id"],))
+    D.audit(conn, current_user(), "ticket_reopen", t["mc_name"])
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/tickets/<channel_id>/kind", methods=["POST"], perm="manageTickets")
+def set_ticket_kind(channel_id):
+    t = load_test_ticket(channel_id)
+    kind = body().get("kind")
+    if not t:
+        return error(404, "not_found")
+    if kind not in ("normal", "high"):
+        return bad("invalid_kind", "類型不正確")
+    conn = db()
+    conn.execute("UPDATE tickets SET kind = ? WHERE channel_id = ?", (kind, t["channel_id"]))
+    D.audit(conn, current_user(), "ticket_kind", f"{t['mc_name']} → {kind}")
+    conn.commit()
+    _, err = bot_call("apply_ticket_kind", int(t["channel_id"]), kind)
+    return jsonify({"ok": True, "botError": bool(err)})
+
+
+# ================================================================ direct results
+def mojang_profile(name):
+    try:
+        req = urllib.request.Request(f"https://api.mojang.com/users/profiles/minecraft/{urllib.parse.quote(name)}",
+                                     headers={"User-Agent": "Mc.Tierlist.Asia"})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            if res.status == 204:
+                return None
+            data = json.loads(res.read().decode() or "{}")
+    except urllib.error.HTTPError as exc:
+        if exc.code in (204, 404):
+            return None
+        raise
+    if not data.get("id"):
+        return None
+    u = data["id"]
+    return {"name": data["name"], "id": f"{u[:8]}-{u[8:12]}-{u[12:16]}-{u[16:20]}-{u[20:]}"}
+
+
+def allowed_tiers(user):
+    if user["seniorTester"] or user["level"] >= C.LEVEL_ADMIN:
+        return C.TIER_ORDER
+    return C.TIER_ORDER[:C.TIER_ORDER.index(C.TESTER_MAX_TIER) + 1]
+
+
+@route("/api/results", methods=["POST"], perm="giveResults")
+def give_result():
+    """Gives a tier directly (without a Discord ticket) — same effect as /result."""
+    data = body()
+    user = current_user()
+    name = str(data.get("name") or "").strip()
+    discord_id = str(data.get("discordId") or "").strip() or None
+    tier = str(data.get("tier") or "").upper()
+    wins = clamp_int(data.get("wins"), 0, 99, -1)
+    losses = clamp_int(data.get("losses"), 0, 99, -1)
+    if not NAME_RE.match(name):
+        return bad("invalid_name", "玩家名稱需為 2–16 個英數字或底線")
+    if discord_id and not DISCORD_ID_RE.match(discord_id):
+        return bad("invalid_discord_id", "Discord ID 格式不正確")
+    if tier not in allowed_tiers(user):
+        return error(403, "tier_not_allowed", "你不能給予這個段位")
+    if wins < 0 or losses < 0:
+        return bad("invalid_score", "勝敗場需為 0–99")
+    try:
+        profile = mojang_profile(name)
+    except (urllib.error.URLError, ValueError):
+        return error(502, "mojang_unavailable", "目前無法連線到 Mojang 驗證帳號")
+    if not profile:
+        return bad("mc_not_found", "找不到這個 Minecraft 帳號")
+    conn = db()
+    existing = conn.execute("SELECT * FROM players WHERE REPLACE(uuid, '-', '') = ? OR name = ?",
+                            (profile["id"].replace("-", ""), profile["name"])).fetchone()
+    discord_id = discord_id or (existing["discord_id"] if existing else None)
+    if discord_id and discord_id == user["id"]:
+        return error(403, "self_result", "你不能給自己成績")
+    m = D.member(conn, discord_id) if discord_id else None
+    prev = C.tier_from_roles(m["roles"]) if m and m["in_guild"] else (existing["tier"] if existing else None)
+    tester = {"id": user["id"], "username": user["username"]}
+    D.record_test(conn, applicant_id=discord_id, mc_name=profile["name"], uuid=profile["id"], tester=tester,
+                  prev_tier=prev, new_tier=tier, wins=wins, losses=losses, channel_id=None)
+    conn.commit()
+    notes, err = bot_call("publish_result", discord_id, profile["name"], user["id"], prev, tier, wins, losses)
+    return jsonify({"ok": True, "name": profile["name"], "prevTier": prev, "tier": tier,
+                    "notes": notes or [], "botError": bool(err)}), 201
 
 
 @app.route("/api/<path:_rest>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

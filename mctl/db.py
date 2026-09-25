@@ -128,6 +128,16 @@ CREATE TABLE IF NOT EXISTS support_blocks (
   created_by  TEXT,
   created_at  INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user_keys (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  prefix        TEXT NOT NULL,
+  key_hash      TEXT NOT NULL UNIQUE,
+  created_at    INTEGER NOT NULL,
+  last_used_at  INTEGER,
+  usage_count   INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT
@@ -324,35 +334,42 @@ def site_stats(conn):
 
 
 def record_test(conn, *, applicant_id, mc_name, uuid, tester, prev_tier, new_tier, wins, losses, channel_id):
-    """Stores a test result, updates the player's tier and totals, and starts the cooldown. Returns (player_id, test_id)."""
+    """Stores a test result, updates the player's tier and totals, and starts the cooldown. Returns (player_id, test_id).
+
+    applicant_id may be None for results given from the website to a player without a linked Discord account;
+    channel_id is None for results that did not come from a ticket.
+    """
     ts = now_ms()
+    did = str(applicant_id) if applicant_id else None
     row = None
     if uuid:
         row = conn.execute("SELECT * FROM players WHERE REPLACE(uuid, '-', '') = ?", (uuid.replace("-", ""),)).fetchone()
     if not row:
         row = conn.execute("SELECT * FROM players WHERE name = ?", (mc_name,)).fetchone()
-    if not row:
-        row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (str(applicant_id),)).fetchone()
+    if not row and did:
+        row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (did,)).fetchone()
     if row:
-        conn.execute("""UPDATE players SET name = ?, uuid = COALESCE(?, uuid), discord_id = ?, tier = ?, retired = 0,
-                        wins = wins + ?, losses = losses + ?, updated_at = ?, updated_by = ? WHERE id = ?""",
-                     (mc_name, uuid, str(applicant_id), new_tier, wins, losses, ts, tester["id"], row["id"]))
+        conn.execute("""UPDATE players SET name = ?, uuid = COALESCE(?, uuid), discord_id = COALESCE(?, discord_id), tier = ?,
+                        retired = 0, wins = wins + ?, losses = losses + ?, updated_at = ?, updated_by = ? WHERE id = ?""",
+                     (mc_name, uuid, did, new_tier, wins, losses, ts, tester["id"], row["id"]))
         player_id = row["id"]
     else:
         cur = conn.execute("""INSERT INTO players (name, uuid, region, tier, retired, discord_id, wins, losses,
                               created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)""",
-                           (mc_name, uuid, C.DEFAULT_REGION, new_tier, str(applicant_id), wins, losses, ts, ts, tester["id"]))
+                           (mc_name, uuid, C.DEFAULT_REGION, new_tier, did, wins, losses, ts, ts, tester["id"]))
         player_id = cur.lastrowid
-    # One Discord account ↔ one player row.
-    conn.execute("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND id != ?", (str(applicant_id), player_id))
+    if did:
+        # One Discord account ↔ one player row.
+        conn.execute("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND id != ?", (did, player_id))
+        until = ts + C.TEST_COOLDOWN_DAYS * 86400 * 1000
+        conn.execute("INSERT INTO cooldowns (discord_id, until) VALUES (?, ?) ON CONFLICT(discord_id) DO UPDATE SET until = excluded.until",
+                     (did, until))
     cur = conn.execute("""INSERT INTO tests (player_id, discord_id, mc_name, tester_id, tester_name, prev_tier, new_tier,
                           wins, losses, channel_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                       (player_id, str(applicant_id), mc_name, tester["id"], tester["username"], prev_tier, new_tier,
-                        wins, losses, str(channel_id), ts))
+                       (player_id, did, mc_name, tester["id"], tester["username"], prev_tier, new_tier,
+                        wins, losses, str(channel_id) if channel_id else "web", ts))
     test_id = cur.lastrowid
-    until = ts + C.TEST_COOLDOWN_DAYS * 86400 * 1000
-    conn.execute("INSERT INTO cooldowns (discord_id, until) VALUES (?, ?) ON CONFLICT(discord_id) DO UPDATE SET until = excluded.until",
-                 (str(applicant_id), until))
-    conn.execute("UPDATE tickets SET status = 'tested', test_id = ? WHERE channel_id = ?", (test_id, str(channel_id)))
+    if channel_id:
+        conn.execute("UPDATE tickets SET status = 'tested', test_id = ? WHERE channel_id = ?", (test_id, str(channel_id)))
     audit(conn, tester, "test_result", f"{mc_name}: {prev_tier or 'Unranked'} → {new_tier} ({wins}-{losses})")
     return player_id, test_id

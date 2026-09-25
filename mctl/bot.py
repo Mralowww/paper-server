@@ -10,6 +10,7 @@ from discord import app_commands
 from . import bridge
 from . import config as C
 from . import db as D
+from . import panel as P
 
 log = logging.getLogger("mctl.bot")
 
@@ -258,22 +259,12 @@ async def cmd_setupapply(interaction: discord.Interaction, channel: discord.Text
     me = interaction.guild.me
     if not category.permissions_for(me).manage_channels:
         return await reply(interaction, f"❌ 機器人在類別「{category.name}」沒有「管理頻道」權限。")
-    embed = discord.Embed(
-        title="Vanilla 考試申請",
-        color=0xF2C14E,
-        description="點擊下方按鈕並輸入你的 Minecraft ID，即可申請 Vanilla 考試。",
-    )
-    embed.add_field(name="申請須知", inline=False, value=(
-        f"- 考試結果公布後，需等待 {C.TEST_COOLDOWN_DAYS} 天才能再次申請\n"
-        "- 請使用正版 Java 帳號的 ID，系統會自動驗證\n"
-        "- 送出後會為你建立專屬的考試頻道"))
-    embed.add_field(name="考試類型", inline=False, value=(
-        "- 一般考試：目前段位 LT3 以下（含未排名），由考官負責\n"
-        "- 高階考試：目前段位 HT3 以上，由高階考官負責"))
-    embed.set_footer(text="Mc.Tierlist.Asia")
-    await channel.send(embed=embed, view=ApplyView())
+    with conn() as c:
+        panel, is_open = P.load(c), P.applications_open(c)
+    message = await channel.send(embed=panel_embed(panel, is_open), view=apply_view(panel, is_open))
     with conn() as c:
         D.set_setting(c, "apply_channel_id", channel.id)
+        D.set_setting(c, "apply_message_id", message.id)
         D.set_setting(c, "ticket_category_id", category.id)
         D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "setup_apply",
                 f"#{channel.name} / {category.name}")
@@ -358,6 +349,8 @@ def ban_message(ban):
 
 def application_block(c, user_id):
     """Why this user can't apply right now, or None."""
+    if not P.applications_open(c):
+        return "目前暫停考試申請，請留意公告。"
     ban = D.find_active_ban(c, discord_id=user_id)
     if ban:
         return ban_message(ban)
@@ -368,6 +361,42 @@ def application_block(c, user_id):
     if until:
         return f"⏳ 你還在冷卻中，可於 <t:{until // 1000}:F>（<t:{until // 1000}:R>）再次申請。"
     return None
+
+
+def panel_embed(panel, is_open):
+    embed = discord.Embed(title=panel["title"], description=P.render(panel["description"]) or None,
+                          color=int(panel["color"].lstrip("#"), 16))
+    if panel["rules"]:
+        embed.add_field(name=panel["rules_title"] or "\u200b", value=P.render(panel["rules"]), inline=False)
+    if panel["types"]:
+        embed.add_field(name=panel["types_title"] or "\u200b", value=P.render(panel["types"]), inline=False)
+    embed.set_footer(text="Mc.Tierlist.Asia")
+    return embed
+
+
+def apply_view(panel, is_open):
+    view = ApplyView()
+    button = view.children[0]
+    button.label = panel["button"] if is_open else panel["paused_button"]
+    button.disabled = not is_open
+    button.style = discord.ButtonStyle.success if is_open else discord.ButtonStyle.secondary
+    return view
+
+
+async def refresh_apply_panel():
+    """Edits the posted panel to match the saved text and open/paused state. Returns True when updated."""
+    with conn() as c:
+        panel, is_open = P.load(c), P.applications_open(c)
+        channel_id, message_id = D.get_setting(c, "apply_channel_id"), D.get_setting(c, "apply_message_id")
+    channel = bot.get_channel(int(channel_id or 0))
+    if not channel or not message_id:
+        return False
+    try:
+        message = await channel.fetch_message(int(message_id))
+        await message.edit(embed=panel_embed(panel, is_open), view=apply_view(panel, is_open))
+        return True
+    except discord.NotFound:
+        return False
 
 
 class ApplyView(discord.ui.View):
@@ -700,6 +729,67 @@ class CloseView(discord.ui.View):
             await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
         except discord.HTTPException:
             pass
+
+
+# ---------------------------------------------------------------- website actions
+async def ticket_channel_exists(channel_id):
+    channel = bot.get_channel(channel_id)
+    if channel:
+        return True
+    try:
+        await bot.fetch_channel(channel_id)
+        return True
+    except (discord.NotFound, discord.Forbidden):
+        return False
+
+
+async def delete_ticket_channel(channel_id, actor_name):
+    channel = bot.get_channel(channel_id)
+    if channel:
+        try:
+            await channel.delete(reason=f"Ticket closed from website by {actor_name}")
+        except discord.HTTPException as exc:
+            log.warning("could not delete ticket channel %s: %s", channel_id, exc)
+    return True
+
+
+async def apply_ticket_kind(channel_id, kind):
+    """Normal tickets are visible to testers; high tickets only to senior testers."""
+    channel = bot.get_channel(channel_id)
+    if not channel:
+        return False
+    tester = channel.guild.get_role(C.ROLE_TESTER)
+    if tester:
+        if kind == "high":
+            await channel.set_permissions(tester, overwrite=None, reason="Ticket set to high test")
+        else:
+            await channel.set_permissions(tester, view_channel=True, send_messages=True, read_message_history=True,
+                                          attach_files=True, embed_links=True, reason="Ticket set to normal test")
+    name = channel.name.removeprefix("高階")
+    await channel.edit(name=f"高階{name}" if kind == "high" else name)
+    return True
+
+
+async def publish_result(discord_id, mc_name, tester_id, prev_tier, tier, wins, losses):
+    """Role sync + result embed for a result given from the website. Returns a list of warnings."""
+    notes = []
+    if discord_id:
+        err = await sync_tier_role(discord_id, tier)
+        if err:
+            notes.append(err)
+    with conn() as c:
+        result_channel_id = D.get_setting(c, "result_channel_id")
+    channel = bot.get_channel(int(result_channel_id or 0))
+    if not channel:
+        notes.append("尚未設定考試結果頻道（/setuptier）。")
+        return notes
+    embed = result_embed(mc_name, tester_id, prev_tier, tier, wins, losses)
+    try:
+        await channel.send(f"<@{discord_id}>" if discord_id else None, embed=embed,
+                           allowed_mentions=discord.AllowedMentions(users=True, roles=False))
+    except discord.HTTPException:
+        notes.append("無法發送到考試結果頻道（權限不足）。")
+    return notes
 
 
 # ---------------------------------------------------------------- /roleup

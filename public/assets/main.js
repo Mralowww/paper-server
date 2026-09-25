@@ -46,6 +46,20 @@
   }
   const api = (path) => request(`/api/site${path}`);
 
+  /** JSON write helper for cookie-authenticated endpoints; throws a translated message. */
+  async function send(url, method, body) {
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const key = `error.${data.error}`;
+      throw new Error(window.I18N.has(key) ? t(key) : (data.message || t('common.error')));
+    }
+    return data;
+  }
+
+  const TIER_ORDER = ['HT1', 'LT1', 'HT2', 'LT2', 'HT3', 'LT3', 'HT4', 'LT4', 'HT5', 'LT5'];
+
   // Current user (null when signed out); resolved once per page.
   const session = request('/api/me').catch(() => ({ user: null, permissions: {} }));
 
@@ -464,6 +478,86 @@
       ${extra}
     </div>`;
 
+  async function renderKeys(root) {
+    let box = $('#keysBox', root);
+    if (!box) {
+      box = document.createElement('section');
+      box.id = 'keysBox';
+      box.className = 'keys-box reveal in';
+      root.append(box);
+    }
+    const { keys } = await request('/api/me/keys');
+    box.innerHTML = `
+      <div class="panel-head"><div><h2 style="font-size:20px">${t('akey.title')}</h2><p>${t('akey.desc')} ${t('akey.docs')}</p></div></div>
+      <form class="key-create" id="keyCreate"><input class="input" name="name" maxlength="48" placeholder="${t('akey.namePh')}" required><button class="btn btn-gold">${t('akey.create')}</button></form>
+      <div id="newKey"></div>
+      <div class="card">${keys.length ? keys.map((k) => `
+        <div class="ticket-row"><span class="mono muted">${esc(k.prefix)}…</span>
+          <span class="ticket-title"><b>${esc(k.name)}</b><span class="muted">${esc(fmtDate(k.created_at))} · ${t('col.lastUsed')} ${esc(fmtDate(k.last_used_at))} · ${t('col.calls')} ${k.usage_count}</span></span>
+          <button class="btn btn-sm btn-danger" data-delkey="${k.id}">${t('common.delete')}</button></div>`).join('') : `<div class="card-pad muted">${t('akey.empty')}</div>`}</div>`;
+    $('#keyCreate', box).addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const { key } = await send('/api/me/keys', 'POST', { name: e.target.name.value.trim() });
+        await renderKeys(root);
+        $('#newKey', box).innerHTML = `<div class="callout" style="margin:12px 0">${t('keys.createdD')}<div class="key-reveal" style="margin-top:10px"><span style="flex:1">${esc(key)}</span><button class="btn btn-sm" id="copyNewKey">${t('common.copy')}</button></div></div>`;
+        $('#copyNewKey', box).addEventListener('click', async (ev) => {
+          try { await navigator.clipboard.writeText(key); ev.target.textContent = t('common.copied'); } catch { toast(t('common.copyFailed'), 'err'); }
+        });
+      } catch (err) { toast(err.message, 'err'); }
+    });
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-delkey]');
+      if (!b || !window.confirm(`${t('akey.deleteT')}\n${t('akey.deleteD')}`)) return;
+      try { await send(`/api/me/keys/${b.dataset.delkey}`, 'DELETE'); renderKeys(root); }
+      catch (err) { toast(err.message, 'err'); }
+    };
+  }
+
+  /** "Give a result" form for testers and admins. */
+  function giveFormHtml(maxTier) {
+    const allowed = TIER_ORDER.slice(TIER_ORDER.indexOf(maxTier));
+    return `
+      <form class="give-card reveal" id="giveForm">
+        <div class="panel-head" style="margin-bottom:14px"><div><h2 style="font-size:20px">${t('give.title')}</h2><p>${t('give.desc')}</p></div></div>
+        <div class="row2">
+          <div class="field"><label>${t('players.mcName')}</label><input class="input" name="name" maxlength="16" placeholder="Steve" required></div>
+          <div class="field"><label>${t('give.discordOpt')}</label><input class="input mono" name="discordId" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>${t('players.tier')}</label><div class="tier-picker">${allowed.map((x, i) => `<button type="button" data-t="${x}" class="${i === allowed.length - 1 ? 'active' : ''}">${x}</button>`).join('')}</div></div>
+        <div class="row2">
+          <div class="field"><label>${t('card.wins')}</label><input class="input mono" name="wins" type="number" min="0" max="99" value="0" required></div>
+          <div class="field"><label>${t('card.losses')}</label><input class="input mono" name="losses" type="number" min="0" max="99" value="0" required></div>
+        </div>
+        <div class="modal-actions"><button class="btn btn-gold">${t('give.submit')}</button></div>
+      </form>`;
+  }
+
+  function bindGiveForm(root, onDone) {
+    const form = $('#giveForm', root);
+    if (!form) return;
+    let tier = $('.tier-picker .active', form)?.dataset.t;
+    $('.tier-picker', form).addEventListener('click', (e) => {
+      const b = e.target.closest('[data-t]');
+      if (!b) return;
+      tier = b.dataset.t;
+      $$('.tier-picker button', form).forEach((x) => x.classList.toggle('active', x === b));
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('button.btn-gold', form);
+      btn.disabled = true;
+      try {
+        const r = await send('/api/results', 'POST', { name: form.name.value.trim(), discordId: form.discordId.value.trim(),
+          tier, wins: Number(form.wins.value), losses: Number(form.losses.value) });
+        toast(t('give.done', { name: r.name, tier: r.tier }));
+        if (r.botError) toast(t('give.botOff'), 'err');
+        r.notes.forEach((n) => toast(n, 'err'));
+        onDone?.();
+      } catch (err) { toast(err.message, 'err'); btn.disabled = false; }
+    });
+  }
+
   // ---------- Pages ----------
   const pages = {
     async home() {
@@ -573,6 +667,8 @@
               ]) : `<div class="card-pad muted">${t('me.noTests')}</div>`}</div>
             </div>
           </div>`;
+        const { permissions: perms } = await session;
+        if (perms.accountKeys) renderKeys(root);
       } catch {
         root.innerHTML = emptyHtml(t('empty.errT'), t('empty.errD'));
       }
@@ -599,6 +695,7 @@
             ${stat(d.totals.all, t('tester.total'), 0)}${stat(d.totals.week, t('tester.week'), 0.05)}
             ${stat(d.tickets.length, t('tester.open'), 0.1)}${stat(`<span style="font-size:22px">LT5 → ${d.maxTier}</span>`, t('tester.range'), 0.15)}
           </div>
+          ${perms.giveResults ? giveFormHtml(d.maxTier) : ''}
           <div class="panel-head reveal"><h2 style="font-size:20px">${t('tester.queue')}</h2></div>
           <div class="card reveal" style="margin-bottom:26px">${d.tickets.length ? testsTable(d.tickets, [
             ['col.player', (x) => `<div class="cell-player"><img src="${avatarUrl(x.mc_name, 32)}" alt="">${esc(x.mc_name)}</div>`],
@@ -614,6 +711,7 @@
             ['col.result', resultCell],
             ['col.score', scoreCell],
           ]) : `<div class="card-pad muted">${t('me.noTests')}</div>`}</div>`;
+        bindGiveForm(root, () => pages.tester());
       } catch {
         root.innerHTML = emptyHtml(t('empty.errT'), t('empty.errD'));
       }
@@ -748,7 +846,7 @@
   window.MCTL = {
     $, $$, esc, icon, t, tierBadge, regionBadge, badgesHtml, avatarUrl, discordAvatar, toast, countUp, initReveal,
     session, levelChips, loginUrl, emptyHtml, testsTable, resultCell, scoreCell,
-    statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml, request,
+    send, giveFormHtml, bindGiveForm, statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml, request,
   };
 
   document.addEventListener('DOMContentLoaded', () => {
