@@ -82,10 +82,15 @@ button, input, select { font: inherit; color: inherit; }
   border-bottom-color: var(--border);
 }
 .nav-inner { display: flex; align-items: center; gap: 28px; height: 68px; }
-.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
-.brand img { width: 34px; height: 34px; filter: drop-shadow(0 4px 12px rgba(242, 181, 44, 0.35)); transition: transform 0.5s var(--ease); }
-.brand:hover img { transform: rotate(-8deg) scale(1.08); }
-.brand .accent { background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+.brand-cube { width: 36px; height: 36px; filter: drop-shadow(0 6px 14px rgba(92, 154, 230, 0.35)); transition: transform 0.6s var(--ease); }
+.brand:hover .brand-cube { transform: translateY(-3px) rotate(-6deg); }
+.brand-text { display: grid; gap: 7px; line-height: 1; }
+.brand-title { font: 400 17px/1 'Press Start 2P', monospace; color: #7fb3ff; letter-spacing: 0.02em; text-shadow: 0 2px 0 #2f5d9c; }
+.brand-sub { font: 400 9px/1 'Press Start 2P', monospace; color: #6b7285; letter-spacing: 0.08em; }
+.brand-sm .brand-cube { width: 26px; height: 26px; }
+.brand-sm .brand-title { font-size: 12px; }
+.brand-sm .brand-sub { font-size: 7px; }
 .nav-links { display: flex; gap: 4px; position: relative; }
 .nav-links a {
   position: relative; padding: 8px 14px; border-radius: 10px; color: var(--muted); font-weight: 500; font-size: 14px;
@@ -492,7 +497,7 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 .actions { display: flex; gap: 6px; justify-content: flex-end; }
 .mono { font-family: var(--font-mono); font-size: 13px; }
 .muted { color: var(--muted); }
-.pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill { display: inline-block; white-space: nowrap; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .pill.on { background: rgba(61, 220, 151, 0.12); color: var(--success); }
 .pill.off { background: rgba(255, 90, 95, 0.12); color: #ff8a8e; }
 .audit { display: grid; }

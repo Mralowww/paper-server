@@ -46,6 +46,8 @@
   }
 
   // ---------- Chrome (nav + footer) ----------
+  const brandHtml = '<img class="brand-cube" src="/assets/cube.svg" alt=""><span class="brand-text"><span class="brand-title">TIERLIST</span><span class="brand-sub">MC · ASIA</span></span>';
+
   function renderChrome(page) {
     const loader = document.createElement('div');
     loader.className = 'page-loader';
@@ -60,7 +62,7 @@
     nav.className = 'nav';
     nav.innerHTML = `
       <div class="container nav-inner">
-        <a class="brand" href="/"><img src="/assets/logo.svg" alt=""><span>Mc.Tierlist<span class="accent">.Asia</span></span></a>
+        <a class="brand" href="/" aria-label="Mc.Tierlist.Asia 首頁">${brandHtml}</a>
         <nav class="nav-links">${links.map(([id, href, label]) => `<a href="${href}" class="${id === page ? 'active' : ''}">${label}</a>`).join('')}
           <a href="/admin" class="${page === 'admin' ? 'active' : ''}">管理後台</a></nav>
         <div class="nav-right">
@@ -89,7 +91,7 @@
     footer.className = 'site';
     footer.innerHTML = `
       <div class="container inner">
-        <div class="brand"><img src="/assets/logo.svg" alt="" style="width:26px;height:26px"><span>Mc.Tierlist<span class="accent">.Asia</span></span></div>
+        <a class="brand brand-sm" href="/">${brandHtml}</a>
         <div>© ${new Date().getFullYear()} Mc.Tierlist.Asia · 非 Mojang / Microsoft 官方網站</div>
         <div style="display:flex;gap:18px"><a href="/rankings">排行榜</a><a href="/docs">API 文件</a><a href="/admin">管理後台</a></div>
       </div>`;

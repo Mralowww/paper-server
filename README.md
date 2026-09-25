@@ -8,22 +8,23 @@
 
 ## 需求
 
-- Node.js **22.13 以上**（使用內建 `node:sqlite`，不需要另外安裝資料庫）
+- Python **3.9 以上**（資料庫使用內建 SQLite，不需另外安裝）
 
 ## 安裝與啟動
 
 ```bash
-npm install
+pip install -r requirements.txt
 cp .env.example .env   # 填入設定
-npm start
+python app.py
 ```
 
-資料存放在 `data/tierlist.db`（SQLite），請記得備份這個資料夾。
+- 伺服器使用 waitress，監聽 `PORT`（或託管提供的 `SERVER_PORT`），預設 3000。
+- 資料存放在 `data/tierlist.db`，請定期備份這個資料夾。
 
 ## Discord 登入設定
 
 1. 到 <https://discord.com/developers/applications> 建立 Application
-2. OAuth2 → 複製 **Client ID** 與 **Client Secret** 到 `.env`
+2. OAuth2 → 把 **Client ID** 與 **Client Secret** 填到 `.env`
 3. OAuth2 → Redirects 加入 `{BASE_URL}/auth/discord/callback`
 
 ## 權限
@@ -37,4 +38,4 @@ npm start
 
 ## 反向代理
 
-若放在 Nginx / Cloudflare 後方，請確保轉發 `Host` 與 `X-Forwarded-*` 標頭，`BASE_URL` 使用 `https://` 時登入 Cookie 會自動設為 Secure。
+若放在 Nginx / Cloudflare 後方，請轉發 `Host` 與 `X-Forwarded-*` 標頭。`BASE_URL` 使用 `https://` 時，登入 Cookie 會自動設為 Secure。
