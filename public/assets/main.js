@@ -349,33 +349,75 @@
   const scoreCell = (x) => `<span class="mono"><b class="win">${x.wins}</b> – <b class="loss">${x.losses}</b></span>`;
 
   // ---------- Support tickets (shared with the staff panel) ----------
-  const statusPill = (st) => `<span class="st-pill ${st}">${t(`support.status.${st}`)}</span>`;
+  const CAT_ICONS = {
+    bug: '<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9M6 13H2M22 13h-4M6.5 8.5 3 7M17.5 8.5 21 7M6.5 17.5 3 19M17.5 17.5 21 19"/>',
+    appeal: '<path d="M12 3v18M5 21h14M3 7h18M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z"/>',
+    report: '<path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/>',
+    other: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
+  };
+  const catIcon = (c, size = 20) => `<span class="cat-ico ${c}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${CAT_ICONS[c] || CAT_ICONS.other}</svg></span>`;
+  const statusPill = (st) => `<span class="st-pill ${st}"><i></i>${t(`support.status.${st}`)}</span>`;
   const catLabel = (c) => t(`support.cat.${c}`);
   const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
+  const STEPS = ['open', 'in_progress', 'closed'];
+  const stepper = (st) => `<div class="stepper">${STEPS.map((x, i) => `<div class="step ${STEPS.indexOf(st) >= i ? 'done' : ''} ${x === st ? 'current' : ''}"><span>${i + 1}</span>${t(`support.status.${x}`)}</div>`).join('<div class="step-line"></div>')}</div>`;
 
   /** Chat thread. `mine(msg)` decides which side a message sits on. */
   function threadHtml(payload, mine) {
     return payload.messages.map((m, i) => `
-      <div class="msg ${mine(m) ? 'mine' : ''} ${m.is_staff ? 'staff' : ''}" style="animation-delay:${Math.min(i, 10) * 0.03}s">
-        <div class="msg-meta"><b>${esc(m.author_name || m.author_id)}</b>${m.is_staff ? `<span class="role admin">${t('support.staff')}</span>` : ''}<time>${esc(fmtDate(m.created_at))}</time></div>
-        <div class="msg-body">${nl2br(m.body)}</div>
-        ${m.attachments.length ? `<div class="msg-images">${m.attachments.map((a) => `<a href="/api/support/attachments/${a.id}" target="_blank" rel="noopener"><img src="/api/support/attachments/${a.id}" alt="${esc(a.orig_name || '')}" loading="lazy"></a>`).join('')}</div>` : ''}
+      <div class="msg-row ${mine(m) ? 'mine' : ''}" style="animation-delay:${Math.min(i, 10) * 0.04}s">
+        <img class="msg-avatar" src="${discordAvatar(m.author_id, m.author_avatar)}" alt="">
+        <div class="msg ${m.is_staff ? 'staff' : ''}">
+          <div class="msg-meta"><b>${esc(m.author_name || m.author_id)}</b>${m.is_staff ? `<span class="role admin">${t('support.staff')}</span>` : ''}<time>${esc(fmtDate(m.created_at))}</time></div>
+          <div class="msg-body">${nl2br(m.body)}</div>
+          ${m.attachments.length ? `<div class="msg-images">${m.attachments.map((a) => `<a href="/api/support/attachments/${a.id}" target="_blank" rel="noopener"><img src="/api/support/attachments/${a.id}" alt="${esc(a.orig_name || '')}" loading="lazy"></a>`).join('')}</div>` : ''}
+        </div>
       </div>`).join('');
   }
 
-  const fileInputHtml = (max) => `
-    <label class="file-pick">${icon.image}<span>${t('support.addImages')}</span>
-      <input type="file" name="files" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-max="${max}"></label>
-    <span class="file-names muted"></span>`;
+  const dropZoneHtml = (max) => `
+    <div class="drop-zone">
+      <input type="file" name="files" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-max="${max}">
+      <div class="drop-previews"></div>
+      <button type="button" class="drop-add">${icon.image}<span>${t('support.addImages')}</span><small>${t('support.images', { n: max })}</small></button>
+    </div>`;
 
-  function bindFileInput(root) {
-    const input = $('input[type=file]', root);
-    input?.addEventListener('change', () => {
-      const max = Number(input.dataset.max) || 3;
-      const files = [...input.files];
-      if (files.length > max) { toast(t('error.too_many_files'), 'err'); input.value = ''; }
-      else if (files.some((f) => f.size > 5 * 1024 * 1024)) { toast(t('error.file_too_large'), 'err'); input.value = ''; }
-      $('.file-names', root).textContent = [...input.files].map((f) => f.name).join('、');
+  /** Image picker with previews, removal and drag & drop. Keeps input.files in sync. */
+  function bindDropZone(root) {
+    const zone = $('.drop-zone', root);
+    if (!zone) return;
+    const input = $('input[type=file]', zone);
+    const max = Number(input.dataset.max) || 3;
+    let files = [];
+    const sync = () => {
+      const dt = new DataTransfer();
+      files.forEach((f) => dt.items.add(f));
+      input.files = dt.files;
+      $('.drop-previews', zone).innerHTML = files.map((f, i) => `
+        <div class="drop-thumb"><img src="${URL.createObjectURL(f)}" alt=""><button type="button" data-rm="${i}" aria-label="${t('common.delete')}">×</button></div>`).join('');
+      $('.drop-add', zone).hidden = files.length >= max;
+    };
+    const add = (list) => {
+      for (const f of list) {
+        if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { toast(t('error.invalid_file'), 'err'); continue; }
+        if (f.size > 5 * 1024 * 1024) { toast(t('error.file_too_large'), 'err'); continue; }
+        if (files.length >= max) { toast(t('error.too_many_files'), 'err'); break; }
+        files.push(f);
+      }
+      sync();
+    };
+    $('.drop-add', zone).addEventListener('click', () => input.click());
+    input.addEventListener('change', () => { const picked = [...input.files]; input.value = ''; add(picked); });
+    zone.addEventListener('click', (e) => {
+      const rm = e.target.closest('[data-rm]');
+      if (rm) { files.splice(Number(rm.dataset.rm), 1); sync(); }
+    });
+    ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('drag'); }));
+    zone.addEventListener('drop', (e) => add([...e.dataTransfer.files]));
+    zone.closest('form')?.addEventListener('paste', (e) => {
+      const pasted = [...(e.clipboardData?.files || [])];
+      if (pasted.length) add(pasted);
     });
   }
 
@@ -389,26 +431,38 @@
     return data;
   }
 
-  /** Reply box under a thread; calls onSent after a successful post. */
   function composerHtml() {
     return `<form class="composer">
       <textarea name="body" rows="3" maxlength="4000" placeholder="${t('support.replyPh')}" required></textarea>
-      <div class="composer-bar">${fileInputHtml(3)}<button class="btn btn-gold btn-sm">${t('support.send')}</button></div>
+      ${dropZoneHtml(3)}
+      <div class="composer-bar"><span class="muted composer-hint">Ctrl + Enter</span><button class="btn btn-gold btn-sm">${t('support.send')}</button></div>
     </form>`;
   }
 
   function bindComposer(root, ticketId, onSent) {
     const form = $('.composer', root);
     if (!form) return;
-    bindFileInput(form);
+    bindDropZone(form);
+    $('textarea', form).addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const btn = $('button', form);
+      const btn = $('button.btn-gold', form);
       btn.disabled = true;
       try { await postForm(`/api/support/tickets/${ticketId}/messages`, form); onSent(); }
       catch (err) { toast(err.message, 'err'); btn.disabled = false; }
     });
   }
+
+  const ticketHeadHtml = (tk, extra = '') => `
+    <div class="ticket-hero reveal in">
+      ${catIcon(tk.category, 26)}
+      <div class="ticket-hero-main">
+        <div class="ticket-hero-meta"><span class="mono">#${tk.id}</span><span>${catLabel(tk.category)}</span><span>${esc(fmtDate(tk.created_at))}</span></div>
+        <h2>${esc(tk.title)}</h2>
+        ${stepper(tk.status)}
+      </div>
+      ${extra}
+    </div>`;
 
   // ---------- Pages ----------
   const pages = {
@@ -574,21 +628,37 @@
           `<p style="margin-top:20px"><a class="btn btn-discord" href="${loginUrl()}">${icon.discord}${t('nav.loginDiscord')}</a></p>`);
         return initReveal();
       }
-      const head = `<div class="panel-head reveal"><div><div class="kicker">Support</div><h2>${t('support.title')}</h2><p>${t('support.subtitle')}</p></div></div>`;
 
       async function showList() {
         history.replaceState(null, '', '/support');
         const d = await request('/api/support/tickets');
-        root.innerHTML = `${head}
-          ${d.blocked ? `<div class="callout reveal" style="margin-bottom:16px">${t('support.blocked')}${d.blockReason ? ` — ${esc(d.blockReason)}` : ''}</div>` : `<div class="reveal" style="margin-bottom:16px"><button class="btn btn-gold" id="newTicket">${t('support.new')}</button></div>`}
-          <div class="card reveal">${d.tickets.length ? d.tickets.map((x) => `
-            <a class="ticket-row" href="#${x.id}" data-open="${x.id}">
-              <span class="mono muted">#${x.id}</span>
-              <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">${catLabel(x.category)} · ${esc(fmtRelative(x.updated_at))}</span></span>
+        const count = (st) => d.tickets.filter((x) => x.status === st).length;
+        root.innerHTML = `
+          <div class="support-hero reveal">
+            <div>
+              <div class="kicker">Support</div>
+              <h2>${t('support.title')}</h2>
+              <p>${t('support.subtitle')}</p>
+            </div>
+            ${d.blocked ? '' : `<button class="btn btn-gold" id="newTicket">${t('support.new')}</button>`}
+          </div>
+          ${d.blocked ? `<div class="callout reveal" style="margin-bottom:18px">${t('support.blocked')}${d.blockReason ? ` — ${esc(d.blockReason)}` : ''}</div>` : ''}
+          <div class="support-stats reveal">
+            ${STEPS.map((st) => `<div class="sstat ${st}"><b>${count(st)}</b><span>${t(`support.status.${st}`)}</span></div>`).join('')}
+          </div>
+          <div class="ticket-list">${d.tickets.length ? d.tickets.map((x, i) => `
+            <a class="ticket-card reveal" style="--d:${Math.min(i, 10) * 0.04}s" href="#${x.id}" data-open="${x.id}">
+              ${catIcon(x.category)}
+              <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">#${x.id} · ${catLabel(x.category)} · ${esc(fmtRelative(x.updated_at))}</span></span>
               ${statusPill(x.status)}
-            </a>`).join('') : `<div class="card-pad muted">${t('support.empty')}</div>`}</div>`;
-        $('#newTicket')?.addEventListener('click', () => showNew(d));
+              <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+            </a>`).join('') : `<div class="support-empty reveal">
+              <div class="support-empty-ico">${catIcon('other', 30)}</div>
+              <h3>${t('support.empty')}</h3>
+              ${d.blocked ? '' : `<button class="btn btn-gold" data-new>${t('support.new')}</button>`}
+            </div>`}</div>`;
         root.onclick = (e) => {
+          if (e.target.closest('#newTicket, [data-new]')) return showNew(d);
           const a = e.target.closest('[data-open]');
           if (a) { e.preventDefault(); showTicket(a.dataset.open); }
         };
@@ -596,18 +666,25 @@
       }
 
       function showNew(d) {
-        root.innerHTML = `${head}
-          <form class="card card-pad reveal in" id="ticketForm" style="max-width:720px">
-            <h3 style="margin:0 0 16px">${t('support.newTitle')}</h3>
-            <div class="field"><label>${t('support.category')}</label><select class="input" name="category">${d.categories.map((c) => `<option value="${c}">${catLabel(c)}</option>`).join('')}</select></div>
+        root.onclick = null;
+        root.innerHTML = `
+          <a href="/support" class="link-more back-link" id="backList">${t('support.back')}</a>
+          <form class="new-ticket reveal in" id="ticketForm">
+            <h2>${t('support.newTitle')}</h2>
+            <div class="field"><label>${t('support.category')}</label>
+              <div class="cat-picker">${d.categories.map((c, i) => `
+                <label class="cat-option"><input type="radio" name="category" value="${c}" ${i === 0 ? 'checked' : ''}>
+                  <span>${catIcon(c, 22)}<b>${catLabel(c)}</b></span></label>`).join('')}</div></div>
             <div class="field"><label>${t('support.subject')}</label><input class="input" name="title" maxlength="100" required></div>
             <div class="field"><label>${t('support.body')}</label><textarea class="input" name="body" rows="7" maxlength="4000" placeholder="${t('support.bodyPh')}" required></textarea></div>
-            <div class="field"><label>${t('support.images', { n: d.maxFiles })}</label><div class="composer-bar" style="justify-content:flex-start">${fileInputHtml(d.maxFiles)}</div></div>
+            <div class="field">${dropZoneHtml(d.maxFiles)}</div>
             <div class="modal-actions"><button type="button" class="btn" id="cancelNew">${t('common.cancel')}</button><button class="btn btn-gold">${t('support.submit')}</button></div>
           </form>`;
         const form = $('#ticketForm');
-        bindFileInput(form);
-        $('#cancelNew').addEventListener('click', showList);
+        bindDropZone(form);
+        const back = (e) => { e?.preventDefault(); showList(); };
+        $('#backList').addEventListener('click', back);
+        $('#cancelNew').addEventListener('click', back);
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const btn = $('button.btn-gold', form);
@@ -621,17 +698,20 @@
       }
 
       async function showTicket(id) {
+        root.onclick = null;
         history.replaceState(null, '', `/support#${id}`);
         let d;
         try { d = await request(`/api/support/tickets/${id}`); } catch { return showList(); }
         const tk = d.ticket;
         root.innerHTML = `
-          <a href="/support" class="link-more" id="backList" style="display:inline-block;margin-bottom:16px">${t('support.back')}</a>
-          <div class="ticket-head reveal in"><div><span class="mono muted">#${tk.id} · ${catLabel(tk.category)}</span><h2>${esc(tk.title)}</h2></div>${statusPill(tk.status)}</div>
+          <a href="/support" class="link-more back-link" id="backList">${t('support.back')}</a>
+          ${ticketHeadHtml(tk)}
           <div class="thread">${threadHtml(d, (m) => m.author_id === user.id)}</div>
           ${tk.status === 'closed' ? `<div class="callout">${t('support.closedNote')}</div>` : composerHtml()}`;
         $('#backList').addEventListener('click', (e) => { e.preventDefault(); showList(); });
         bindComposer(root, tk.id, () => showTicket(tk.id));
+        const last = $('.thread .msg-row:last-child');
+        if (last && d.messages.length > 3) last.scrollIntoView({ block: 'center' });
       }
 
       const route = () => {
@@ -668,7 +748,7 @@
   window.MCTL = {
     $, $$, esc, icon, t, tierBadge, regionBadge, badgesHtml, avatarUrl, discordAvatar, toast, countUp, initReveal,
     session, levelChips, loginUrl, emptyHtml, testsTable, resultCell, scoreCell,
-    statusPill, catLabel, threadHtml, composerHtml, bindComposer, request,
+    statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml, request,
   };
 
   document.addEventListener('DOMContentLoaded', () => {

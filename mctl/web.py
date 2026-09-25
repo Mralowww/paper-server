@@ -834,7 +834,9 @@ def load_ticket(tid):
 
 def ticket_payload(t):
     conn = db()
-    msgs = [dict(r) for r in conn.execute("SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY id", (t["id"],))]
+    msgs = [dict(r) for r in conn.execute("""SELECT sm.*, m.avatar AS author_avatar FROM support_messages sm
+                                              LEFT JOIN members m ON m.discord_id = sm.author_id
+                                              WHERE sm.ticket_id = ? ORDER BY sm.id""", (t["id"],))]
     atts = {}
     for a in conn.execute("SELECT id, message_id, orig_name, mime, size FROM support_attachments WHERE ticket_id = ?", (t["id"],)):
         atts.setdefault(a["message_id"], []).append(dict(a))

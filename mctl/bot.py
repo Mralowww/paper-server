@@ -31,6 +31,26 @@ def rank_name(tier):
     return C.TIER_NAMES[tier] if tier else "Unranked"
 
 
+APPLY_MODAL_ID = "mctl:apply_modal"
+
+
+def modal_values(data):
+    """custom_id → value for every text input in a modal submit payload."""
+    out = {}
+
+    def walk(node):
+        if isinstance(node, dict):
+            if "custom_id" in node and "value" in node:
+                out[node["custom_id"]] = node["value"]
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(data.get("components", []))
+    return out
+
+
 def conn():
     return D.transaction()
 
@@ -53,6 +73,7 @@ class TierBot(discord.Client):
         self.http_session = aiohttp.ClientSession(headers={"User-Agent": "Mc.Tierlist.Asia bot"})
         self.add_view(ApplyView())
         self.add_view(CloseView())
+        self.add_dynamic_items(ResultTierSelect, ResultButton, RoleupButton)
         guild = discord.Object(id=C.GUILD_ID)
         # Wipe every previously registered command (global and guild), then register ours on the guild.
         self.tree.clear_commands(guild=None)
@@ -112,6 +133,20 @@ class TierBot(discord.Client):
             if D.member(c, member.id):
                 D.upsert_member(c, member.id, member.display_name, member.avatar.key if member.avatar else None,
                                 tracked_role_ids(member), save=False)
+
+    async def on_interaction(self, interaction: discord.Interaction):
+        """Modal submits are routed here by custom_id so they keep working across restarts."""
+        if interaction.type != discord.InteractionType.modal_submit:
+            return
+        cid = interaction.data.get("custom_id", "")
+        try:
+            if cid == APPLY_MODAL_ID:
+                await handle_apply(interaction, modal_values(interaction.data).get("mc_name", ""))
+            elif m := SCORE_MODAL_RE.fullmatch(cid):
+                await handle_score(interaction, int(m["ch"]), m["tier"], modal_values(interaction.data))
+        except Exception:
+            log.exception("modal %s failed", cid)
+            await reply(interaction, "⚠️ 發生錯誤，請稍後再試或聯絡管理員。")
 
     async def on_guild_channel_delete(self, channel):
         with conn() as c:
@@ -348,92 +383,93 @@ class ApplyView(discord.ui.View):
             return await reply(interaction, block)
         if not ready:
             return await reply(interaction, "⚠️ 考試系統尚未設定完成，請聯絡管理員。")
-        await interaction.response.send_modal(ApplyModal())
+        modal = discord.ui.Modal(title="申請 Vanilla 考試", custom_id=APPLY_MODAL_ID, timeout=600)
+        modal.add_item(discord.ui.TextInput(label="Minecraft ID", placeholder="例如：Steve", min_length=3,
+                                            max_length=16, custom_id="mc_name"))
+        await interaction.response.send_modal(modal)
 
 
-class ApplyModal(discord.ui.Modal, title="申請 Vanilla 考試"):
-    mc_name = discord.ui.TextInput(label="Minecraft ID", placeholder="例如：Steve", min_length=3, max_length=16)
+async def handle_apply(interaction: discord.Interaction, name):
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    name = name.strip()
+    if not MC_NAME_RE.match(name):
+        return await reply(interaction, "❌ Minecraft ID 只能包含英文、數字與底線（3–16 字）。")
+    try:
+        profile = await bot.mojang_profile(name)
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        return await reply(interaction, "⚠️ 目前無法連線到 Mojang 驗證帳號，請稍後再試。")
+    if not profile:
+        return await reply(interaction, f"❌ 找不到 Minecraft 帳號 **{name}**，請確認拼字（需為正版 Java 帳號）。")
+    user = interaction.user
+    guild = interaction.guild
+    with conn() as c:
+        block = application_block(c, user.id)
+        if block:
+            return await reply(interaction, block)
+        ban = D.find_active_ban(c, name=profile["name"], uuid=profile["id"])
+        if ban:
+            return await reply(interaction, ban_message(ban))
+        owner = c.execute("SELECT discord_id FROM players WHERE (REPLACE(uuid, '-', '') = ? OR name = ?) "
+                          "AND discord_id IS NOT NULL AND discord_id != ?",
+                          (profile["id"].replace("-", ""), profile["name"], str(user.id))).fetchone()
+        if owner:
+            return await reply(interaction, f"❌ **{profile['name']}** 已綁定其他 Discord 帳號，如有疑問請聯絡管理員。")
+        category = guild.get_channel(int(D.get_setting(c, "ticket_category_id") or 0))
+    if not isinstance(category, discord.CategoryChannel):
+        return await reply(interaction, "⚠️ 考試單類別不存在，請管理員重新使用 /setupapply。")
 
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        name = self.mc_name.value.strip()
-        if not MC_NAME_RE.match(name):
-            return await reply(interaction, "❌ Minecraft ID 只能包含英文、數字與底線（3–16 字）。")
-        try:
-            profile = await bot.mojang_profile(name)
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            return await reply(interaction, "⚠️ 目前無法連線到 Mojang 驗證帳號，請稍後再試。")
-        if not profile:
-            return await reply(interaction, f"❌ 找不到 Minecraft 帳號 **{name}**，請確認拼字（需為正版 Java 帳號）。")
+    prev_tier = C.tier_from_roles([r.id for r in user.roles])
+    high = prev_tier is not None and C.TIER_ORDER.index(prev_tier) >= C.TIER_ORDER.index(C.HIGH_TEST_FROM)
+    allow = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True,
+                                        attach_files=True, embed_links=True)
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: allow,
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True,
+                                              embed_links=True, read_message_history=True),
+    }
+    tester_roles = [C.ROLE_SENIOR_TESTER] + ([] if high else [C.ROLE_TESTER])
+    for rid in tester_roles + STAFF_ROLES:
+        role = guild.get_role(rid)
+        if role:
+            overwrites[role] = allow
+    try:
+        channel = await guild.create_text_channel(
+            f"{'高階' if high else ''}考試-{profile['name']}", category=category, overwrites=overwrites,
+            topic=f"{profile['name']} 的 Vanilla {'高階' if high else '普通'}考試 · 申請人 {user} ({user.id})",
+            reason=f"Tier test application by {user}")
+    except discord.Forbidden:
+        return await reply(interaction, "⚠️ 機器人沒有建立頻道的權限，請聯絡管理員。")
 
-        user = interaction.user
-        guild = interaction.guild
-        with conn() as c:
-            block = application_block(c, user.id)
-            if block:
-                return await reply(interaction, block)
-            ban = D.find_active_ban(c, name=profile["name"], uuid=profile["id"])
-            if ban:
-                return await reply(interaction, ban_message(ban))
-            owner = c.execute("SELECT discord_id FROM players WHERE (REPLACE(uuid, '-', '') = ? OR name = ?) "
-                              "AND discord_id IS NOT NULL AND discord_id != ?",
-                              (profile["id"].replace("-", ""), profile["name"], str(user.id))).fetchone()
-            if owner:
-                return await reply(interaction, f"❌ **{profile['name']}** 已綁定其他 Discord 帳號，如有疑問請聯絡管理員。")
-            category = guild.get_channel(int(D.get_setting(c, "ticket_category_id") or 0))
-        if not isinstance(category, discord.CategoryChannel):
-            return await reply(interaction, "⚠️ 考試單類別不存在，請管理員重新使用 /setupapply。")
+    with conn() as c:
+        c.execute("INSERT INTO tickets (channel_id, applicant_id, mc_name, uuid, kind, prev_tier, created_at) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (str(channel.id), str(user.id), profile["name"], profile["id"], "high" if high else "normal",
+                   prev_tier, D.now_ms()))
+        D.upsert_member(c, user.id, user.display_name, user.avatar.key if user.avatar else None, tracked_role_ids(user))
+        D.audit(c, {"id": str(user.id), "username": user.display_name}, "ticket_open", f"{profile['name']} ({'high' if high else 'normal'})")
 
-        prev_tier = C.tier_from_roles([r.id for r in user.roles])
-        high = prev_tier is not None and C.TIER_ORDER.index(prev_tier) >= C.TIER_ORDER.index(C.HIGH_TEST_FROM)
-        allow = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True,
-                                            attach_files=True, embed_links=True)
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            user: allow,
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True,
-                                                  embed_links=True, read_message_history=True),
-        }
-        tester_roles = [C.ROLE_SENIOR_TESTER] + ([] if high else [C.ROLE_TESTER])
-        for rid in tester_roles + STAFF_ROLES:
-            role = guild.get_role(rid)
-            if role:
-                overwrites[role] = allow
-        try:
-            channel = await guild.create_text_channel(
-                f"{'高階' if high else ''}考試-{profile['name']}", category=category, overwrites=overwrites,
-                topic=f"{profile['name']} 的 Vanilla {'高階' if high else '普通'}考試 · 申請人 {user} ({user.id})",
-                reason=f"Tier test application by {user}")
-        except discord.Forbidden:
-            return await reply(interaction, "⚠️ 機器人沒有建立頻道的權限，請聯絡管理員。")
-
-        with conn() as c:
-            c.execute("INSERT INTO tickets (channel_id, applicant_id, mc_name, uuid, kind, prev_tier, created_at) "
-                      "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                      (str(channel.id), str(user.id), profile["name"], profile["id"], "high" if high else "normal",
-                       prev_tier, D.now_ms()))
-            D.upsert_member(c, user.id, user.display_name, user.avatar.key if user.avatar else None, tracked_role_ids(user))
-            D.audit(c, {"id": str(user.id), "username": user.display_name}, "ticket_open", f"{profile['name']} ({'high' if high else 'normal'})")
-
-        kind_label = "🟣 高階考試" if high else "🟢 普通考試"
-        embed = discord.Embed(
-            title=f"{kind_label} · {profile['name']}",
-            color=0xA66CE0 if high else 0x3DDC97,
-            description=("考官會盡快與你聯繫，請耐心等候並準備好上線。\n"
-                         "考官完成考試後請在此頻道使用 **`/result`** 登錄結果。"),
-        )
-        embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{profile['id']}/128")
-        embed.add_field(name="考生", value=user.mention)
-        embed.add_field(name="Minecraft ID", value=profile["name"])
-        embed.add_field(name="目前段位", value=rank_name(prev_tier))
-        embed.add_field(name="負責考官", value=f"<@&{C.ROLE_SENIOR_TESTER}>" if high else f"<@&{C.ROLE_TESTER}> / <@&{C.ROLE_SENIOR_TESTER}>", inline=False)
-        embed.set_footer(text="Mc.Tierlist.Asia")
-        ping = f"<@&{C.ROLE_SENIOR_TESTER}>" if high else f"<@&{C.ROLE_TESTER}>"
-        await channel.send(f"{user.mention} {ping}", embed=embed, view=CloseView())
-        await reply(interaction, f"✅ 已驗證 **{profile['name']}**，你的考試單：{channel.mention}")
+    kind_label = "🟣 高階考試" if high else "🟢 普通考試"
+    embed = discord.Embed(
+        title=f"{kind_label} · {profile['name']}",
+        color=0xA66CE0 if high else 0x3DDC97,
+        description=("考官會盡快與你聯繫，請耐心等候並準備好上線。\n"
+                     "考官完成考試後請在此頻道使用 **`/result`** 登錄結果。"),
+    )
+    embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{profile['id']}/128")
+    embed.add_field(name="考生", value=user.mention)
+    embed.add_field(name="Minecraft ID", value=profile["name"])
+    embed.add_field(name="目前段位", value=rank_name(prev_tier))
+    embed.add_field(name="負責考官", value=f"<@&{C.ROLE_SENIOR_TESTER}>" if high else f"<@&{C.ROLE_TESTER}> / <@&{C.ROLE_SENIOR_TESTER}>", inline=False)
+    embed.set_footer(text="Mc.Tierlist.Asia")
+    ping = f"<@&{C.ROLE_SENIOR_TESTER}>" if high else f"<@&{C.ROLE_TESTER}>"
+    await channel.send(f"{user.mention} {ping}", embed=embed, view=CloseView())
+    await reply(interaction, f"✅ 已驗證 **{profile['name']}**，你的考試單：{channel.mention}")
 
 
 # ---------------------------------------------------------------- /result
+# Every step keeps its state in the component custom_id and reloads the ticket from the database,
+# so the menus keep working after the bot restarts.
 class Draft:
     def __init__(self, ticket, tester, prev_tier, allowed):
         self.ticket = ticket
@@ -441,14 +477,16 @@ class Draft:
         self.prev_tier = prev_tier
         self.allowed = allowed
         self.new_tier = None
-        self.wins = None
-        self.losses = None
+
+    @property
+    def channel_id(self):
+        return int(self.ticket["channel_id"])
 
     def intro_embed(self):
         e = discord.Embed(
-            title="📋 登錄考試結果",
+            title="登錄考試結果",
             color=0xA66CE0 if self.ticket["kind"] == "high" else 0x3DDC97,
-            description="**① 選擇考後段位** → ② 輸入比分 → ③ 確認發送",
+            description="**1. 選擇考後段位** → 2. 輸入比分 → 3. 確認發送",
         )
         e.set_thumbnail(url=f"https://mc-heads.net/avatar/{self.ticket['mc_name']}/96")
         e.add_field(name="考生", value=f"<@{self.ticket['applicant_id']}>")
@@ -456,10 +494,6 @@ class Draft:
         e.add_field(name="目前段位", value=rank_name(self.prev_tier))
         e.add_field(name="可選段位", value=f"{self.allowed[0]} ～ {self.allowed[-1]}", inline=False)
         return e
-
-    def preview_embed(self):
-        return result_embed(self.ticket["mc_name"], self.tester.id, self.prev_tier, self.new_tier,
-                            self.wins, self.losses, preview=True)
 
 
 def can_test(user, ticket):
@@ -473,121 +507,174 @@ def can_test(user, ticket):
     return False, None
 
 
+async def load_draft(interaction, channel_id):
+    """Rebuilds the /result state for this tester and ticket. Returns (draft, error message)."""
+    with conn() as c:
+        row = c.execute("SELECT * FROM tickets WHERE channel_id = ?", (str(channel_id),)).fetchone()
+    if not row:
+        return None, "❌ 請在考試單頻道內使用這個指令。"
+    ticket = dict(row)
+    if ticket["status"] != "open":
+        return None, "ℹ️ 這張考試單已經登錄過結果了。"
+    ok, allowed = can_test(interaction.user, ticket)
+    if not ok:
+        return None, ("❌ 高階考試需由高階考官負責。" if access(interaction.user)["tester"] else "❌ 只有考官可以登錄考試結果。")
+    if str(interaction.user.id) == ticket["applicant_id"]:
+        return None, "❌ 你不能登錄自己的考試結果。"
+    applicant = await get_member(interaction.guild, ticket["applicant_id"])
+    prev = C.tier_from_roles([r.id for r in applicant.roles]) if applicant else ticket["prev_tier"]
+    return Draft(ticket, interaction.user, prev, allowed), None
+
+
 @app_commands.command(name="result", description="登錄這張考試單的考試結果")
 @app_commands.guild_only()
 async def cmd_result(interaction: discord.Interaction):
-    with conn() as c:
-        row = c.execute("SELECT * FROM tickets WHERE channel_id = ?", (str(interaction.channel_id),)).fetchone()
-    if not row:
-        return await reply(interaction, "❌ 請在考試單頻道內使用這個指令。")
-    ticket = dict(row)
-    if ticket["status"] != "open":
-        return await reply(interaction, "ℹ️ 這張考試單已經登錄過結果了。")
-    ok, allowed = can_test(interaction.user, ticket)
-    if not ok:
-        msg = "❌ 高階考試需由高階考官負責。" if access(interaction.user)["tester"] else "❌ 只有考官可以登錄考試結果。"
-        return await reply(interaction, msg)
-    if str(interaction.user.id) == ticket["applicant_id"]:
-        return await reply(interaction, "❌ 你不能登錄自己的考試結果。")
-    applicant = await get_member(interaction.guild, ticket["applicant_id"])
-    prev = C.tier_from_roles([r.id for r in applicant.roles]) if applicant else ticket["prev_tier"]
-    draft = Draft(ticket, interaction.user, prev, allowed)
-    await interaction.response.send_message(embed=draft.intro_embed(), view=TierSelectView(draft), ephemeral=True)
+    draft, err = await load_draft(interaction, interaction.channel_id)
+    if err:
+        return await reply(interaction, err)
+    await interaction.response.send_message(embed=draft.intro_embed(), view=tier_view(draft), ephemeral=True)
 
 
-class TierSelectView(discord.ui.View):
-    def __init__(self, draft):
-        super().__init__(timeout=900)
-        self.draft = draft
-        options = [discord.SelectOption(label=f"{t} • {C.TIER_NAMES[t]}", value=t, default=(t == draft.new_tier),
-                                        emoji="⬆️" if draft.prev_tier and C.TIER_ORDER.index(t) > C.TIER_ORDER.index(draft.prev_tier)
-                                        else ("➡️" if t == draft.prev_tier else None))
-                   for t in reversed(draft.allowed)]
-        select = discord.ui.Select(placeholder="選擇考後段位…", options=options)
-        select.callback = self.on_select
-        self.add_item(select)
-
-    async def on_select(self, interaction: discord.Interaction):
-        self.draft.new_tier = interaction.data["values"][0]
-        await interaction.response.send_modal(ScoreModal(self.draft))
-
-    @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, row=1)
-    async def cancel(self, interaction: discord.Interaction, _button):
-        await interaction.response.edit_message(content="已取消登錄。", embed=None, view=None)
+def tier_view(draft):
+    view = discord.ui.View(timeout=600)
+    view.add_item(ResultTierSelect(draft.channel_id, draft))
+    view.add_item(ResultButton("x", draft.channel_id))
+    return view
 
 
-class ScoreModal(discord.ui.Modal):
-    def __init__(self, draft):
-        super().__init__(title=f"比分 · {draft.ticket['mc_name']} → {draft.new_tier}")
-        self.draft = draft
-        self.wins = discord.ui.TextInput(label="考生勝場（Wins）", placeholder="例如：3", max_length=2,
-                                         default=None if draft.wins is None else str(draft.wins))
-        self.losses = discord.ui.TextInput(label="考生敗場（Losses）", placeholder="例如：2", max_length=2,
-                                           default=None if draft.losses is None else str(draft.losses))
-        self.add_item(self.wins)
-        self.add_item(self.losses)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            wins, losses = int(self.wins.value), int(self.losses.value)
-            if not (0 <= wins <= 99 and 0 <= losses <= 99):
-                raise ValueError
-        except ValueError:
-            return await reply(interaction, "❌ 比分必須是 0–99 的數字，請重新選擇段位後再輸入一次。")
-        self.draft.wins, self.draft.losses = wins, losses
-        await interaction.response.edit_message(
-            content="請確認以下內容，確認後將發送到考試結果頻道：",
-            embed=self.draft.preview_embed(), view=ConfirmView(self.draft))
+def confirm_view(channel_id, tier, wins, losses):
+    view = discord.ui.View(timeout=600)
+    for act in ("ok", "edit", "no"):
+        view.add_item(ResultButton(act, channel_id, tier, wins, losses))
+    return view
 
 
-class ConfirmView(discord.ui.View):
-    def __init__(self, draft):
-        super().__init__(timeout=900)
-        self.draft = draft
-
-    @discord.ui.button(label="確認發送", emoji="✅", style=discord.ButtonStyle.success)
-    async def confirm(self, interaction: discord.Interaction, _button):
-        d = self.draft
-        with conn() as c:
-            status = c.execute("SELECT status FROM tickets WHERE channel_id = ?", (d.ticket["channel_id"],)).fetchone()
-        if not status or status["status"] != "open":
-            return await interaction.response.edit_message(content="ℹ️ 這張考試單已經登錄過結果了。", embed=None, view=None)
-        await interaction.response.edit_message(content="⏳ 發送中…", embed=None, view=None)
-
-        tester = {"id": str(interaction.user.id), "username": interaction.user.display_name}
-        with conn() as c:
-            D.record_test(c, applicant_id=d.ticket["applicant_id"], mc_name=d.ticket["mc_name"], uuid=d.ticket["uuid"],
-                          tester=tester, prev_tier=d.prev_tier, new_tier=d.new_tier, wins=d.wins, losses=d.losses,
-                          channel_id=d.ticket["channel_id"])
-            result_channel_id = D.get_setting(c, "result_channel_id")
-
-        notes = []
-        role_error = await sync_tier_role(d.ticket["applicant_id"], d.new_tier)
-        if role_error:
-            notes.append(f"⚠️ {role_error}")
-
-        embed = result_embed(d.ticket["mc_name"], interaction.user.id, d.prev_tier, d.new_tier, d.wins, d.losses)
-        mention = f"<@{d.ticket['applicant_id']}>"
-        results = interaction.guild.get_channel(int(result_channel_id or 0))
-        if results:
-            try:
-                await results.send(mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=False))
-            except discord.Forbidden:
-                notes.append(f"⚠️ 無法發送到 {results.mention}（權限不足）。")
+class ResultTierSelect(discord.ui.DynamicItem[discord.ui.Select], template=r"mctl:rt:(?P<ch>\d+)"):
+    def __init__(self, channel_id, draft=None):
+        if draft:
+            options = [discord.SelectOption(label=f"{t} • {C.TIER_NAMES[t]}", value=t, default=(t == draft.new_tier),
+                                            description="目前段位" if t == draft.prev_tier else None)
+                       for t in reversed(draft.allowed)]
         else:
-            notes.append("⚠️ 尚未設定考試結果頻道，請管理員使用 /setuptier。")
+            options = [discord.SelectOption(label="-", value="-")]
+        super().__init__(discord.ui.Select(custom_id=f"mctl:rt:{channel_id}", placeholder="選擇考後段位…", options=options))
+        self.channel_id = int(channel_id)
 
-        await interaction.channel.send(f"{mention} 考試結果已登錄！", embed=embed, view=CloseView(),
-                                       allowed_mentions=discord.AllowedMentions(users=True, roles=False))
-        await interaction.edit_original_response(content="✅ 考試結果已發送！" + ("\n" + "\n".join(notes) if notes else ""))
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(match["ch"])
 
-    @discord.ui.button(label="編輯", emoji="✏️", style=discord.ButtonStyle.secondary)
-    async def edit(self, interaction: discord.Interaction, _button):
-        await interaction.response.edit_message(content=None, embed=self.draft.intro_embed(), view=TierSelectView(self.draft))
+    async def callback(self, interaction: discord.Interaction):
+        draft, err = await load_draft(interaction, self.channel_id)
+        if err:
+            return await interaction.response.edit_message(content=err, embed=None, view=None)
+        tier = interaction.data["values"][0]
+        if tier not in draft.allowed:
+            return await reply(interaction, "❌ 你不能給予這個段位。")
+        await interaction.response.send_modal(score_modal(self.channel_id, tier, draft.ticket["mc_name"]))
 
-    @discord.ui.button(label="取消", emoji="✖️", style=discord.ButtonStyle.danger)
-    async def cancel(self, interaction: discord.Interaction, _button):
-        await interaction.response.edit_message(content="已取消登錄。", embed=None, view=None)
+
+def score_modal(channel_id, tier, mc_name, wins=None, losses=None):
+    modal = discord.ui.Modal(title=f"比分 · {mc_name} → {tier}"[:45], custom_id=f"mctl:rs:{channel_id}:{tier}", timeout=600)
+    modal.add_item(discord.ui.TextInput(label="考生勝場（Wins）", placeholder="例如：3", max_length=2, custom_id="wins",
+                                        default=None if wins is None else str(wins)))
+    modal.add_item(discord.ui.TextInput(label="考生敗場（Losses）", placeholder="例如：2", max_length=2, custom_id="losses",
+                                        default=None if losses is None else str(losses)))
+    return modal
+
+
+SCORE_MODAL_RE = re.compile(r"mctl:rs:(?P<ch>\d+):(?P<tier>[HL]T[1-5])")
+
+
+async def handle_score(interaction: discord.Interaction, channel_id, tier, values):
+    try:
+        wins, losses = int(values.get("wins", "")), int(values.get("losses", ""))
+        if not (0 <= wins <= 99 and 0 <= losses <= 99):
+            raise ValueError
+    except ValueError:
+        return await reply(interaction, "❌ 比分必須是 0–99 的數字，請重新選擇段位後再輸入一次。")
+    draft, err = await load_draft(interaction, channel_id)
+    if err:
+        return await reply(interaction, err)
+    if tier not in draft.allowed:
+        return await reply(interaction, "❌ 你不能給予這個段位。")
+    embed = result_embed(draft.ticket["mc_name"], interaction.user.id, draft.prev_tier, tier, wins, losses, preview=True)
+    await interaction.response.edit_message(content="請確認以下內容，確認後將發送到考試結果頻道：",
+                                            embed=embed, view=confirm_view(channel_id, tier, wins, losses))
+
+
+RESULT_BUTTONS = {
+    "ok": ("確認發送", discord.ButtonStyle.success),
+    "edit": ("編輯", discord.ButtonStyle.secondary),
+    "no": ("取消", discord.ButtonStyle.danger),
+    "x": ("取消", discord.ButtonStyle.secondary),
+}
+
+
+class ResultButton(discord.ui.DynamicItem[discord.ui.Button],
+                   template=r"mctl:rc:(?P<act>ok|edit|no|x):(?P<ch>\d+)(?::(?P<tier>[HL]T[1-5]):(?P<w>\d{1,2}):(?P<l>\d{1,2}))?"):
+    def __init__(self, act, channel_id, tier=None, wins=None, losses=None):
+        label, style = RESULT_BUTTONS[act]
+        custom_id = f"mctl:rc:{act}:{channel_id}" + (f":{tier}:{wins}:{losses}" if tier else "")
+        super().__init__(discord.ui.Button(label=label, style=style, custom_id=custom_id, row=1 if act == "x" else None))
+        self.act, self.channel_id, self.tier = act, int(channel_id), tier
+        self.wins = None if wins is None else int(wins)
+        self.losses = None if losses is None else int(losses)
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(match["act"], match["ch"], match["tier"], match["w"], match["l"])
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.act in ("no", "x"):
+            return await interaction.response.edit_message(content="已取消登錄。", embed=None, view=None)
+        draft, err = await load_draft(interaction, self.channel_id)
+        if err:
+            return await interaction.response.edit_message(content=err, embed=None, view=None)
+        if self.tier not in draft.allowed:
+            return await interaction.response.edit_message(content="❌ 你不能給予這個段位。", embed=None, view=None)
+        if self.act == "edit":
+            draft.new_tier = self.tier
+            return await interaction.response.edit_message(content=None, embed=draft.intro_embed(), view=tier_view(draft))
+        await finalize_result(interaction, draft, self.tier, self.wins, self.losses)
+
+
+async def finalize_result(interaction, draft, tier, wins, losses):
+    ticket = draft.ticket
+    with conn() as c:
+        # Claim the ticket atomically so a double click can't post two results.
+        claimed = c.execute("UPDATE tickets SET status = 'tested' WHERE channel_id = ? AND status = 'open'",
+                            (ticket["channel_id"],)).rowcount
+    if not claimed:
+        return await interaction.response.edit_message(content="ℹ️ 這張考試單已經登錄過結果了。", embed=None, view=None)
+    await interaction.response.edit_message(content="⏳ 發送中…", embed=None, view=None)
+
+    tester = {"id": str(interaction.user.id), "username": interaction.user.display_name}
+    with conn() as c:
+        D.record_test(c, applicant_id=ticket["applicant_id"], mc_name=ticket["mc_name"], uuid=ticket["uuid"],
+                      tester=tester, prev_tier=draft.prev_tier, new_tier=tier, wins=wins, losses=losses,
+                      channel_id=ticket["channel_id"])
+        result_channel_id = D.get_setting(c, "result_channel_id")
+
+    notes = []
+    role_error = await sync_tier_role(ticket["applicant_id"], tier)
+    if role_error:
+        notes.append(f"⚠️ {role_error}")
+
+    embed = result_embed(ticket["mc_name"], interaction.user.id, draft.prev_tier, tier, wins, losses)
+    mention = f"<@{ticket['applicant_id']}>"
+    results = interaction.guild.get_channel(int(result_channel_id or 0))
+    if results:
+        try:
+            await results.send(mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=False))
+        except discord.Forbidden:
+            notes.append(f"⚠️ 無法發送到 {results.mention}（權限不足）。")
+    else:
+        notes.append("⚠️ 尚未設定考試結果頻道，請管理員使用 /setuptier。")
+
+    await interaction.channel.send(f"{mention} 考試結果已登錄！", embed=embed, view=CloseView(),
+                                   allowed_mentions=discord.AllowedMentions(users=True, roles=False))
+    await interaction.edit_original_response(content="✅ 考試結果已發送！" + ("\n" + "\n".join(notes) if notes else ""))
 
 
 # ---------------------------------------------------------------- closing tickets
@@ -670,7 +757,7 @@ async def cmd_roleup(interaction: discord.Interaction):
             title="🛡️ 管理身分組恢復申請", color=0xF2C14E,
             description=f"{user.mention} 申請依資料庫紀錄恢復以下管理身分組：\n" + "\n".join(f"• {r.mention}" for r in staff))
         embed.set_footer(text="僅限創始人／開發者核准")
-        await interaction.channel.send(embed=embed, view=StaffApproveView(user.id, [r.id for r in staff]),
+        await interaction.channel.send(embed=embed, view=staff_approve_view(user.id, [r.id for r in staff]),
                                        allowed_mentions=discord.AllowedMentions.none())
         lines.append("🛡️ 管理身分組需由創始人／開發者核准，已送出申請。")
     if not lines:
@@ -681,17 +768,28 @@ async def cmd_roleup(interaction: discord.Interaction):
     await reply(interaction, "\n".join(lines))
 
 
-class StaffApproveView(discord.ui.View):
-    def __init__(self, target_id, role_ids):
-        super().__init__(timeout=86400)
-        self.target_id = target_id
-        self.role_ids = role_ids
+STAFF_ROLE_ORDER = sorted(STAFF_GATED_ROLES)
 
-    async def interaction_check(self, interaction):
-        if can_approve_staff(interaction.user):
-            return True
-        await reply(interaction, "❌ 只有創始人或開發者可以核准。")
-        return False
+
+def staff_approve_view(target_id, role_ids):
+    mask = sum(1 << STAFF_ROLE_ORDER.index(r) for r in role_ids if r in STAFF_ROLE_ORDER)
+    view = discord.ui.View(timeout=600)
+    view.add_item(RoleupButton("y", target_id, mask))
+    view.add_item(RoleupButton("n", target_id, mask))
+    return view
+
+
+class RoleupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"mctl:ra:(?P<act>y|n):(?P<uid>\d+):(?P<mask>\d+)"):
+    def __init__(self, act, target_id, mask):
+        approve = act == "y"
+        super().__init__(discord.ui.Button(label="核准套用" if approve else "拒絕",
+                                           style=discord.ButtonStyle.success if approve else discord.ButtonStyle.danger,
+                                           custom_id=f"mctl:ra:{act}:{target_id}:{mask}"))
+        self.act, self.target_id, self.mask = act, int(target_id), int(mask)
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(match["act"], match["uid"], match["mask"])
 
     async def finish(self, interaction, text, color):
         embed = interaction.message.embeds[0]
@@ -699,26 +797,26 @@ class StaffApproveView(discord.ui.View):
         embed.add_field(name="結果", value=text, inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
 
-    @discord.ui.button(label="核准套用", emoji="✅", style=discord.ButtonStyle.success)
-    async def approve(self, interaction: discord.Interaction, _button):
+    async def callback(self, interaction: discord.Interaction):
+        if not can_approve_staff(interaction.user):
+            return await reply(interaction, "❌ 只有創始人或開發者可以核准。")
+        actor = {"id": str(interaction.user.id), "username": interaction.user.display_name}
+        if self.act == "n":
+            with conn() as c:
+                D.audit(c, actor, "roleup_deny", str(self.target_id))
+            return await self.finish(interaction, f"已由 {interaction.user.mention} 拒絕。", 0xFF5A5F)
         member = await get_member(interaction.guild, self.target_id)
-        roles = [r for r in (assignable(interaction.guild, x) for x in self.role_ids) if r]
         if not member:
-            return await self.finish(interaction, "⚠️ 該成員已不在伺服器。", 0x6B7590)
+            return await self.finish(interaction, "該成員已不在伺服器。", 0x6B7590)
+        role_ids = [r for i, r in enumerate(STAFF_ROLE_ORDER) if self.mask >> i & 1]
+        roles = [r for r in (assignable(interaction.guild, x) for x in role_ids) if r]
         try:
             await member.add_roles(*roles, reason=f"/roleup approved by {interaction.user}")
         except discord.Forbidden:
-            return await self.finish(interaction, "⚠️ 機器人權限不足，無法套用。", 0xFF5A5F)
+            return await self.finish(interaction, "機器人權限不足，無法套用。", 0xFF5A5F)
         with conn() as c:
-            D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "roleup_approve",
-                    f"{member.display_name}: {', '.join(r.name for r in roles)}")
-        await self.finish(interaction, f"✅ 已由 {interaction.user.mention} 核准並套用。", 0x3DDC97)
-
-    @discord.ui.button(label="拒絕", emoji="✖️", style=discord.ButtonStyle.danger)
-    async def deny(self, interaction: discord.Interaction, _button):
-        with conn() as c:
-            D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "roleup_deny", str(self.target_id))
-        await self.finish(interaction, f"✖️ 已由 {interaction.user.mention} 拒絕。", 0xFF5A5F)
+            D.audit(c, actor, "roleup_approve", f"{member.display_name}: {', '.join(r.name for r in roles)}")
+        await self.finish(interaction, f"已由 {interaction.user.mention} 核准並套用。", 0x3DDC97)
 
 
 # ---------------------------------------------------------------- entry

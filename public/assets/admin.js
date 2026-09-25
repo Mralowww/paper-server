@@ -1,7 +1,7 @@
 /* Mc.Tierlist.Asia — staff panel */
 document.addEventListener('DOMContentLoaded', async () => {
   const { $, $$, esc, t, tierBadge, avatarUrl, discordAvatar, toast, countUp, session, levelChips, loginUrl,
-    testsTable, resultCell, scoreCell, icon, statusPill, catLabel, threadHtml, composerHtml, bindComposer } = window.MCTL;
+    testsTable, resultCell, scoreCell, icon, statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml } = window.MCTL;
   const { fmtDate, fmtRelative } = window.I18N;
   const root = $('#adminRoot');
   const TIERS = ['HT1', 'LT1', 'HT2', 'LT2', 'HT3', 'LT3', 'HT4', 'LT4', 'HT5', 'LT5'];
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="seg" style="margin-bottom:14px">${seg.map(([st, label, n]) => `<button class="${st === filter ? 'active' : ''}" data-go="support${st ? `/${st}` : ''}">${label} (${n})</button>`).join('')}</div>
           <div class="card" style="margin-bottom:26px">${tickets.length ? tickets.map((x) => `
             <a class="ticket-row" href="#support/${x.id}" data-open="${x.id}">
-              <span class="mono muted">#${x.id}</span>
+              ${catIcon(x.category)}<span class="mono muted">#${x.id}</span>
               <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">${catLabel(x.category)} · ${esc(x.username || x.user_id)} · ${esc(fmtRelative(x.updated_at))} · ${t('support.messages', { n: x.message_count })}</span></span>
               ${x.status !== 'closed' && !x.last_is_staff ? `<span class="pill high">${t('support.awaiting')}</span>` : ''}
               ${statusPill(x.status)}
@@ -472,13 +472,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const tk = d.ticket;
     panel.innerHTML = `
       <div class="panel">
-        <a href="#support" class="link-more" data-go="support" style="display:inline-block;margin-bottom:14px">${t('support.back')}</a>
-        <div class="ticket-head"><div><span class="mono muted">#${tk.id} · ${catLabel(tk.category)} · ${esc(tk.username || tk.user_id)} (<span class="mono">${esc(tk.user_id)}</span>)</span><h2>${esc(tk.title)}</h2></div>
+        <a href="#support" class="link-more back-link" data-go="support">${t('support.back')}</a>
+        ${ticketHeadHtml(tk, `<div class="ticket-hero-side">
+          <div class="muted" style="font-size:13px">${esc(tk.username || tk.user_id)} · <span class="mono">${esc(tk.user_id)}</span></div>
           <div class="actions">
             <label class="select-wrap"><select id="stSel" aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></label>
             ${perms.managePlayers ? `<button class="btn btn-sm" id="blockUser">${t('support.block')}</button><button class="btn btn-sm btn-danger" id="delTicket">${t('common.delete')}</button>` : ''}
-          </div>
-        </div>
+          </div></div>`)}
         <div class="thread">${threadHtml(d, (m) => !!m.is_staff)}</div>
         ${composerHtml()}
       </div>`;
