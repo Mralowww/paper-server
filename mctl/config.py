@@ -50,6 +50,12 @@ OWNER_IDS = set(_list("SUPER_ADMIN_IDS", "995145509897523221"))
 API_RATE_LIMIT = _int("API_RATE_LIMIT_PER_MIN", 60)
 SITE_RATE_LIMIT = _int("SITE_RATE_LIMIT_PER_MIN", 240)
 TEST_COOLDOWN_DAYS = _int("TEST_COOLDOWN_DAYS", 7)
+# Cloudflare dynamic DNS: keeps these A records pointed at this host's public IP.
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN", "")
+CF_ZONE_ID = os.environ.get("CF_ZONE_ID", "")
+CF_DNS_RECORDS = _list("CF_DNS_RECORDS", "tierlist.asia,www.tierlist.asia")
+DDNS_INTERVAL = max(60, _int("DDNS_INTERVAL", 300))
+
 SERVER_ADDRESS = os.environ.get("SERVER_ADDRESS", "Mc.Tierlist.Asia")
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024

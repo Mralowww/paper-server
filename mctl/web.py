@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import bridge
 from . import config as C
 from . import db as D
+from . import ddns
 from . import panel as P
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
@@ -661,6 +662,7 @@ def settings():
         "applyChannel": D.get_setting(conn, "apply_channel_id"),
         "ticketCategory": D.get_setting(conn, "ticket_category_id"),
         "cooldownDays": C.TEST_COOLDOWN_DAYS,
+        "ddns": {"enabled": ddns.enabled(), **ddns.state},
     })
 
 

@@ -505,6 +505,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${row(t('settings.applyChannel'), ch(s.applyChannel))}
             ${row(t('settings.category'), s.ticketCategory ? `<span class="mono">${esc(s.ticketCategory)}</span>` : `<span class="muted">${t('settings.notSet')}</span>`)}
             ${row(t('settings.cooldown'), t('settings.days', { n: s.cooldownDays }))}
+            ${row('Cloudflare DDNS', !s.ddns.enabled ? `<span class="pill off">${t('ddns.off')}</span>`
+              : `<div style="text-align:right"><span class="pill ${s.ddns.error ? 'off' : 'on'}">● ${s.ddns.error ? esc(s.ddns.error) : t('ddns.ok')}</span>
+                 <div class="muted" style="font-size:12px;margin-top:4px">IP <span class="mono">${esc(s.ddns.ip || '—')}</span> · ${t('ddns.checked')} ${esc(fmtDate(s.ddns.checkedAt))}${s.ddns.updatedAt ? ` · ${t('ddns.updated')} ${esc(fmtDate(s.ddns.updatedAt))}` : ''}</div></div>`)}
           </div>
 
           <div class="apps-toggle card card-pad ${a.open ? 'is-open' : 'is-paused'}" style="margin-bottom:20px">

@@ -475,6 +475,12 @@
     'cmd.navigate': ['選擇', 'navigate', 'di chuyển'],
     'cmd.select': ['執行', 'run', 'chạy'],
 
+    'ddns.off': ['未啟用（缺少 CF_API_TOKEN / CF_ZONE_ID）', 'Disabled (missing CF_API_TOKEN / CF_ZONE_ID)', 'Chưa bật (thiếu CF_API_TOKEN / CF_ZONE_ID)'],
+    'ddns.ok': ['運作中', 'Running', 'Đang chạy'],
+    'ddns.checked': ['上次檢查', 'checked', 'kiểm tra'],
+    'ddns.updated': ['上次更新', 'updated', 'cập nhật'],
+    'action.ddns_update': ['自動更新 Cloudflare DNS', 'updated Cloudflare DNS', 'đã cập nhật DNS Cloudflare'],
+
     // ---- docs
     'docs.title': ['開發者 API', 'Developer API', 'API cho nhà phát triển'],
     'docs.intro': ['透過 REST API 讀取 Mc.Tierlist.Asia 的排行榜與玩家資料。所有回應皆為 JSON。', 'Read Mc.Tierlist.Asia rankings and player data through a REST API. All responses are JSON.', 'Đọc bảng xếp hạng và dữ liệu người chơi Mc.Tierlist.Asia qua REST API. Mọi phản hồi đều là JSON.'],
