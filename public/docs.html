@@ -37,7 +37,7 @@
 
     <h2 id="stats">統計</h2>
     <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/stats</span><span class="desc">網站整體統計</span></div>
-    <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{ <span class="k">"players"</span>: <span class="n">128</span>, <span class="k">"tier1"</span>: <span class="n">6</span>, <span class="k">"regions"</span>: <span class="n">4</span>, <span class="k">"modes"</span>: <span class="n">1</span> }</pre></div>
+    <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{ <span class="k">"players"</span>: <span class="n">128</span>, <span class="k">"tier1"</span>: <span class="n">6</span>, <span class="k">"tier2"</span>: <span class="n">14</span>, <span class="k">"regions"</span>: <span class="n">1</span>, <span class="k">"modes"</span>: <span class="n">1</span> }</pre></div>
 
     <h2 id="modes">模式與 Tier</h2>
     <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/modes</span><span class="desc">可用模式、Tier 積分表與地區代碼</span></div>
@@ -51,7 +51,7 @@
     <table class="simple"><tr><th>參數</th><th>說明</th></tr>
       <tr><td><code>limit</code></td><td>每頁筆數，1–100，預設 50</td></tr>
       <tr><td><code>offset</code></td><td>略過筆數，預設 0</td></tr>
-      <tr><td><code>region</code></td><td>地區：AS / NA / EU / SA / OC / AF</td></tr>
+      <tr><td><code>region</code></td><td>地區代碼，目前只有 <code>TW</code>（台灣）</td></tr>
       <tr><td><code>tier</code></td><td>精確 Tier（<code>HT1</code>）或 Tier 群組（<code>1</code> = HT1 + LT1）</td></tr>
       <tr><td><code>search</code></td><td>玩家名稱關鍵字</td></tr></table>
     <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{
@@ -62,8 +62,9 @@
       <span class="k">"rank"</span>: <span class="n">1</span>,
       <span class="k">"name"</span>: <span class="s">"Steve"</span>,
       <span class="k">"uuid"</span>: <span class="s">"8667ba71-b85a-4004-af54-457a9734eed7"</span>,
-      <span class="k">"region"</span>: <span class="s">"AS"</span>,
+      <span class="k">"region"</span>: <span class="s">"TW"</span>,
       <span class="k">"points"</span>: <span class="n">60</span>,
+      <span class="k">"title"</span>: <span class="s">"Combat Specialist"</span>,
       <span class="k">"tiers"</span>: { <span class="k">"vanilla"</span>: { <span class="k">"tier"</span>: <span class="s">"HT1"</span>, <span class="k">"points"</span>: <span class="n">60</span>, <span class="k">"retired"</span>: <span class="n">false</span> } },
       <span class="k">"updatedAt"</span>: <span class="s">"2026-09-25T08:00:00.000Z"</span>
     }
@@ -99,7 +100,7 @@ console.log(player.name, player.tiers.vanilla.tier); <span class="c">// Steve HT
 r = requests.get(
     <span class="s">"<span class="base-url"></span>/api/v1/rankings/vanilla"</span>,
     headers={<span class="s">"X-API-Key"</span>: os.environ[<span class="s">"MCTL_API_KEY"</span>]},
-    params={<span class="s">"region"</span>: <span class="s">"AS"</span>, <span class="s">"limit"</span>: <span class="n">10</span>},
+    params={<span class="s">"region"</span>: <span class="s">"TW"</span>, <span class="s">"limit"</span>: <span class="n">10</span>},
 )
 <span class="k">for</span> p <span class="k">in</span> r.json()[<span class="s">"players"</span>]:
     print(p[<span class="s">"rank"</span>], p[<span class="s">"name"</span>], p[<span class="s">"tiers"</span>][<span class="s">"vanilla"</span>][<span class="s">"tier"</span>])</pre></div>

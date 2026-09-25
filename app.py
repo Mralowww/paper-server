@@ -66,8 +66,11 @@ if not SESSION_SECRET:
 TIERS = [("HT1", 60), ("LT1", 45), ("HT2", 30), ("LT2", 20), ("HT3", 10),
          ("LT3", 6), ("HT4", 4), ("LT4", 3), ("HT5", 2), ("LT5", 1)]
 TIER_POINTS = dict(TIERS)
-REGIONS = [("AS", "Asia"), ("NA", "North America"), ("EU", "Europe"),
-           ("SA", "South America"), ("OC", "Oceania"), ("AF", "Africa")]
+REGIONS = [("TW", "台灣")]
+DEFAULT_REGION = "TW"
+# Same thresholds MCTiers uses; with Vanilla only, 60 points (HT1) is the maximum.
+TITLES = [(400, "Combat Grandmaster"), (250, "Combat Master"), (100, "Combat Ace"),
+          (50, "Combat Specialist"), (20, "Combat Cadet"), (10, "Combat Novice"), (0, "Rookie")]
 REGION_IDS = {r for r, _ in REGIONS}
 MODES = [{"id": "vanilla", "name": "Vanilla"}]
 
@@ -190,6 +193,10 @@ def ranked_players():
     return rows
 
 
+def title_for(points):
+    return next(name for threshold, name in TITLES if points >= threshold)
+
+
 def public_player(p):
     return {
         "rank": p["rank"],
@@ -197,6 +204,7 @@ def public_player(p):
         "uuid": p["uuid"] or None,
         "region": p["region"],
         "points": p["points"],
+        "title": title_for(p["points"]),
         "tiers": {"vanilla": {"tier": p["tier"], "points": p["points"], "retired": bool(p["retired"])}},
         "updatedAt": datetime.fromtimestamp(p["updated_at"] / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
     }
@@ -207,6 +215,7 @@ def site_stats():
     return {
         "players": len(players),
         "tier1": sum(1 for p in players if p["tier"] in ("HT1", "LT1")),
+        "tier2": sum(1 for p in players if p["tier"] in ("HT2", "LT2")),
         "regions": len({p["region"] for p in players}),
         "modes": 1,
     }
@@ -525,7 +534,7 @@ def overview():
 def validate_player(data):
     name = str(data.get("name") or "").strip()
     uuid = str(data.get("uuid") or "").strip() or None
-    region = str(data.get("region") or "").upper()
+    region = str(data.get("region") or DEFAULT_REGION).upper()
     tier = str(data.get("tier") or "").upper()
     if not NAME_RE.match(name):
         return None, "玩家名稱需為 2–16 個英數字或底線"

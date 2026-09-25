@@ -24,7 +24,12 @@
     const group = tier.slice(2);
     return `<span class="tier t${group}${tier.startsWith('LT') ? ' lt' : ''}${retired ? ' retired' : ''}${lg ? ' lg' : ''}" title="${retired ? '已退休 · ' : ''}${tier}">${retired ? 'R' : ''}${tier}</span>`;
   };
-  const regionBadge = (r) => `<span class="region ${esc(r)}">${esc(r)}</span>`;
+  const REGION_NAMES = { TW: '台灣' };
+  const regionBadge = (r) => `<span class="region ${esc(r)}">${esc(REGION_NAMES[r] || r)}</span>`;
+  const TITLE_STYLE = {
+    'Combat Grandmaster': 'grandmaster', 'Combat Master': 'master', 'Combat Ace': 'ace',
+    'Combat Specialist': 'specialist', 'Combat Cadet': 'cadet', 'Combat Novice': 'novice', Rookie: 'rookie',
+  };
   const avatarUrl = (name, size = 64) => `https://mc-heads.net/avatar/${encodeURIComponent(name)}/${size}`;
   const fallbackImg = "this.onerror=null;this.src='https://mc-heads.net/avatar/MHF_Steve/64'";
 
@@ -180,7 +185,7 @@
     const top = p.rank <= 3 ? ` top r${p.rank}` : '';
     const v = p.tiers.vanilla;
     return `
-      <a class="board-row reveal${top}" style="--d:${Math.min(i, 12) * 0.04}s" href="/player/${encodeURIComponent(p.name)}">
+      <a class="board-row reveal${top}" data-player="${esc(p.name)}" style="--d:${Math.min(i, 12) * 0.04}s" href="/player/${encodeURIComponent(p.name)}">
         <div class="rank-cell"><span class="n">${p.rank}.</span><img src="${avatarUrl(p.name)}" alt="" loading="lazy" onerror="${fallbackImg}"></div>
         <div class="player-cell">
           <div class="pname">${esc(p.name)}</div>
@@ -198,6 +203,57 @@
         <h3>${title}</h3><p>${text}</p>
       </div>
     </div>`;
+
+  /** Player card shown in the leaderboard popup and on /player/:name. */
+  function playerCardHtml(p) {
+    const v = p.tiers.vanilla;
+    const group = v.tier.slice(2);
+    const rankCls = p.rank <= 3 ? `r${p.rank}` : 'rn';
+    return `
+      <div class="pcard-avatar"><img src="${avatarUrl(p.name, 160)}" alt="" onerror="${fallbackImg}"></div>
+      <h2 class="pcard-name">${esc(p.name)}</h2>
+      <div class="title-pill ${TITLE_STYLE[p.title] || 'rookie'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 22 10 12 22 2 10Z"/></svg>${esc(p.title)}</div>
+      <div class="pcard-region">${esc(REGION_NAMES[p.region] || p.region)}</div>
+      <a class="btn btn-sm pcard-namemc" href="https://namemc.com/profile/${encodeURIComponent(p.name)}" target="_blank" rel="noopener">NameMC <span aria-hidden="true">↗</span></a>
+      <div class="pcard-label">POSITION <span>排名</span></div>
+      <div class="pcard-pos">
+        <div class="pos-rank ${rankCls}">${p.rank}.</div>
+        <div class="pos-info">${icon.trophy.replace('width="20" height="20"', 'width="20" height="20" class="pos-trophy"')}<b>總覽</b><span>(${p.points} 分)</span></div>
+      </div>
+      <div class="pcard-label">TIERS <span>階級</span></div>
+      <div class="pcard-tiers">
+        <div class="tier-tile t${group}${v.retired ? ' retired' : ''}" title="Vanilla${v.retired ? ' · 已退休' : ''}">
+          <div class="tile-ico"><img src="/assets/vanilla.svg" alt="Vanilla"></div>
+          <span>${v.retired ? 'R' : ''}${v.tier}</span>
+        </div>
+      </div>`;
+  }
+
+  async function openPlayerCard(name) {
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal pcard" role="dialog" aria-modal="true" aria-label="${esc(name)}">
+      <button class="pcard-close" aria-label="關閉"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="pcard-body"><div class="skeleton" style="width:120px;height:120px;border-radius:50%;margin:10px auto 20px"></div><div class="skeleton" style="height:200px"></div></div></div>`;
+    const close = () => { bg.classList.add('closing'); setTimeout(() => bg.remove(), 200); removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
+    $('.pcard-close', bg).addEventListener('click', close);
+    addEventListener('keydown', onKey);
+    document.body.append(bg);
+    try {
+      $('.pcard-body', bg).innerHTML = playerCardHtml(await api(`/players/${encodeURIComponent(name)}`));
+    } catch (err) {
+      $('.pcard-body', bg).innerHTML = emptyHtml(err.status === 404 ? '找不到這位玩家' : '暫時無法載入', '請稍後再試。').replace('reveal', '');
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest?.('[data-player]');
+    if (!row || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    openPlayerCard(row.dataset.player);
+  });
 
   const skeletonRows = (n) => Array.from({ length: n }, () => '<div class="skeleton" style="height:72px;margin-bottom:8px"></div>').join('');
 
@@ -224,7 +280,7 @@
     async rankings() {
       const list = $('#board');
       const moreBtn = $('#loadMore');
-      const state = { region: '', tier: '', search: '', offset: 0, limit: 50 };
+      const state = { tier: '', search: '', offset: 0, limit: 50 };
       const params = new URLSearchParams(location.search);
       state.search = params.get('q') || '';
       $('#boardSearch').value = state.search;
@@ -232,15 +288,14 @@
       async function load(reset) {
         if (reset) { state.offset = 0; list.innerHTML = skeletonRows(6); }
         const q = new URLSearchParams({ limit: state.limit, offset: state.offset });
-        if (state.region) q.set('region', state.region);
         if (state.tier) q.set('tier', state.tier);
         if (state.search) q.set('search', state.search);
         try {
           const data = await api(`/rankings/vanilla?${q}`);
           const html = data.players.map((p, i) => rowHtml(p, i)).join('');
           if (reset) list.innerHTML = html || emptyHtml(
-            state.region || state.tier || state.search ? '沒有符合條件的玩家' : '排行榜即將開放',
-            state.region || state.tier || state.search ? '換個篩選條件試試看。' : '目前還沒有玩家上榜，敬請期待！');
+            state.tier || state.search ? '沒有符合條件的玩家' : '排行榜即將開放',
+            state.tier || state.search ? '換個篩選條件試試看。' : '目前還沒有玩家上榜，敬請期待！');
           else list.insertAdjacentHTML('beforeend', html);
           state.offset += data.players.length;
           moreBtn.hidden = state.offset >= data.total;
@@ -251,15 +306,7 @@
         initReveal();
       }
 
-      const bindChips = (root, key) => root.addEventListener('click', (e) => {
-        const chip = e.target.closest('.chip');
-        if (!chip) return;
-        $$('.chip', root).forEach((c) => c.classList.toggle('active', c === chip));
-        state[key] = chip.dataset.v;
-        load(true);
-      });
-      bindChips($('#regionChips'), 'region');
-      bindChips($('#tierChips'), 'tier');
+      $('#tierSelect').addEventListener('change', (e) => { state.tier = e.target.value; load(true); });
       let t;
       $('#boardSearch').addEventListener('input', (e) => {
         clearTimeout(t);
@@ -274,29 +321,9 @@
       const root = $('#profile');
       try {
         const p = await api(`/players/${encodeURIComponent(name)}`);
-        const v = p.tiers.vanilla;
         document.title = `${p.name} · Mc.Tierlist.Asia`;
-        root.innerHTML = `
-          <div class="profile-card spot reveal">
-            <div class="body-render"><img src="https://mc-heads.net/body/${encodeURIComponent(p.name)}/220" alt="${esc(p.name)}" onerror="this.onerror=null;this.src='https://mc-heads.net/body/MHF_Steve/220'"></div>
-            <h1>${esc(p.name)}</h1>
-            <div class="profile-meta">${regionBadge(p.region)} ${tierBadge(v.tier, { retired: v.retired })}</div>
-          </div>
-          <div class="profile-main">
-            <div class="kv">
-              <div class="stat spot reveal" style="--d:.05s"><div class="ico">${icon.trophy}</div><div class="num">#<span data-to="${p.rank}">0</span></div><div class="lbl">總排名</div></div>
-              <div class="stat spot reveal" style="--d:.1s"><div class="ico">${icon.bolt.replace(/22/g, '20')}</div><div class="num"><span data-to="${p.points}">0</span></div><div class="lbl">積分</div></div>
-              <div class="stat spot reveal" style="--d:.15s"><div class="ico">${icon.globe}</div><div class="num">${esc(p.region)}</div><div class="lbl">地區</div></div>
-            </div>
-            <div class="mode-row spot reveal" style="--d:.2s">
-              <div class="left"><div class="m-ico"><img src="/assets/vanilla.svg" alt="" width="26" height="26" style="image-rendering:pixelated"></div>Vanilla</div>
-              ${tierBadge(v.tier, { retired: v.retired, lg: true })}
-            </div>
-            <p class="reveal" style="--d:.25s;color:var(--dim);font-size:13px;margin:0">最後更新：${new Date(p.updatedAt).toLocaleString('zh-TW')}</p>
-          </div>`;
-        $$('[data-to]', root).forEach((el) => countUp(el, Number(el.dataset.to)));
+        root.innerHTML = `<div class="modal pcard pcard-page reveal">${playerCardHtml(p)}</div>`;
       } catch (err) {
-        root.style.gridTemplateColumns = '1fr';
         root.innerHTML = emptyHtml(err.status === 404 ? '找不到這位玩家' : '暫時無法載入',
           err.status === 404 ? `「${esc(name)}」尚未被列入排行榜。` : '請稍後重新整理頁面。');
       }

@@ -23,16 +23,13 @@
       <button class="mode-tab active"><img src="/assets/vanilla.svg" alt="" style="image-rendering:pixelated">Vanilla</button>
     </div>
     <div class="filters">
-      <div class="chips" id="regionChips">
-        <button class="chip active" data-v="">全部地區</button>
-        <button class="chip" data-v="AS">AS</button><button class="chip" data-v="NA">NA</button><button class="chip" data-v="EU">EU</button>
-        <button class="chip" data-v="SA">SA</button><button class="chip" data-v="OC">OC</button><button class="chip" data-v="AF">AF</button>
-      </div>
-      <div class="chips" id="tierChips">
-        <button class="chip active" data-v="">全部 Tier</button>
-        <button class="chip" data-v="1">T1</button><button class="chip" data-v="2">T2</button><button class="chip" data-v="3">T3</button>
-        <button class="chip" data-v="4">T4</button><button class="chip" data-v="5">T5</button>
-      </div>
+      <label class="select-wrap">
+        <select id="tierSelect" aria-label="篩選 Tier">
+          <option value="">全部 Tier</option>
+          <option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option>
+          <option value="4">Tier 4</option><option value="5">Tier 5</option>
+        </select>
+      </label>
       <label class="search-inline"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="boardSearch" placeholder="篩選玩家名稱…" autocomplete="off"></label>
     </div>
     <div class="board-head"><span>#</span><span>玩家</span><span>地區</span><span style="text-align:right">Tier</span></div>

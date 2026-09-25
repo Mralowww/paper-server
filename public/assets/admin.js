@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const { $, $$, esc, tierBadge, regionBadge, avatarUrl, toast, countUp } = window.MCTL;
   const root = $('#adminRoot');
   const TIERS = ['HT1', 'LT1', 'HT2', 'LT2', 'HT3', 'LT3', 'HT4', 'LT4', 'HT5', 'LT5'];
-  const REGIONS = [['AS', '亞洲'], ['NA', '北美'], ['EU', '歐洲'], ['SA', '南美'], ['OC', '大洋洲'], ['AF', '非洲']];
   const ACTIONS = {
     login: '登入後台', login_denied: '嘗試登入（無權限）', seed: '初始化管理員',
     player_create: '新增玩家', player_update: '更新玩家', player_delete: '刪除玩家',
@@ -354,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
       <form id="playerForm">
         <div class="field"><label>Minecraft 名稱</label><input class="input" name="name" maxlength="16" value="${esc(p?.name || '')}" placeholder="例如：Steve" required></div>
         <div class="field"><label>UUID（選填）</label><input class="input mono" name="uuid" value="${esc(p?.uuid || '')}" placeholder="8667ba71-b85a-4004-af54-457a9734eed7"></div>
-        <div class="field"><label>地區</label><select class="input" name="region">${REGIONS.map(([id, n]) => `<option value="${id}" ${(p?.region || 'AS') === id ? 'selected' : ''}>${id} · ${n}</option>`).join('')}</select></div>
         <div class="field"><label>Vanilla Tier</label><div class="tier-picker">${TIERS.map((t) => `<button type="button" data-t="${t}" class="${t === tier ? 'active' : ''}">${t}</button>`).join('')}</div></div>
         <label class="check"><input type="checkbox" name="retired" ${p?.retired ? 'checked' : ''}> 已退休（排行榜上會標示 R）</label>
         <div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn btn-gold">${editing ? '儲存' : '新增'}</button></div>
@@ -368,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const body = { name: form.name.value.trim(), uuid: form.uuid.value.trim(), region: form.region.value, tier, retired: form.retired.checked };
+        const body = { name: form.name.value.trim(), uuid: form.uuid.value.trim(), region: 'TW', tier, retired: form.retired.checked };
         try {
           await api(editing ? `/players/${p.id}` : '/players', { method: editing ? 'PUT' : 'POST', body });
           close();
