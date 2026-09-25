@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['settings', 'tab.settings', perms.manageSettings, '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'],
     ['site', 'tab.site', perms.manageSettings, '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/>'],
     ['storage', 'tab.storage', true, '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'],
-    ['audit', 'tab.audit', true, '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>'],
+    ['audit', 'tab.audit', perms.viewAudit, '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>'],
   ].filter(([, , allowed]) => allowed);
 
   root.innerHTML = `
@@ -139,11 +139,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="stats" style="margin:0 0 20px">
             ${stat(d.players, t('stat.players'), 0)}${stat(d.tests, t('stat.tests'), 0.05)}${stat(d.openTickets, t('admin.openTickets'), 0.1)}${stat(d.apiCalls, t('admin.apiCalls'), 0.15)}
           </div>
-          <div class="panel-head"><div><h2 style="font-size:19px">${t('admin.recent')}</h2></div><button class="btn btn-sm" data-go="audit">${t('admin.viewAll')}</button></div>
-          <div class="card audit">${auditHtml(d.recent)}</div>
+          ${perms.viewAudit ? `<div class="panel-head"><div><h2 style="font-size:19px">${t('admin.recent')}</h2></div><a class="btn btn-sm" href="/audit">${t('admin.viewAll')}</a></div>
+          <div class="card audit">${auditHtml(d.recent)}</div>` : ''}
         </div>`;
       $$('[data-n]', panel).forEach((el) => countUp(el, Number(el.dataset.n)));
-      $('[data-go]', panel).addEventListener('click', () => go('audit'));
     },
 
     async players(panel) {
@@ -819,13 +818,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       draw();
     },
 
-    async audit(panel) {
-      const { entries } = await api('/audit?limit=200');
-      panel.innerHTML = `
-        <div class="panel">
-          <div class="panel-head"><div><h2>${t('tab.audit')}</h2><p>${t('audit.subtitle')}</p></div></div>
-          <div class="card audit">${auditHtml(entries)}</div>
-        </div>`;
+    async audit() {
+      location.href = '/audit';
     },
   };
 

@@ -91,7 +91,8 @@ def loop():
                 msg = f"{', '.join(changed)} → {state['ip']}"
                 print(f"[ddns] Cloudflare DNS updated: {msg}", flush=True)
                 with D.transaction() as c:
-                    D.audit(c, {"id": None, "username": "DDNS"}, "ddns_update", msg)
+                    D.audit(c, {"id": None, "username": "DDNS"}, "ddns_update", msg, source="system",
+                            target=("setting", "dns", "Cloudflare DNS"), meta={"records": changed, "ip": state["ip"]})
             last_error = None
         except Exception as exc:  # network outages are expected; keep retrying
             state["error"] = str(exc)

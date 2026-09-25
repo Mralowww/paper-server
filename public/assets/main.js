@@ -192,6 +192,7 @@
       const items = [['me', '/me', 'nav.me']];
       if (perms.testerPanel) items.push(['tester', '/tester', 'nav.tester']);
       if (perms.viewStaff) items.push(['admin', '/admin', 'nav.admin']);
+      if (perms.viewAudit) items.push(['audit', '/audit', 'nav.audit']);
       slot.innerHTML = `
         <div class="dropdown user-dd">
           <button class="dd-toggle user-chip"><img src="${discordAvatar(user.id, user.avatar)}" alt=""><span>${esc(user.username)}</span>${icon.chevron}</button>

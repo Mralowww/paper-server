@@ -1,4 +1,5 @@
 """SQLite storage shared by the website and the Discord bot."""
+import contextvars
 import json
 import sqlite3
 import time
@@ -166,6 +167,15 @@ MIGRATIONS = [
     ("members", "saved_roles", "TEXT NOT NULL DEFAULT '[]'"),
     # 'read' = developer API key, 'server' = the official Minecraft server plugin.
     ("api_keys", "scope", "TEXT NOT NULL DEFAULT 'read'"),
+    # Detailed audit trail: where it came from, what it touched, and what changed.
+    ("audit_log", "source", "TEXT"),
+    ("audit_log", "ip", "TEXT"),
+    ("audit_log", "user_agent", "TEXT"),
+    ("audit_log", "target_type", "TEXT"),
+    ("audit_log", "target_id", "TEXT"),
+    ("audit_log", "target_name", "TEXT"),
+    ("audit_log", "changes", "TEXT"),
+    ("audit_log", "meta", "TEXT"),
 ]
 
 
@@ -206,13 +216,59 @@ def init():
         conn.execute("CREATE INDEX IF NOT EXISTS bans_active ON bans (revoked_at, expires_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_user ON support_tickets (user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_msg_ticket ON support_messages (ticket_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_actor ON audit_log (actor_id, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_action ON audit_log (action, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_target ON audit_log (target_type, target_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_time ON audit_log (created_at)")
 
 
 # ---------------------------------------------------------------- generic helpers
-def audit(conn, actor, action, detail=None):
-    conn.execute("INSERT INTO audit_log (actor_id, actor_name, action, detail, created_at) VALUES (?, ?, ?, ?, ?)",
-                 (actor.get("id") if actor else None, actor.get("username") if actor else "system",
-                  action, detail, now_ms()))
+# Request context set by the website for the current thread (source, IP, user agent, request data).
+AUDIT_CTX = contextvars.ContextVar("audit_ctx", default=None)
+
+
+def diff(before, after, fields=None):
+    """{field: [old, new]} for fields whose value changed."""
+    before, after = before or {}, after or {}
+    keys = fields or sorted(set(before) | set(after))
+    return {k: [before.get(k), after.get(k)] for k in keys if before.get(k) != after.get(k)}
+
+
+def flatten(value, prefix=""):
+    """{"a": {"b": 1}} → {"a.b": 1}; lists of dicts are keyed by position."""
+    out = {}
+    items = value.items() if isinstance(value, dict) else enumerate(value) if isinstance(value, list) else None
+    if items is None:
+        return {prefix: value}
+    for k, v in items:
+        key = f"{prefix}.{k}" if prefix else str(k)
+        if isinstance(v, (dict, list)) and v:
+            out.update(flatten(v, key))
+        else:
+            out[key] = v
+    return out
+
+
+def audit(conn, actor, action, detail=None, *, target=None, changes=None, meta=None, source=None):
+    """Writes an audit entry.
+
+    target  = (type, id, name) of what was acted on, e.g. ("player", 12, "Steve")
+    changes = {field: [before, after]}
+    meta    = any extra JSON-able data (merged with the request/interaction context)
+    """
+    ctx = AUDIT_CTX.get() or {}
+    actor_id = actor.get("id") if actor else None
+    source = source or ctx.get("source") or ("discord" if actor_id else "system")
+    info = {k: v for k, v in ctx.items() if k not in ("source", "ip", "ua")}
+    if meta:
+        info.update(meta)
+    t_type, t_id, t_name = (list(target) + [None, None, None])[:3] if target else (None, None, None)
+    conn.execute("""INSERT INTO audit_log (actor_id, actor_name, action, detail, created_at, source, ip, user_agent,
+                    target_type, target_id, target_name, changes, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 (actor_id, actor.get("username") if actor else "system", action, detail, now_ms(), source,
+                  ctx.get("ip"), ctx.get("ua"), t_type, None if t_id is None else str(t_id), t_name,
+                  json.dumps(changes, ensure_ascii=False, default=str) if changes else None,
+                  json.dumps(info, ensure_ascii=False, default=str) if info else None))
 
 
 def get_setting(conn, key, default=None):
@@ -386,5 +442,8 @@ def record_test(conn, *, applicant_id, mc_name, uuid, tester, prev_tier, new_tie
     test_id = cur.lastrowid
     if channel_id:
         conn.execute("UPDATE tickets SET status = 'tested', test_id = ? WHERE channel_id = ?", (test_id, str(channel_id)))
-    audit(conn, tester, "test_result", f"{mc_name}: {prev_tier or 'Unranked'} → {new_tier} ({wins}-{losses})")
+    audit(conn, tester, "test_result", f"{mc_name}: {prev_tier or 'Unranked'} → {new_tier} ({wins}-{losses})",
+          target=("player", player_id, mc_name), changes={"tier": [prev_tier, new_tier]},
+          meta={"test": {"id": test_id, "wins": wins, "losses": losses, "applicant": did, "channel": channel_id and str(channel_id),
+                         "uuid": uuid}})
     return player_id, test_id

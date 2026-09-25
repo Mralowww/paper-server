@@ -162,10 +162,11 @@
     }
     if (p.viewStaff) {
       const tabs = [['overview', 'tab.overview'], ['players', 'tab.players'], ['bans', 'tab.bans'], ['support', 'tab.support'],
-        ['tickets', 'tab.tickets'], ['tests', 'tab.tests'], ['team', 'tab.team'], ['storage', 'tab.storage'], ['audit', 'tab.audit']];
+        ['tickets', 'tab.tickets'], ['tests', 'tab.tests'], ['team', 'tab.team'], ['storage', 'tab.storage']];
       if (p.manageKeys) tabs.push(['keys', 'tab.keys']);
-      if (p.manageSettings) tabs.push(['settings', 'tab.settings']);
+      if (p.manageSettings) tabs.push(['settings', 'tab.settings'], ['site', 'tab.site']);
       tabs.forEach(([id, key]) => list.push({ group: 'cmd.staff', label: `${t('nav.admin')} · ${t(key)}`, icon: 'shield', run: () => { location.href = `/admin#${id}`; } }));
+      if (p.viewAudit) list.push({ group: 'cmd.staff', label: t('nav.audit'), icon: 'search', run: () => { location.href = '/audit'; } });
     }
     list.push({ group: 'cmd.actions', label: t('cmd.copyIp'), hint: 'Mc.Tierlist.Asia', icon: 'copy', run: () => document.querySelector('[data-copy-ip]')?.click() });
     window.I18N.LANGS.forEach((l) => l.id !== window.I18N.lang && list.push({ group: 'cmd.actions', label: `${t('nav.language')}: ${l.label}`, icon: 'globe', run: () => window.I18N.setLang(l.id) }));

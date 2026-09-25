@@ -126,6 +126,39 @@ def close_db(_exc):
     conn = g.pop("db", None)
     if conn is not None:
         conn.close()
+    D.AUDIT_CTX.set(None)
+
+
+SECRET_FIELD_RE = re.compile(r"key|token|secret|password|code", re.I)
+
+
+def scrub(value, depth=0):
+    """Request data safe to keep in the audit log: secrets masked, long text trimmed."""
+    if isinstance(value, dict):
+        return {k: "***" if SECRET_FIELD_RE.search(str(k)) else scrub(v, depth + 1) for k, v in list(value.items())[:50]}
+    if isinstance(value, list):
+        return [scrub(v, depth + 1) for v in value[:50]]
+    if isinstance(value, str) and len(value) > 500:
+        return value[:500] + f"…（共 {len(value)} 字）"
+    return value
+
+
+@app.before_request
+def audit_context():
+    """Everything an audit entry written during this request should know about the request."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        req = {"method": request.method, "path": request.path}
+    else:
+        req = {"method": request.method, "path": request.path}
+        if request.args:
+            req["query"] = scrub(request.args.to_dict())
+        if request.is_json:
+            req["body"] = scrub(request.get_json(silent=True))
+        elif request.form or request.files:
+            req["form"] = scrub(request.form.to_dict())
+            req["files"] = [{"name": f.filename, "type": f.mimetype} for f in request.files.getlist("files")][:10]
+    D.AUDIT_CTX.set({"source": "web", "ip": request.remote_addr, "ua": (request.user_agent.string or "")[:300],
+                     "request": req, "host": request.host})
 
 
 @app.after_request
@@ -215,6 +248,7 @@ def permissions(user):
         "giveResults": bool(user and (user["tester"] or lvl >= C.LEVEL_ADMIN)),
         "manageTickets": lvl >= C.LEVEL_MODERATOR,
         "accountKeys": key_eligible(user),
+        "viewAudit": lvl >= C.LEVEL_ADMIN,
     }
 
 
@@ -236,6 +270,9 @@ def route(rule, methods=("GET",), level=None, perm=None, login=True):
         def wrapper(*args, **kwargs):
             user = current_user()
             if g.via_key:
+                ctx = D.AUDIT_CTX.get()
+                if ctx is not None:
+                    ctx.update(source="api", accountKeyId=g.via_key)
                 allowed, headers = api_limiter.hit(f"ukey:{g.via_key}")
                 g.extra_headers = headers
                 if not allowed:
@@ -446,7 +483,7 @@ def sign_in(user):
     session.clear()
     session.permanent = True
     session.update(user_id=user["id"], username=user["username"], avatar=user["avatar"])
-    D.audit(db(), user, "login")
+    D.audit(db(), user, "login", target=("member", user["id"], user["username"]))
     db().commit()
     return redirect(nxt)
 
@@ -532,7 +569,9 @@ def overview():
     conn = db()
     keys = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(usage_count), 0) AS calls FROM api_keys WHERE revoked = 0").fetchone()
     open_tickets = conn.execute("SELECT COUNT(*) FROM tickets WHERE status = 'open'").fetchone()[0]
-    recent = [dict(r) for r in conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 8").fetchall()]
+    recent = [dict(r) for r in conn.execute(
+        "SELECT id, actor_id, actor_name, action, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 8").fetchall()] \
+        if permissions(current_user())["viewAudit"] else []
     return jsonify({**D.site_stats(conn), "activeKeys": keys["n"], "apiCalls": keys["calls"],
                     "openTickets": open_tickets, "botOnline": bridge.running(), "recent": recent})
 
@@ -590,7 +629,9 @@ def create_player():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                  (value["name"], value["uuid"], value["region"], value["tier"], value["retired"], value["discord_id"],
                   value["wins"], value["losses"], ts, ts, user["id"]))
-    D.audit(conn, user, "player_create", f"{value['name']} → {value['tier']}")
+    pid = conn.execute("SELECT id FROM players WHERE name = ?", (value["name"],)).fetchone()["id"]
+    D.audit(conn, user, "player_create", f"{value['name']} → {value['tier']}", target=("player", pid, value["name"]),
+            changes=D.diff({}, value))
     conn.commit()
     if value["discord_id"]:
         bridge.submit(_sync_role, value["discord_id"], value["tier"])
@@ -616,7 +657,8 @@ def update_player(pid):
                  (value["name"], value["uuid"], value["region"], value["tier"], value["retired"], value["discord_id"],
                   value["wins"], value["losses"], D.now_ms(), user["id"], pid))
     change = f"{existing['tier']} → {value['tier']}" if existing["tier"] != value["tier"] else "details updated"
-    D.audit(conn, user, "player_update", f"{value['name']}: {change}")
+    D.audit(conn, user, "player_update", f"{value['name']}: {change}", target=("player", pid, value["name"]),
+            changes=D.diff({k: existing[k] for k in value}, value))
     conn.commit()
     if value["discord_id"] and existing["tier"] != value["tier"]:
         bridge.submit(_sync_role, value["discord_id"], value["tier"])
@@ -630,7 +672,8 @@ def delete_player(pid):
     if not existing:
         return error(404, "not_found")
     conn.execute("DELETE FROM players WHERE id = ?", (pid,))
-    D.audit(conn, current_user(), "player_delete", existing["name"])
+    D.audit(conn, current_user(), "player_delete", existing["name"], target=("player", pid, existing["name"]),
+            meta={"deleted": dict(existing)})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -643,7 +686,8 @@ def reset_cooldown(pid):
         return error(404, "not_found")
     if p["discord_id"]:
         conn.execute("DELETE FROM cooldowns WHERE discord_id = ?", (p["discord_id"],))
-    D.audit(conn, current_user(), "cooldown_reset", p["name"])
+    D.audit(conn, current_user(), "cooldown_reset", p["name"], target=("player", pid, p["name"]),
+            meta={"discordId": p["discord_id"]})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -674,7 +718,9 @@ def create_key():
     conn = db()
     conn.execute("INSERT INTO api_keys (name, prefix, key_hash, created_by, created_at, scope) VALUES (?, ?, ?, ?, ?, ?)",
                  (name, key[:12], sha256(key), current_user()["id"], D.now_ms(), scope))
-    D.audit(conn, current_user(), "key_create", f"{name} ({scope})")
+    kid = conn.execute("SELECT id FROM api_keys WHERE key_hash = ?", (sha256(key),)).fetchone()["id"]
+    D.audit(conn, current_user(), "key_create", f"{name} ({scope})", target=("key", kid, name),
+            meta={"scope": scope, "prefix": key[:12]})
     conn.commit()
     return jsonify({"key": key}), 201
 
@@ -687,7 +733,8 @@ def toggle_key(kid):
         return error(404, "not_found")
     revoked = 1 if body().get("revoked") else 0
     conn.execute("UPDATE api_keys SET revoked = ? WHERE id = ?", (revoked, kid))
-    D.audit(conn, current_user(), "key_revoke" if revoked else "key_restore", row["name"])
+    D.audit(conn, current_user(), "key_revoke" if revoked else "key_restore", row["name"], target=("key", kid, row["name"]),
+            changes={"revoked": [bool(row["revoked"]), bool(revoked)]})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -699,7 +746,8 @@ def delete_key(kid):
     if not row:
         return error(404, "not_found")
     conn.execute("DELETE FROM api_keys WHERE id = ?", (kid,))
-    D.audit(conn, current_user(), "key_delete", row["name"])
+    D.audit(conn, current_user(), "key_delete", row["name"], target=("key", kid, row["name"]),
+            meta={"deleted": {k: row[k] for k in row.keys() if k != "key_hash"}})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -733,11 +781,155 @@ def settings():
     })
 
 
-@route("/api/admin/audit", perm="viewStaff")
+# ---------------------------------------------------------------- audit log (admins)
+AUDIT_TZ = "+8 hours"   # group by Taiwan calendar day / hour
+
+
+def audit_filters():
+    """SQL WHERE clause + args from the query string."""
+    a = request.args
+    where, args = [], []
+    if a.get("actor"):
+        where.append("actor_id IS ?" if a["actor"] != "system" else "actor_id IS NULL")
+        if a["actor"] != "system":
+            args.append(a["actor"])
+    actions = [x for x in (a.get("action") or "").split(",") if re.fullmatch(r"[a-z_]{2,40}", x)]
+    if actions:
+        where.append(f"action IN ({','.join('?' * len(actions))})")
+        args += actions
+    if a.get("source"):
+        where.append("source IS ?" if a["source"] != "legacy" else "source IS NULL")
+        if a["source"] != "legacy":
+            args.append(a["source"])
+    if a.get("target_type"):
+        where.append("target_type = ?")
+        args.append(a["target_type"])
+    if a.get("target_id"):
+        where.append("target_id = ?")
+        args.append(a["target_id"])
+    if a.get("ip"):
+        where.append("ip = ?")
+        args.append(a["ip"])
+    if a.get("q"):
+        like = f"%{a['q'][:100]}%"
+        where.append("(detail LIKE ? OR actor_name LIKE ? OR target_name LIKE ? OR action LIKE ? OR ip LIKE ? OR meta LIKE ? OR changes LIKE ?)")
+        args += [like] * 7
+    for key, op in (("from", ">="), ("to", "<")):
+        if a.get(key):
+            where.append(f"created_at {op} ?")
+            args.append(clamp_int(a[key], 0, 10**14, 0))
+    return (" WHERE " + " AND ".join(where)) if where else "", args
+
+
+def audit_row(r):
+    e = dict(r)
+    for k in ("changes", "meta"):
+        try:
+            e[k] = json.loads(e[k]) if e.get(k) else None
+        except ValueError:
+            pass
+    return e
+
+
+@route("/api/admin/audit", perm="viewAudit")
 def audit_list():
-    limit = clamp_int(request.args.get("limit"), 1, 200, 100)
-    rows = db().execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-    return jsonify({"entries": [dict(r) for r in rows]})
+    limit = clamp_int(request.args.get("limit"), 1, 200, 50)
+    where, args = audit_filters()
+    before = clamp_int(request.args.get("before"), 0, 10**12, 0)
+    if before:
+        where += (" AND " if where else " WHERE ") + "id < ?"
+        args.append(before)
+    rows = db().execute(f"""SELECT a.*, m.avatar AS actor_avatar FROM audit_log a
+                            LEFT JOIN members m ON m.discord_id = a.actor_id {where}
+                            ORDER BY a.id DESC LIMIT ?""", (*args, limit + 1)).fetchall()
+    entries = [audit_row(r) for r in rows[:limit]]
+    return jsonify({"entries": entries, "hasMore": len(rows) > limit,
+                    "nextBefore": entries[-1]["id"] if entries else None})
+
+
+@route("/api/admin/audit/facets", perm="viewAudit")
+def audit_facets():
+    conn = db()
+    actors = conn.execute("""SELECT a.actor_id AS id, MAX(a.actor_name) AS name, m.avatar, COUNT(*) AS count,
+                             MAX(a.created_at) AS last FROM audit_log a LEFT JOIN members m ON m.discord_id = a.actor_id
+                             GROUP BY a.actor_id ORDER BY count DESC LIMIT 300""").fetchall()
+    actions = conn.execute("SELECT action, COUNT(*) AS count FROM audit_log GROUP BY action ORDER BY count DESC").fetchall()
+    sources = conn.execute("SELECT COALESCE(source, 'legacy') AS source, COUNT(*) AS count FROM audit_log GROUP BY 1").fetchall()
+    return jsonify({"actors": [dict(r) for r in actors], "actions": [dict(r) for r in actions],
+                    "sources": [dict(r) for r in sources],
+                    "total": conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]})
+
+
+@route("/api/admin/audit/stats", perm="viewAudit")
+def audit_stats():
+    conn = db()
+    days = clamp_int(request.args.get("days"), 1, 365, 30)
+    where, args = audit_filters()
+    since = D.now_ms() - days * 86400 * 1000
+    where += (" AND " if where else " WHERE ") + "created_at >= ?"
+    args.append(since)
+    day_expr = f"date(created_at / 1000, 'unixepoch', '{AUDIT_TZ}')"
+    hour_expr = f"CAST(strftime('%H', created_at / 1000, 'unixepoch', '{AUDIT_TZ}') AS INTEGER)"
+    q = lambda sql: [dict(r) for r in conn.execute(sql.format(w=where), args).fetchall()]
+    by_hour = {r["hour"]: r["count"] for r in q(f"SELECT {hour_expr} AS hour, COUNT(*) AS count FROM audit_log{{w}} GROUP BY 1")}
+    return jsonify({
+        "days": days,
+        "total": q("SELECT COUNT(*) AS n FROM audit_log{w}")[0]["n"],
+        "daily": q(f"SELECT {day_expr} AS day, COUNT(*) AS count FROM audit_log{{w}} GROUP BY 1 ORDER BY 1"),
+        "byHour": [by_hour.get(h, 0) for h in range(24)],
+        "byAction": q("SELECT action, COUNT(*) AS count FROM audit_log{w} GROUP BY 1 ORDER BY 2 DESC LIMIT 12"),
+        "byActor": q("SELECT actor_id AS id, MAX(actor_name) AS name, COUNT(*) AS count FROM audit_log{w} "
+                     "GROUP BY actor_id ORDER BY 3 DESC LIMIT 10"),
+        "bySource": q("SELECT COALESCE(source, 'legacy') AS source, COUNT(*) AS count FROM audit_log{w} GROUP BY 1 ORDER BY 2 DESC"),
+        "activeActors": q("SELECT COUNT(DISTINCT actor_id) AS n FROM audit_log{w}")[0]["n"],
+    })
+
+
+@route("/api/admin/audit/actor/<actor_id>", perm="viewAudit")
+def audit_actor(actor_id):
+    conn = db()
+    uid = None if actor_id == "system" else actor_id
+    cond, args = ("actor_id IS NULL", []) if uid is None else ("actor_id = ?", [uid])
+    head = conn.execute(f"SELECT COUNT(*) AS total, MIN(created_at) AS first, MAX(created_at) AS last, MAX(actor_name) AS name "
+                        f"FROM audit_log WHERE {cond}", args).fetchone()
+    if not head["total"]:
+        return error(404, "not_found")
+    m = D.member(conn, uid) if uid else None
+    acc = C.access_for(uid, m["roles"] if m and m["in_guild"] else []) if uid else None
+    ips = conn.execute(f"""SELECT ip, COUNT(*) AS count, MIN(created_at) AS first, MAX(created_at) AS last,
+                           MAX(user_agent) AS ua FROM audit_log WHERE {cond} AND ip IS NOT NULL
+                           GROUP BY ip ORDER BY last DESC LIMIT 50""", args).fetchall()
+    agents = conn.execute(f"""SELECT user_agent AS ua, COUNT(*) AS count, MAX(created_at) AS last FROM audit_log
+                              WHERE {cond} AND user_agent IS NOT NULL AND user_agent != ''
+                              GROUP BY user_agent ORDER BY last DESC LIMIT 20""", args).fetchall()
+    targets = conn.execute(f"""SELECT target_type AS type, target_id AS id, MAX(target_name) AS name, COUNT(*) AS count
+                               FROM audit_log WHERE {cond} AND target_type IS NOT NULL
+                               GROUP BY target_type, target_id ORDER BY count DESC LIMIT 15""", args).fetchall()
+    on_them = conn.execute("SELECT COUNT(*) FROM audit_log WHERE target_type = 'member' AND target_id = ?",
+                           (uid or "",)).fetchone()[0]
+    return jsonify({
+        "id": actor_id, "name": (m and m["username"]) or head["name"], "avatar": m and m["avatar"],
+        "inGuild": bool(m and m["in_guild"]), "access": acc,
+        "total": head["total"], "first": head["first"], "last": head["last"], "actedOn": on_them,
+        "ips": [dict(r) for r in ips], "agents": [dict(r) for r in agents], "targets": [dict(r) for r in targets],
+    })
+
+
+@route("/api/admin/audit/<int:eid>", perm="viewAudit")
+def audit_entry(eid):
+    conn = db()
+    row = conn.execute("""SELECT a.*, m.avatar AS actor_avatar FROM audit_log a
+                          LEFT JOIN members m ON m.discord_id = a.actor_id WHERE a.id = ?""", (eid,)).fetchone()
+    if not row:
+        return error(404, "not_found")
+    e = audit_row(row)
+    related = []
+    if e["target_type"]:
+        related = [audit_row(r) for r in conn.execute(
+            "SELECT id, actor_id, actor_name, action, detail, created_at, source FROM audit_log "
+            "WHERE target_type = ? AND target_id = ? AND id != ? ORDER BY id DESC LIMIT 15",
+            (e["target_type"], e["target_id"], eid)).fetchall()]
+    return jsonify({"entry": e, "related": related})
 
 
 
@@ -769,8 +961,10 @@ def server_join():
     g.extra_headers = headers
     if not allowed:
         return error(429, "rate_limited")
-    if not server_key_ok():
+    key = server_key_ok()
+    if not key:
         return error(401, "invalid_server_key")
+    D.AUDIT_CTX.get().update(source="server", serverKeyId=key["id"])
     data = body()
     uuid, name = L.norm_uuid(str(data.get("uuid") or "")), str(data.get("name") or "")
     if not re.fullmatch(r"[0-9a-f]{32}", uuid) or not re.fullmatch(r"[A-Za-z0-9_]{1,16}", name):
@@ -822,8 +1016,10 @@ def delete_link(did):
 def set_link_required():
     on = bool(body().get("on"))
     conn = db()
+    before = L.required(conn)
     D.set_setting(conn, "link_required", "1" if on else "0")
-    D.audit(conn, current_user(), "link_required", "on" if on else "off")
+    D.audit(conn, current_user(), "link_required", "on" if on else "off", target=("setting", "link_required", "申請考試必須先綁定"),
+            changes={"linkRequired": [before, on]})
     conn.commit()
     return jsonify({"ok": True, "linkRequired": on})
 
@@ -881,11 +1077,13 @@ def put_site_state():
     except ValueError as exc:
         return bad(str(exc), "設定內容不正確")
     conn = db()
+    before = S.load(conn)
     S.save(conn, state)
     closed = [p for p, m in state["maintenance"]["pages"].items() if m["on"]]
     D.audit(conn, current_user(), "site_update",
             f"launch={state['launchAt'] or '-'} all={'on' if state['maintenance']['all']['on'] else 'off'} "
-            f"pages={','.join(closed) or '-'} announcements={len(state['announcements'])}")
+            f"pages={','.join(closed) or '-'} announcements={len(state['announcements'])}",
+            target=("setting", "site_state", "網站狀態"), changes=D.diff(D.flatten(before), D.flatten(state)))
     conn.commit()
     return jsonify({"ok": True, "state": state})
 
@@ -921,8 +1119,10 @@ def set_discord_invite():
     if not INVITE_RE.match(url):
         return bad("invalid_invite", "邀請連結格式不正確（例如 https://discord.gg/xxxx）")
     conn = db()
+    before = discord_invite(conn)
     D.set_setting(conn, "discord_invite", url)
-    D.audit(conn, current_user(), "discord_invite_update", url)
+    D.audit(conn, current_user(), "discord_invite_update", url, target=("setting", "discord_invite", "Discord 邀請連結"),
+            changes={"url": [before, url]})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1031,10 +1231,13 @@ def create_ban():
     if player:
         name = player["name"]
     user = current_user()
-    conn.execute("""INSERT INTO bans (mc_name, uuid, discord_id, reason, created_by, created_by_name, created_at, expires_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                 (name, uuid, discord_id, reason, user["id"], user["username"], D.now_ms(), expires))
-    D.audit(conn, user, "ban_create", f"{name} ({'permanent' if not expires else duration}) — {reason}")
+    cur = conn.execute("""INSERT INTO bans (mc_name, uuid, discord_id, reason, created_by, created_by_name, created_at, expires_at)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (name, uuid, discord_id, reason, user["id"], user["username"], D.now_ms(), expires))
+    D.audit(conn, user, "ban_create", f"{name} ({'permanent' if not expires else duration}) — {reason}",
+            target=("ban", cur.lastrowid, name),
+            meta={"ban": {"mcName": name, "uuid": uuid, "discordId": discord_id, "reason": reason, "duration": duration,
+                          "expiresAt": expires, "playerId": player["id"] if player else None}})
     conn.commit()
     return jsonify({"ok": True}), 201
 
@@ -1048,7 +1251,8 @@ def revoke_ban(bid):
     user = current_user()
     conn.execute("UPDATE bans SET revoked_at = ?, revoked_by_name = ? WHERE id = ? AND revoked_at IS NULL",
                  (D.now_ms(), user["username"], bid))
-    D.audit(conn, user, "ban_revoke", b["mc_name"])
+    D.audit(conn, user, "ban_revoke", b["mc_name"], target=("ban", bid, b["mc_name"]),
+            changes={"status": ["active", "revoked"]}, meta={"ban": dict(b)})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1206,7 +1410,8 @@ def open_ticket():
                        "VALUES (?, ?, ?, ?, 'open', ?, ?)", (user["id"], user["username"], category, title, ts, ts))
     tid = cur.lastrowid
     save_message(conn, tid, user, False, text, uploads)
-    D.audit(conn, user, "support_open", f"#{tid} {title}")
+    D.audit(conn, user, "support_open", f"#{tid} {title}", target=("support", tid, title),
+            meta={"category": category, "images": len(uploads), "length": len(text)})
     conn.commit()
     bridge.submit(_notify, "notify_support_new", tid, user["id"], category, title, text[:300], site_url(f"/admin#support/{tid}"))
     return jsonify({"ok": True, "id": tid}), 201
@@ -1285,7 +1490,8 @@ def set_ticket_status(tid):
     if not t:
         return error(404, "not_found")
     conn.execute("UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?", (status, D.now_ms(), tid))
-    D.audit(conn, current_user(), "support_status", f"#{tid} → {status}")
+    D.audit(conn, current_user(), "support_status", f"#{tid} → {status}", target=("support", tid, t["title"]),
+            changes={"status": [t["status"], status]}, meta={"owner": t["user_id"]})
     conn.commit()
     if status == "closed" and t["status"] != "closed":
         bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "closed", site_url(f"/support#{tid}"))
@@ -1300,7 +1506,8 @@ def delete_ticket(tid):
         return error(404, "not_found")
     delete_attachment_files(conn.execute("SELECT stored_name FROM support_attachments WHERE ticket_id = ?", (tid,)).fetchall())
     conn.execute("DELETE FROM support_tickets WHERE id = ?", (tid,))
-    D.audit(conn, current_user(), "support_delete", f"#{tid} {t['title']}")
+    D.audit(conn, current_user(), "support_delete", f"#{tid} {t['title']}", target=("support", tid, t["title"]),
+            meta={"deleted": dict(t)})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1323,7 +1530,8 @@ def block_support_user():
     conn.execute("INSERT INTO support_blocks (discord_id, reason, created_by, created_at) VALUES (?, ?, ?, ?) "
                  "ON CONFLICT(discord_id) DO UPDATE SET reason = excluded.reason",
                  (uid, reason, current_user()["id"], D.now_ms()))
-    D.audit(conn, current_user(), "support_block", uid)
+    m = D.member(conn, uid)
+    D.audit(conn, current_user(), "support_block", uid, target=("member", uid, m and m["username"]), meta={"reason": reason})
     conn.commit()
     return jsonify({"ok": True}), 201
 
@@ -1332,7 +1540,8 @@ def block_support_user():
 def unblock_support_user(uid):
     conn = db()
     conn.execute("DELETE FROM support_blocks WHERE discord_id = ?", (uid,))
-    D.audit(conn, current_user(), "support_unblock", uid)
+    m = D.member(conn, uid)
+    D.audit(conn, current_user(), "support_unblock", uid, target=("member", uid, m and m["username"]))
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1362,7 +1571,8 @@ def delete_attachment(aid):
         return error(404, "not_found")
     delete_attachment_files([a])
     conn.execute("DELETE FROM support_attachments WHERE id = ?", (aid,))
-    D.audit(conn, current_user(), "image_delete", f"#{a['ticket_id']} {a['orig_name'] or ''} ({a['size']} B)")
+    D.audit(conn, current_user(), "image_delete", f"#{a['ticket_id']} {a['orig_name'] or ''} ({a['size']} B)",
+            target=("support", a["ticket_id"], f"#{a['ticket_id']}"), meta={"attachment": dict(a)})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1375,7 +1585,8 @@ def cleanup_storage():
     delete_attachment_files(rows)
     conn.execute("DELETE FROM support_attachments WHERE id IN (SELECT a.id FROM support_attachments a "
                  "JOIN support_tickets t ON t.id = a.ticket_id WHERE t.status = 'closed')")
-    D.audit(conn, current_user(), "image_cleanup", f"{len(rows)} images from closed tickets")
+    D.audit(conn, current_user(), "image_cleanup", f"{len(rows)} images from closed tickets",
+            meta={"count": len(rows), "bytes": sum(r["size"] for r in rows), "tickets": sorted({r["ticket_id"] for r in rows})})
     conn.commit()
     return jsonify({"ok": True, "deleted": len(rows)})
 
@@ -1402,7 +1613,7 @@ def create_my_key():
     key = f"{USER_KEY_PREFIX}{secrets.token_urlsafe(30)}"
     conn.execute("INSERT INTO user_keys (user_id, name, prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?)",
                  (user["id"], name, key[:12], sha256(key), D.now_ms()))
-    D.audit(conn, user, "account_key_create", name)
+    D.audit(conn, user, "account_key_create", name, target=("member", user["id"], user["username"]), meta={"prefix": key[:12]})
     conn.commit()
     return jsonify({"key": key}), 201
 
@@ -1415,7 +1626,8 @@ def delete_my_key(kid):
     if not row:
         return error(404, "not_found")
     conn.execute("DELETE FROM user_keys WHERE id = ?", (kid,))
-    D.audit(conn, user, "account_key_delete", row["name"])
+    D.audit(conn, user, "account_key_delete", row["name"], target=("member", user["id"], user["username"]),
+            meta={"key": {"id": kid, "name": row["name"], "prefix": row["prefix"], "uses": row["usage_count"]}})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1434,7 +1646,10 @@ def revoke_account_key(kid):
     if not row:
         return error(404, "not_found")
     conn.execute("DELETE FROM user_keys WHERE id = ?", (kid,))
-    D.audit(conn, current_user(), "account_key_revoke", f"{row['name']} ({row['user_id']})")
+    m = D.member(conn, row["user_id"])
+    D.audit(conn, current_user(), "account_key_revoke", f"{row['name']} ({row['user_id']})",
+            target=("member", row["user_id"], m and m["username"]),
+            meta={"key": {"id": kid, "name": row["name"], "prefix": row["prefix"], "uses": row["usage_count"]}})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1472,12 +1687,16 @@ def set_applications():
         panel, bad_field = P.validate(data.get("panel") or {})
         if bad_field:
             return bad("invalid_panel", f"欄位格式不正確：{bad_field}")
+        before = P.load(conn)
         P.save(conn, panel)
-        D.audit(conn, user, "panel_update", panel["title"])
+        D.audit(conn, user, "panel_update", panel["title"], target=("setting", "apply_panel", "考試申請面板"),
+                changes=D.diff(before, panel))
     if "open" in data:
         is_open = bool(data.get("open"))
+        was_open = P.applications_open(conn)
         D.set_setting(conn, "applications_open", "1" if is_open else "0")
-        D.audit(conn, user, "applications_open" if is_open else "applications_pause", None)
+        D.audit(conn, user, "applications_open" if is_open else "applications_pause", None,
+                target=("setting", "applications_open", "考試申請"), changes={"open": [was_open, is_open]})
     conn.commit()
     posted, err = bot_call("refresh_apply_panel")
     return jsonify({"ok": True, "panelUpdated": bool(posted), "botError": bool(err)})
@@ -1494,8 +1713,10 @@ def set_result_template():
     if bad_field:
         return bad("invalid_template", f"欄位不可空白或過長：{bad_field}")
     conn = db()
+    before = P.load_result(conn)
     P.save_result(conn, tpl)
-    D.audit(conn, current_user(), "result_template_update", tpl["title"])
+    D.audit(conn, current_user(), "result_template_update", tpl["title"], target=("setting", "result_template", "考試結果樣式"),
+            changes=D.diff(before, tpl))
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1528,7 +1749,8 @@ def close_test_ticket(channel_id):
     conn = db()
     conn.execute("UPDATE tickets SET status = 'closed', closed_at = ?, closed_by = ? WHERE channel_id = ?",
                  (D.now_ms(), user["id"], t["channel_id"]))
-    D.audit(conn, user, "ticket_force_close", t["mc_name"])
+    D.audit(conn, user, "ticket_force_close", t["mc_name"], target=("ticket", t["channel_id"], t["mc_name"]),
+            changes={"status": [t["status"], "closed"]}, meta={"ticket": dict(t)})
     conn.commit()
     _, err = bot_call("delete_ticket_channel", int(t["channel_id"]), user["username"])
     return jsonify({"ok": True, "botError": bool(err)})
@@ -1546,7 +1768,8 @@ def reopen_test_ticket(channel_id):
         return bad("channel_gone", "考試頻道已被刪除，無法重新開啟")
     conn = db()
     conn.execute("UPDATE tickets SET status = 'open', closed_at = NULL, closed_by = NULL WHERE channel_id = ?", (t["channel_id"],))
-    D.audit(conn, current_user(), "ticket_reopen", t["mc_name"])
+    D.audit(conn, current_user(), "ticket_reopen", t["mc_name"], target=("ticket", t["channel_id"], t["mc_name"]),
+            changes={"status": [t["status"], "open"]}, meta={"ticket": dict(t)})
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1561,7 +1784,8 @@ def set_ticket_kind(channel_id):
         return bad("invalid_kind", "類型不正確")
     conn = db()
     conn.execute("UPDATE tickets SET kind = ? WHERE channel_id = ?", (kind, t["channel_id"]))
-    D.audit(conn, current_user(), "ticket_kind", f"{t['mc_name']} → {kind}")
+    D.audit(conn, current_user(), "ticket_kind", f"{t['mc_name']} → {kind}", target=("ticket", t["channel_id"], t["mc_name"]),
+            changes={"kind": [t["kind"], kind]})
     conn.commit()
     _, err = bot_call("apply_ticket_kind", int(t["channel_id"]), kind)
     return jsonify({"ok": True, "botError": bool(err)})

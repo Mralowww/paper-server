@@ -92,7 +92,8 @@ def redeem(conn, user, code):
         conn.execute("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND id != ?", (did, player["id"]))
         conn.execute("UPDATE players SET discord_id = ?, uuid = ? WHERE id = ?", (did, dashed(uuid), player["id"]))
         rename_player(conn, player["id"], name)
-    D.audit(conn, user, "mc_link", f"{name} ({dashed(uuid)})")
+    D.audit(conn, user, "mc_link", f"{name} ({dashed(uuid)})", target=("member", did, user.get("username")),
+            meta={"minecraft": {"name": name, "uuid": dashed(uuid)}, "playerId": player["id"] if player else None})
     return link_for(conn, did)
 
 
@@ -104,7 +105,9 @@ def unlink(conn, actor, discord_id):
     # The leaderboard entry stays, but no longer belongs to this Discord account.
     conn.execute("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND REPLACE(LOWER(uuid), '-', '') = ?",
                  (str(discord_id), link["uuid"]))
-    D.audit(conn, actor, "mc_unlink", f"{link['mc_name']} ({dashed(link['uuid'])}) ← {discord_id}")
+    m = D.member(conn, discord_id)
+    D.audit(conn, actor, "mc_unlink", f"{link['mc_name']} ({dashed(link['uuid'])}) ← {discord_id}",
+            target=("member", discord_id, m and m["username"]), meta={"link": {**link, "uuid": dashed(link["uuid"])}})
     return link
 
 
@@ -125,7 +128,8 @@ def sync_name(conn, uuid, name):
         if p["name"] != name:
             rename_player(conn, p["id"], name)
             changed = 1
-            D.audit(conn, None, "mc_rename", f"{p['name']} → {name}")
+            D.audit(conn, None, "mc_rename", f"{p['name']} → {name}", target=("player", p["id"], name),
+                    changes={"name": [p["name"], name]}, meta={"uuid": dashed(uuid)})
     return bool(changed)
 
 

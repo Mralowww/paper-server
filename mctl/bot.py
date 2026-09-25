@@ -58,6 +58,23 @@ def conn():
     return D.transaction()
 
 
+def ix_meta(interaction, **extra):
+    """Discord interaction details for the audit log."""
+    data = interaction.data or {}
+    ch = interaction.channel
+    return {"discord": {
+        "type": interaction.type.name, "command": interaction.command.name if interaction.command else None,
+        "customId": data.get("custom_id"), "options": data.get("options"),
+        "channelId": str(interaction.channel_id) if interaction.channel_id else None,
+        "channelName": getattr(ch, "name", None), "guildId": str(interaction.guild_id) if interaction.guild_id else None,
+        "user": {"id": str(interaction.user.id), "tag": str(interaction.user)}, "locale": str(interaction.locale),
+        **extra}}
+
+
+def actor_of(interaction):
+    return {"id": str(interaction.user.id), "username": interaction.user.display_name}
+
+
 # ---------------------------------------------------------------- bot
 class TierBot(discord.Client):
     def __init__(self):
@@ -251,7 +268,8 @@ async def cmd_setuptier(interaction: discord.Interaction, channel: discord.TextC
         return await reply(interaction, f"❌ 機器人在 {channel.mention} 沒有「發送訊息／嵌入連結」權限。")
     with conn() as c:
         D.set_setting(c, "result_channel_id", channel.id)
-        D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "setup_result_channel", f"#{channel.name}")
+        D.audit(c, actor_of(interaction), "setup_result_channel", f"#{channel.name}", target=("setting", "result_channel_id", "考試結果頻道"),
+                changes={"channel": [None, f"#{channel.name} ({channel.id})"]}, meta=ix_meta(interaction), source="discord")
     await reply(interaction, f"✅ 考試結果將發送到 {channel.mention}")
 
 
@@ -271,8 +289,10 @@ async def cmd_setupapply(interaction: discord.Interaction, channel: discord.Text
         D.set_setting(c, "apply_channel_id", channel.id)
         D.set_setting(c, "apply_message_id", message.id)
         D.set_setting(c, "ticket_category_id", category.id)
-        D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "setup_apply",
-                f"#{channel.name} / {category.name}")
+        D.audit(c, actor_of(interaction), "setup_apply", f"#{channel.name} / {category.name}",
+                target=("setting", "apply_channel_id", "考試申請面板"),
+                meta=ix_meta(interaction, applyChannel=str(channel.id), messageId=str(message.id), category=str(category.id)),
+                source="discord")
     await reply(interaction, f"✅ 已在 {channel.mention} 放置申請按鈕，考試單會建立在「{category.name}」。")
 
 
@@ -287,7 +307,8 @@ async def cmd_setupsupport(interaction: discord.Interaction, channel: discord.Te
         return await reply(interaction, f"❌ 機器人在 {channel.mention} 沒有「發送訊息／嵌入連結」權限。")
     with conn() as c:
         D.set_setting(c, "support_channel_id", channel.id)
-        D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "setup_support_channel", f"#{channel.name}")
+        D.audit(c, actor_of(interaction), "setup_support_channel", f"#{channel.name}", target=("setting", "support_channel_id", "客服通知頻道"),
+                changes={"channel": [None, f"#{channel.name} ({channel.id})"]}, meta=ix_meta(interaction), source="discord")
     await reply(interaction, f"✅ 網站客服單通知將發送到 {channel.mention}")
 
 
@@ -503,7 +524,10 @@ async def start_ticket(interaction: discord.Interaction, profile):
                   (str(channel.id), str(user.id), profile["name"], profile["id"], "high" if high else "normal",
                    prev_tier, D.now_ms()))
         D.upsert_member(c, user.id, user.display_name, user.avatar.key if user.avatar else None, tracked_role_ids(user))
-        D.audit(c, {"id": str(user.id), "username": user.display_name}, "ticket_open", f"{profile['name']} ({'high' if high else 'normal'})")
+        D.audit(c, {"id": str(user.id), "username": user.display_name}, "ticket_open", f"{profile['name']} ({'high' if high else 'normal'})",
+                target=("ticket", channel.id, profile["name"]), source="discord",
+                meta=ix_meta(interaction, ticket={"channel": str(channel.id), "uuid": profile["id"], "kind": "high" if high else "normal",
+                                                  "prevTier": prev_tier}))
 
     kind_label = "🟣 高階考試" if high else "🟢 普通考試"
     embed = discord.Embed(
@@ -784,7 +808,8 @@ class CloseView(discord.ui.View):
                 return await reply(interaction, "❌ 找不到這張考試單的紀錄。")
             c.execute("UPDATE tickets SET status = 'closed', closed_at = ?, closed_by = ? WHERE channel_id = ?",
                       (D.now_ms(), str(interaction.user.id), str(interaction.channel_id)))
-            D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "ticket_close", ticket["mc_name"])
+            D.audit(c, actor_of(interaction), "ticket_close", ticket["mc_name"], target=("ticket", interaction.channel_id, ticket["mc_name"]),
+                    changes={"status": [ticket["status"], "closed"]}, meta=ix_meta(interaction), source="discord")
         await interaction.response.send_message(f"🔒 {interaction.user.mention} 關閉了考試單，頻道將在 5 秒後刪除。")
         await asyncio.sleep(5)
         try:
@@ -916,7 +941,9 @@ async def cmd_roleup(interaction: discord.Interaction):
         lines.append("👍 你已經擁有所有紀錄中的身分組。")
     with conn() as c:
         D.audit(c, {"id": str(user.id), "username": user.display_name}, "roleup",
-                f"applied {len(applied)}, pending staff {len(staff)}")
+                f"applied {len(applied)}, pending staff {len(staff)}", target=("member", user.id, user.display_name), source="discord",
+                meta=ix_meta(interaction, applied=[getattr(r, "name", str(r)) for r in applied],
+                             pendingStaff=[getattr(r, "name", str(r)) for r in staff]))
     await reply(interaction, "\n".join(lines))
 
 
@@ -955,7 +982,9 @@ class RoleupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"mctl:ra
         actor = {"id": str(interaction.user.id), "username": interaction.user.display_name}
         if self.act == "n":
             with conn() as c:
-                D.audit(c, actor, "roleup_deny", str(self.target_id))
+                m = D.member(c, self.target_id)
+                D.audit(c, actor, "roleup_deny", str(self.target_id), target=("member", self.target_id, m and m["username"]),
+                        meta=ix_meta(interaction), source="discord")
             return await self.finish(interaction, f"已由 {interaction.user.mention} 拒絕。", 0xFF5A5F)
         member = await get_member(interaction.guild, self.target_id)
         if not member:
@@ -967,7 +996,9 @@ class RoleupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"mctl:ra
         except discord.Forbidden:
             return await self.finish(interaction, "機器人權限不足，無法套用。", 0xFF5A5F)
         with conn() as c:
-            D.audit(c, actor, "roleup_approve", f"{member.display_name}: {', '.join(r.name for r in roles)}")
+            D.audit(c, actor, "roleup_approve", f"{member.display_name}: {', '.join(r.name for r in roles)}",
+                    target=("member", member.id, member.display_name), source="discord",
+                    meta=ix_meta(interaction, roles=[{"id": str(r.id), "name": r.name} for r in roles]))
         await self.finish(interaction, f"已由 {interaction.user.mention} 核准並套用。", 0x3DDC97)
 
 
