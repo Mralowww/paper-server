@@ -58,7 +58,7 @@ class TierBot(discord.Client):
         self.tree.clear_commands(guild=None)
         await self.tree.sync()
         self.tree.clear_commands(guild=guild)
-        for cmd in (cmd_setuptier, cmd_setupapply, cmd_result, cmd_roleup):
+        for cmd in (cmd_setuptier, cmd_setupapply, cmd_setupsupport, cmd_result, cmd_roleup):
             self.tree.add_command(cmd, guild=guild)
         synced = await self.tree.sync(guild=guild)
         log.info("Registered %d guild commands: %s", len(synced), ", ".join(c.name for c in synced))
@@ -244,9 +244,87 @@ async def cmd_setupapply(interaction: discord.Interaction, channel: discord.Text
     await reply(interaction, f"✅ 已在 {channel.mention} 放置申請按鈕，考試單會建立在「{category.name}」。")
 
 
+@app_commands.command(name="setupsupport", description="設定網站客服單的通知頻道")
+@app_commands.describe(channel="新客服單與回覆的通知頻道")
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.guild_only()
+@app_commands.check(is_admin)
+async def cmd_setupsupport(interaction: discord.Interaction, channel: discord.TextChannel):
+    perms = channel.permissions_for(interaction.guild.me)
+    if not (perms.view_channel and perms.send_messages and perms.embed_links):
+        return await reply(interaction, f"❌ 機器人在 {channel.mention} 沒有「發送訊息／嵌入連結」權限。")
+    with conn() as c:
+        D.set_setting(c, "support_channel_id", channel.id)
+        D.audit(c, {"id": str(interaction.user.id), "username": interaction.user.display_name}, "setup_support_channel", f"#{channel.name}")
+    await reply(interaction, f"✅ 網站客服單通知將發送到 {channel.mention}")
+
+
+# ---------------------------------------------------------------- support notifications
+SUPPORT_CATEGORY_LABELS = {"bug": "🐞 問題回報", "appeal": "⚖️ 封禁申訴", "report": "🚩 檢舉", "other": "💬 其他"}
+
+
+async def _support_channel():
+    with conn() as c:
+        cid = D.get_setting(c, "support_channel_id")
+    return bot.get_channel(int(cid)) if cid else None
+
+
+async def notify_support_new(tid, user_id, category, title, snippet, url):
+    channel = await _support_channel()
+    if not channel:
+        return
+    e = discord.Embed(title=f"🎫 新客服單 #{tid}｜{title}", url=url, color=0xF2C14E, description=snippet)
+    e.add_field(name="分類", value=SUPPORT_CATEGORY_LABELS.get(category, category))
+    e.add_field(name="開單者", value=f"<@{user_id}>")
+    e.set_footer(text="Mc.Tierlist.Asia · 點標題前往後台處理")
+    e.timestamp = discord.utils.utcnow()
+    try:
+        await channel.send(embed=e, allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException as exc:
+        log.warning("support notify failed: %s", exc)
+
+
+async def notify_support_reply(tid, user_id, title, snippet, url):
+    channel = await _support_channel()
+    if not channel:
+        return
+    e = discord.Embed(title=f"💬 客服單 #{tid} 有新回覆｜{title}", url=url, color=0x5C9AE6, description=snippet)
+    e.add_field(name="回覆者", value=f"<@{user_id}>")
+    try:
+        await channel.send(embed=e, allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException as exc:
+        log.warning("support notify failed: %s", exc)
+
+
+async def dm_support_update(user_id, tid, title, kind, url):
+    """DMs the ticket owner that staff replied to (or closed) their ticket."""
+    try:
+        user = bot.get_user(int(user_id)) or await bot.fetch_user(int(user_id))
+        if kind == "closed":
+            e = discord.Embed(title=f"🔒 你的客服單 #{tid} 已關閉", color=0x6B7590,
+                              description=f"「{title}」已被管理團隊關閉。\n[前往網站查看]({url})")
+        else:
+            e = discord.Embed(title=f"📩 你的客服單 #{tid} 有新回覆", color=0xF2C14E,
+                              description=f"管理團隊回覆了「{title}」。\n[前往網站查看]({url})")
+        e.set_footer(text="Mc.Tierlist.Asia")
+        await user.send(embed=e)
+    except (discord.Forbidden, discord.NotFound):
+        log.info("could not DM %s (DMs closed or user not found)", user_id)
+    except discord.HTTPException as exc:
+        log.warning("DM failed: %s", exc)
+
+
 # ---------------------------------------------------------------- applications
+def ban_message(ban):
+    until = f"<t:{ban['expires_at'] // 1000}:F>" if ban["expires_at"] else "永久"
+    return f"⛔ 你已被封禁，無法申請考試。\n原因：{ban['reason']}\n期限：{until}"
+
+
 def application_block(c, user_id):
     """Why this user can't apply right now, or None."""
+    ban = D.find_active_ban(c, discord_id=user_id)
+    if ban:
+        return ban_message(ban)
     ticket = c.execute("SELECT channel_id FROM tickets WHERE applicant_id = ? AND status = 'open'", (str(user_id),)).fetchone()
     if ticket:
         return f"❌ 你已經有一張進行中的考試單：<#{ticket['channel_id']}>"
@@ -293,6 +371,9 @@ class ApplyModal(discord.ui.Modal, title="申請 Vanilla 考試"):
             block = application_block(c, user.id)
             if block:
                 return await reply(interaction, block)
+            ban = D.find_active_ban(c, name=profile["name"], uuid=profile["id"])
+            if ban:
+                return await reply(interaction, ban_message(ban))
             owner = c.execute("SELECT discord_id FROM players WHERE (REPLACE(uuid, '-', '') = ? OR name = ?) "
                               "AND discord_id IS NOT NULL AND discord_id != ?",
                               (profile["id"].replace("-", ""), profile["name"], str(user.id))).fetchone()

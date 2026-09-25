@@ -50,6 +50,14 @@ OWNER_IDS = set(_list("SUPER_ADMIN_IDS", "995145509897523221"))
 API_RATE_LIMIT = _int("API_RATE_LIMIT_PER_MIN", 60)
 SITE_RATE_LIMIT = _int("SITE_RATE_LIMIT_PER_MIN", 240)
 TEST_COOLDOWN_DAYS = _int("TEST_COOLDOWN_DAYS", 7)
+SERVER_ADDRESS = os.environ.get("SERVER_ADDRESS", "Mc.Tierlist.Asia")
+UPLOAD_DIR = DATA_DIR / "uploads"
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+UPLOAD_MAX_FILES = 3
+# Refuse new uploads once the data folder reaches this size (hosting plan has 1 GB).
+STORAGE_LIMIT_BYTES = _int("STORAGE_LIMIT_MB", 900) * 1024 * 1024
+SUPPORT_CATEGORIES = ("bug", "appeal", "report", "other")
+SUPPORT_MAX_OPEN = 3
 ALLOW_DEV_LOGIN = os.environ.get("ALLOW_DEV_LOGIN") == "true" and not PRODUCTION
 
 if not SESSION_SECRET:

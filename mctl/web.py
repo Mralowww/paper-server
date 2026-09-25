@@ -76,7 +76,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=C.BASE_URL.startswith("https://"),
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-    MAX_CONTENT_LENGTH=32 * 1024,
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
 app.json.ensure_ascii = False
 app.json.sort_keys = False
@@ -255,6 +255,9 @@ def api_v1(path):
         return error(429, "rate_limited", "Too many requests, slow down.")
     db().execute("UPDATE api_keys SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?", (D.now_ms(), row["id"]))
     db().commit()
+    parts = [x for x in path.split("/") if x]
+    if parts and parts[0] == "bans" and len(parts) <= 2:
+        return read_bans(parts)
     return dispatch_read(path, detailed=True)
 
 
@@ -374,7 +377,7 @@ def logout():
 @route("/api/me", login=False)
 def me():
     user = current_user()
-    return jsonify({"user": user, "permissions": permissions(user)})
+    return jsonify({"user": user, "permissions": permissions(user), "serverAddress": C.SERVER_ADDRESS})
 
 
 @route("/api/me/profile")
@@ -628,9 +631,6 @@ def audit_list():
     return jsonify({"entries": [dict(r) for r in rows]})
 
 
-@app.route("/api/<path:_rest>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-def api_not_found(_rest):
-    return error(404, "not_found")
 
 
 # ---------------------------------------------------------------- pages & static files
@@ -672,3 +672,401 @@ def not_found(_exc):
 @app.errorhandler(413)
 def too_large(_exc):
     return error(413, "payload_too_large")
+
+
+# ================================================================ bans
+DURATIONS = {"1d": 1, "7d": 7, "30d": 30}
+
+
+def ban_row(b):
+    now = D.now_ms()
+    status = ("revoked" if b["revoked_at"] else
+              "expired" if b["expires_at"] and b["expires_at"] <= now else "active")
+    return {**b, "status": status}
+
+
+@route("/api/admin/bans", perm="viewStaff")
+def list_bans():
+    rows = db().execute("SELECT * FROM bans ORDER BY id DESC LIMIT 500").fetchall()
+    return jsonify({"bans": [ban_row(dict(r)) for r in rows]})
+
+
+@route("/api/admin/bans", methods=["POST"], perm="managePlayers")
+def create_ban():
+    data = body()
+    name = str(data.get("name") or "").strip()
+    reason = str(data.get("reason") or "").strip()
+    discord_id = str(data.get("discordId") or "").strip() or None
+    if not NAME_RE.match(name):
+        return bad("invalid_name", "玩家名稱需為 2–16 個英數字或底線")
+    if not reason or len(reason) > 300:
+        return bad("invalid_reason", "請輸入 1–300 字的封禁原因")
+    if discord_id and not DISCORD_ID_RE.match(discord_id):
+        return bad("invalid_discord_id", "Discord ID 格式不正確")
+    duration = str(data.get("duration") or "perm")
+    if duration == "perm":
+        expires = None
+    elif duration in DURATIONS:
+        expires = D.now_ms() + DURATIONS[duration] * 86400 * 1000
+    else:
+        days = clamp_int(data.get("days"), 1, 3650, 0)
+        if not days:
+            return bad("invalid_duration", "請輸入 1–3650 天")
+        expires = D.now_ms() + days * 86400 * 1000
+    conn = db()
+    player = conn.execute("SELECT * FROM players WHERE name = ?", (name,)).fetchone()
+    uuid = player["uuid"] if player else None
+    discord_id = discord_id or (player["discord_id"] if player else None)
+    if player:
+        name = player["name"]
+    user = current_user()
+    conn.execute("""INSERT INTO bans (mc_name, uuid, discord_id, reason, created_by, created_by_name, created_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                 (name, uuid, discord_id, reason, user["id"], user["username"], D.now_ms(), expires))
+    D.audit(conn, user, "ban_create", f"{name} ({'permanent' if not expires else duration}) — {reason}")
+    conn.commit()
+    return jsonify({"ok": True}), 201
+
+
+@route("/api/admin/bans/<int:bid>/revoke", methods=["POST"], perm="managePlayers")
+def revoke_ban(bid):
+    conn = db()
+    b = conn.execute("SELECT * FROM bans WHERE id = ?", (bid,)).fetchone()
+    if not b:
+        return error(404, "not_found")
+    user = current_user()
+    conn.execute("UPDATE bans SET revoked_at = ?, revoked_by_name = ? WHERE id = ? AND revoked_at IS NULL",
+                 (D.now_ms(), user["username"], bid))
+    D.audit(conn, user, "ban_revoke", b["mc_name"])
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+def public_ban(b):
+    return {"name": b["mc_name"], "uuid": b["uuid"], "reason": b["reason"],
+            "bannedAt": D.iso(b["created_at"]), "expiresAt": D.iso(b["expires_at"]) if b["expires_at"] else None}
+
+
+def read_bans(parts):
+    """Developer API: /bans lists active bans, /bans/{name|uuid} checks one player."""
+    if len(parts) == 1:
+        return jsonify({"bans": [public_ban(b) for b in D.active_bans(db())]})
+    q = parts[1]
+    is_uuid = bool(UUID_RE.match(q))
+    b = D.find_active_ban(db(), name=None if is_uuid else q, uuid=q if is_uuid else None)
+    return jsonify({"banned": bool(b), "ban": public_ban(b) if b else None})
+
+
+# ================================================================ support tickets
+IMAGE_TYPES = [(b"\x89PNG\r\n\x1a\n", "image/png", "png"), (b"\xff\xd8\xff", "image/jpeg", "jpg"),
+               (b"GIF87a", "image/gif", "gif"), (b"GIF89a", "image/gif", "gif")]
+
+
+def sniff_image(head):
+    for magic, mime, ext in IMAGE_TYPES:
+        if head.startswith(magic):
+            return mime, ext
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp", "webp"
+    return None
+
+
+def storage_used():
+    total = 0
+    for path in C.DATA_DIR.rglob("*"):
+        if path.is_file():
+            total += path.stat().st_size
+    return total
+
+
+def read_uploads():
+    """Validates uploaded images. Returns (list of (bytes, mime, ext, name), error tuple)."""
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+    if len(files) > C.UPLOAD_MAX_FILES:
+        return None, ("too_many_files", f"每則訊息最多 {C.UPLOAD_MAX_FILES} 張圖片")
+    out = []
+    for f in files:
+        data = f.read(C.UPLOAD_MAX_BYTES + 1)
+        if len(data) > C.UPLOAD_MAX_BYTES:
+            return None, ("file_too_large", "每張圖片最多 5MB")
+        kind = sniff_image(data[:16])
+        if not kind:
+            return None, ("invalid_file", "只能上傳 PNG、JPG、GIF 或 WEBP 圖片")
+        out.append((data, kind[0], kind[1], (f.filename or "")[:100]))
+    if out and storage_used() + sum(len(d) for d, *_ in out) > C.STORAGE_LIMIT_BYTES:
+        return None, ("storage_full", "伺服器儲存空間不足，暫時無法上傳圖片")
+    return out, None
+
+
+def save_message(conn, ticket_id, user, is_staff, text, uploads):
+    ts = D.now_ms()
+    cur = conn.execute("INSERT INTO support_messages (ticket_id, author_id, author_name, is_staff, body, created_at) "
+                       "VALUES (?, ?, ?, ?, ?, ?)", (ticket_id, user["id"], user["username"], 1 if is_staff else 0, text, ts))
+    C.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    for data, mime, ext, orig in uploads:
+        stored = f"{secrets.token_hex(16)}.{ext}"
+        (C.UPLOAD_DIR / stored).write_bytes(data)
+        conn.execute("INSERT INTO support_attachments (ticket_id, message_id, stored_name, orig_name, mime, size, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)", (ticket_id, cur.lastrowid, stored, orig, mime, len(data), ts))
+    conn.execute("UPDATE support_tickets SET updated_at = ? WHERE id = ?", (ts, ticket_id))
+
+
+def delete_attachment_files(rows):
+    for r in rows:
+        try:
+            (C.UPLOAD_DIR / r["stored_name"]).unlink(missing_ok=True)
+        except OSError as exc:
+            print(f"[support] could not delete {r['stored_name']}: {exc}")
+
+
+def is_support_staff(user):
+    return bool(user and user["level"] >= C.LEVEL_HELPER)
+
+
+def load_ticket(tid):
+    """Ticket the current user may see (owner or staff), or None."""
+    user = current_user()
+    t = db().execute("SELECT * FROM support_tickets WHERE id = ?", (tid,)).fetchone()
+    if not t or (t["user_id"] != user["id"] and not is_support_staff(user)):
+        return None
+    return dict(t)
+
+
+def ticket_payload(t):
+    conn = db()
+    msgs = [dict(r) for r in conn.execute("SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY id", (t["id"],))]
+    atts = {}
+    for a in conn.execute("SELECT id, message_id, orig_name, mime, size FROM support_attachments WHERE ticket_id = ?", (t["id"],)):
+        atts.setdefault(a["message_id"], []).append(dict(a))
+    for m in msgs:
+        m["attachments"] = atts.get(m["id"], [])
+    return {"ticket": t, "messages": msgs}
+
+
+def text_field(name, max_len):
+    return str(request.form.get(name) or "").strip()[:max_len + 1]
+
+
+def site_url(path):
+    return f"{C.BASE_URL}{path}"
+
+
+async def _notify(kind, *args):
+    from . import bot
+    await getattr(bot, kind)(*args)
+
+
+@route("/api/support/tickets")
+def my_tickets():
+    user = current_user()
+    conn = db()
+    rows = conn.execute("SELECT * FROM support_tickets WHERE user_id = ? ORDER BY updated_at DESC", (user["id"],)).fetchall()
+    blocked = conn.execute("SELECT reason FROM support_blocks WHERE discord_id = ?", (user["id"],)).fetchone()
+    return jsonify({"tickets": [dict(r) for r in rows], "blocked": bool(blocked),
+                    "blockReason": blocked["reason"] if blocked else None,
+                    "categories": list(C.SUPPORT_CATEGORIES), "maxFiles": C.UPLOAD_MAX_FILES})
+
+
+@route("/api/support/tickets", methods=["POST"])
+def open_ticket():
+    user = current_user()
+    conn = db()
+    if conn.execute("SELECT 1 FROM support_blocks WHERE discord_id = ?", (user["id"],)).fetchone():
+        return error(403, "support_blocked", "你已被禁止開立客服單")
+    open_count = conn.execute("SELECT COUNT(*) FROM support_tickets WHERE user_id = ? AND status != 'closed'",
+                              (user["id"],)).fetchone()[0]
+    if open_count >= C.SUPPORT_MAX_OPEN:
+        return bad("too_many_open", f"最多同時開 {C.SUPPORT_MAX_OPEN} 張客服單")
+    category = request.form.get("category", "")
+    title, text = text_field("title", 100), text_field("body", 4000)
+    if category not in C.SUPPORT_CATEGORIES:
+        return bad("invalid_category", "請選擇分類")
+    if not title or len(title) > 100:
+        return bad("invalid_title", "標題需為 1–100 字")
+    if not text or len(text) > 4000:
+        return bad("invalid_body", "內容需為 1–4000 字")
+    uploads, err = read_uploads()
+    if err:
+        return bad(*err)
+    ts = D.now_ms()
+    cur = conn.execute("INSERT INTO support_tickets (user_id, username, category, title, status, created_at, updated_at) "
+                       "VALUES (?, ?, ?, ?, 'open', ?, ?)", (user["id"], user["username"], category, title, ts, ts))
+    tid = cur.lastrowid
+    save_message(conn, tid, user, False, text, uploads)
+    D.audit(conn, user, "support_open", f"#{tid} {title}")
+    conn.commit()
+    bridge.submit(_notify, "notify_support_new", tid, user["id"], category, title, text[:300], site_url(f"/admin#support/{tid}"))
+    return jsonify({"ok": True, "id": tid}), 201
+
+
+@route("/api/support/tickets/<int:tid>")
+def get_ticket(tid):
+    t = load_ticket(tid)
+    if not t:
+        return error(404, "not_found")
+    return jsonify(ticket_payload(t))
+
+
+@route("/api/support/tickets/<int:tid>/messages", methods=["POST"])
+def reply_ticket(tid):
+    t = load_ticket(tid)
+    if not t:
+        return error(404, "not_found")
+    user = current_user()
+    staff = is_support_staff(user) and user["id"] != t["user_id"]
+    if t["status"] == "closed" and not staff:
+        return bad("ticket_closed", "此客服單已關閉")
+    text = text_field("body", 4000)
+    if not text or len(text) > 4000:
+        return bad("invalid_body", "內容需為 1–4000 字")
+    uploads, err = read_uploads()
+    if err:
+        return bad(*err)
+    conn = db()
+    save_message(conn, tid, user, staff, text, uploads)
+    if staff and t["status"] == "open":
+        conn.execute("UPDATE support_tickets SET status = 'in_progress' WHERE id = ?", (tid,))
+    conn.commit()
+    if staff:
+        bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "reply", site_url(f"/support#{tid}"))
+    else:
+        bridge.submit(_notify, "notify_support_reply", tid, user["id"], t["title"], text[:300], site_url(f"/admin#support/{tid}"))
+    return jsonify({"ok": True}), 201
+
+
+@route("/api/support/attachments/<int:aid>")
+def get_attachment(aid):
+    a = db().execute("SELECT * FROM support_attachments WHERE id = ?", (aid,)).fetchone()
+    if not a or not load_ticket(a["ticket_id"]):
+        return error(404, "not_found")
+    resp = send_from_directory(C.UPLOAD_DIR, a["stored_name"], mimetype=a["mime"], max_age=3600)
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"
+    resp.headers["Cache-Control"] = "private, max-age=3600"
+    return resp
+
+
+# ---- staff side
+@route("/api/admin/support", perm="viewStaff")
+def admin_tickets():
+    status = request.args.get("status", "")
+    conn = db()
+    sql = """SELECT t.*, (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id) AS message_count,
+                    (SELECT is_staff FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_is_staff
+             FROM support_tickets t"""
+    args = ()
+    if status in ("open", "in_progress", "closed"):
+        sql += " WHERE t.status = ?"
+        args = (status,)
+    rows = conn.execute(sql + " ORDER BY CASE t.status WHEN 'closed' THEN 1 ELSE 0 END, t.updated_at DESC LIMIT 300", args).fetchall()
+    counts = {r["status"]: r["n"] for r in conn.execute("SELECT status, COUNT(*) AS n FROM support_tickets GROUP BY status")}
+    return jsonify({"tickets": [dict(r) for r in rows], "counts": counts})
+
+
+@route("/api/admin/support/<int:tid>", methods=["PATCH"], perm="viewStaff")
+def set_ticket_status(tid):
+    status = body().get("status")
+    if status not in ("open", "in_progress", "closed"):
+        return bad("invalid_status", "狀態不正確")
+    conn = db()
+    t = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (tid,)).fetchone()
+    if not t:
+        return error(404, "not_found")
+    conn.execute("UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?", (status, D.now_ms(), tid))
+    D.audit(conn, current_user(), "support_status", f"#{tid} → {status}")
+    conn.commit()
+    if status == "closed" and t["status"] != "closed":
+        bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "closed", site_url(f"/support#{tid}"))
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/support/<int:tid>", methods=["DELETE"], perm="managePlayers")
+def delete_ticket(tid):
+    conn = db()
+    t = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (tid,)).fetchone()
+    if not t:
+        return error(404, "not_found")
+    delete_attachment_files(conn.execute("SELECT stored_name FROM support_attachments WHERE ticket_id = ?", (tid,)).fetchall())
+    conn.execute("DELETE FROM support_tickets WHERE id = ?", (tid,))
+    D.audit(conn, current_user(), "support_delete", f"#{tid} {t['title']}")
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/support/blocks", perm="viewStaff")
+def list_support_blocks():
+    rows = db().execute("""SELECT b.*, m.username FROM support_blocks b
+                           LEFT JOIN members m ON m.discord_id = b.discord_id ORDER BY b.created_at DESC""").fetchall()
+    return jsonify({"blocks": [dict(r) for r in rows]})
+
+
+@route("/api/admin/support/blocks", methods=["POST"], perm="managePlayers")
+def block_support_user():
+    data = body()
+    uid = str(data.get("discordId") or "").strip()
+    reason = str(data.get("reason") or "").strip()[:300] or None
+    if not DISCORD_ID_RE.match(uid):
+        return bad("invalid_discord_id", "Discord ID 格式不正確")
+    conn = db()
+    conn.execute("INSERT INTO support_blocks (discord_id, reason, created_by, created_at) VALUES (?, ?, ?, ?) "
+                 "ON CONFLICT(discord_id) DO UPDATE SET reason = excluded.reason",
+                 (uid, reason, current_user()["id"], D.now_ms()))
+    D.audit(conn, current_user(), "support_block", uid)
+    conn.commit()
+    return jsonify({"ok": True}), 201
+
+
+@route("/api/admin/support/blocks/<uid>", methods=["DELETE"], perm="managePlayers")
+def unblock_support_user(uid):
+    conn = db()
+    conn.execute("DELETE FROM support_blocks WHERE discord_id = ?", (uid,))
+    D.audit(conn, current_user(), "support_unblock", uid)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+# ---- storage
+@route("/api/admin/storage", perm="viewStaff")
+def storage():
+    conn = db()
+    rows = conn.execute("""SELECT a.id, a.ticket_id, a.orig_name, a.mime, a.size, a.created_at, t.title, t.status
+                           FROM support_attachments a JOIN support_tickets t ON t.id = a.ticket_id
+                           ORDER BY a.size DESC LIMIT 500""").fetchall()
+    images = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM support_attachments").fetchone()
+    closed = conn.execute("""SELECT COUNT(*) AS n, COALESCE(SUM(a.size), 0) AS bytes FROM support_attachments a
+                             JOIN support_tickets t ON t.id = a.ticket_id WHERE t.status = 'closed'""").fetchone()
+    return jsonify({
+        "used": storage_used(), "limit": C.STORAGE_LIMIT_BYTES,
+        "images": dict(images), "closedImages": dict(closed),
+        "attachments": [dict(r) for r in rows],
+    })
+
+
+@route("/api/admin/storage/attachments/<int:aid>", methods=["DELETE"], perm="managePlayers")
+def delete_attachment(aid):
+    conn = db()
+    a = conn.execute("SELECT * FROM support_attachments WHERE id = ?", (aid,)).fetchone()
+    if not a:
+        return error(404, "not_found")
+    delete_attachment_files([a])
+    conn.execute("DELETE FROM support_attachments WHERE id = ?", (aid,))
+    D.audit(conn, current_user(), "image_delete", f"#{a['ticket_id']} {a['orig_name'] or ''} ({a['size']} B)")
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/storage/cleanup", methods=["POST"], perm="managePlayers")
+def cleanup_storage():
+    conn = db()
+    rows = conn.execute("""SELECT a.* FROM support_attachments a JOIN support_tickets t ON t.id = a.ticket_id
+                           WHERE t.status = 'closed'""").fetchall()
+    delete_attachment_files(rows)
+    conn.execute("DELETE FROM support_attachments WHERE id IN (SELECT a.id FROM support_attachments a "
+                 "JOIN support_tickets t ON t.id = a.ticket_id WHERE t.status = 'closed')")
+    D.audit(conn, current_user(), "image_cleanup", f"{len(rows)} images from closed tickets")
+    conn.commit()
+    return jsonify({"ok": True, "deleted": len(rows)})
+
+
+@app.route("/api/<path:_rest>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def api_not_found(_rest):
+    return error(404, "not_found")

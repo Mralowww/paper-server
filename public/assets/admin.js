@@ -1,7 +1,7 @@
 /* Mc.Tierlist.Asia — staff panel */
 document.addEventListener('DOMContentLoaded', async () => {
   const { $, $$, esc, t, tierBadge, avatarUrl, discordAvatar, toast, countUp, session, levelChips, loginUrl,
-    testsTable, resultCell, scoreCell, icon } = window.MCTL;
+    testsTable, resultCell, scoreCell, icon, statusPill, catLabel, threadHtml, composerHtml, bindComposer } = window.MCTL;
   const { fmtDate, fmtRelative } = window.I18N;
   const root = $('#adminRoot');
   const TIERS = ['HT1', 'LT1', 'HT2', 'LT2', 'HT3', 'LT3', 'HT4', 'LT4', 'HT5', 'LT5'];
@@ -70,10 +70,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const TABS = [
     ['overview', 'tab.overview', true, '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>'],
     ['players', 'tab.players', true, '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>'],
+    ['bans', 'tab.bans', true, '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'],
+    ['support', 'tab.support', true, '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'],
     ['tests', 'tab.tests', true, '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>'],
     ['keys', 'tab.keys', perms.manageKeys, '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/>'],
     ['team', 'tab.team', true, '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'],
     ['settings', 'tab.settings', perms.manageSettings, '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'],
+    ['storage', 'tab.storage', true, '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'],
     ['audit', 'tab.audit', true, '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>'],
   ].filter(([, , allowed]) => allowed);
 
@@ -95,16 +98,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (b) go(b.dataset.tab);
   });
 
-  function go(tab) {
-    if (!views[tab] || !TABS.some(([id]) => id === tab)) tab = 'overview';
-    history.replaceState(null, '', `#${tab}`);
+  function go(route) {
+    let [tab, arg] = String(route).split('/');
+    if (!views[tab] || !TABS.some(([id]) => id === tab)) { tab = 'overview'; arg = undefined; }
+    history.replaceState(null, '', `#${tab}${arg ? `/${arg}` : ''}`);
     $$('.side-nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     // Fresh element per view so event listeners from the previous view don't pile up.
     const old = $('#panel');
     const panel = old.cloneNode(false);
     old.replaceWith(panel);
     panel.innerHTML = '<div class="skeleton" style="height:320px"></div>';
-    views[tab](panel).catch((err) => {
+    views[tab](panel, arg).catch((err) => {
       if (err.message !== 'unauthorized') panel.innerHTML = `<div class="empty"><div><h3>${t('common.loadFailed')}</h3><p>${esc(err.message)}</p></div></div>`;
     });
   }
@@ -115,6 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div><b>${esc(e.actor_name || 'system')}</b> <span class="muted">${esc(actionLabel(e.action))}</span>${e.detail ? ` · <span class="mono">${esc(e.detail)}</span>` : ''}</div>
         <time>${esc(fmtDate(e.created_at))}</time></div>`).join('')
     : `<div class="card-pad muted">${t('audit.empty')}</div>`);
+  const fmtBytes = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
   const readOnly = perms.managePlayers ? '' : ` <span class="pill off">${t('admin.readOnly')}</span>`;
 
   // ---------- Views ----------
@@ -192,6 +197,151 @@ document.addEventListener('DOMContentLoaded', async () => {
               toast(t('players.deleted', { name: p.name }));
               go('players');
             }
+          }
+        } catch (err) { toast(err.message, 'err'); }
+      });
+    },
+
+    async bans(panel, arg) {
+      const { bans } = await api('/bans');
+      const showAll = arg === 'all';
+      const list = showAll ? bans : bans.filter((b) => b.status === 'active');
+      const canEdit = perms.managePlayers;
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2>${t('tab.bans')}${readOnly}</h2><p>${t('bans.subtitle')}</p></div>
+            ${canEdit ? `<button class="btn btn-gold" id="addBan">${t('bans.add')}</button>` : ''}
+          </div>
+          <div class="seg" style="margin-bottom:14px">
+            <button class="${showAll ? '' : 'active'}" data-go="bans">${t('bans.filterActive')} (${bans.filter((b) => b.status === 'active').length})</button>
+            <button class="${showAll ? 'active' : ''}" data-go="bans/all">${t('bans.filterAll')} (${bans.length})</button>
+          </div>
+          <div class="card">${list.length ? `<div class="table-wrap"><table class="data">
+            <thead><tr><th>${t('col.player')}</th><th>${t('bans.reason')}</th><th>${t('col.expires')}</th><th>${t('col.bannedBy')}</th><th>${t('col.status')}</th><th></th></tr></thead>
+            <tbody>${list.map((b, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
+              <td><div class="cell-player"><img src="${avatarUrl(b.mc_name, 32)}" alt="">${esc(b.mc_name)}</div>${b.discord_id ? `<div class="mono muted" style="font-size:11px">${esc(b.discord_id)}</div>` : ''}</td>
+              <td style="max-width:280px">${esc(b.reason)}</td>
+              <td class="muted" style="font-size:13px">${b.expires_at ? esc(fmtDate(b.expires_at)) : t('bans.perm')}</td>
+              <td class="muted" style="font-size:13px">${esc(b.created_by_name || '—')}<div>${esc(fmtDate(b.created_at))}</div></td>
+              <td><span class="pill ${b.status === 'active' ? 'off' : ''}">${t(`bans.status.${b.status}`)}</span></td>
+              <td>${canEdit && b.status === 'active' ? `<div class="actions"><button class="btn btn-sm" data-revoke="${b.id}" data-name="${esc(b.mc_name)}">${t('bans.revoke')}</button></div>` : ''}</td>
+            </tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('bans.empty')}</div>`}</div>
+        </div>`;
+      $$('[data-go]', panel).forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+      if (!canEdit) return;
+      $('#addBan').addEventListener('click', () => modal(`
+        <h3>${t('bans.addTitle')}</h3>
+        <form id="banForm">
+          <div class="field"><label>${t('players.mcName')}</label><input class="input" name="name" maxlength="16" placeholder="Steve" required></div>
+          <div class="field"><label>${t('bans.discordOpt')}</label><input class="input mono" name="discordId" inputmode="numeric"></div>
+          <div class="field"><label>${t('bans.reason')}</label><input class="input" name="reason" maxlength="300" placeholder="${t('bans.reasonPh')}" required></div>
+          <div class="row2">
+            <div class="field"><label>${t('bans.duration')}</label><select class="input" name="duration">
+              ${['perm', '1d', '7d', '30d', 'custom'].map((d) => `<option value="${d}">${t(`bans.${d}`)}</option>`).join('')}</select></div>
+            <div class="field" id="daysField" hidden><label>${t('bans.days')}</label><input class="input mono" name="days" type="number" min="1" max="3650" value="14"></div>
+          </div>
+          <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-danger">${t('bans.addTitle')}</button></div>
+        </form>`, (bg, close) => {
+        const form = $('#banForm', bg);
+        form.duration.addEventListener('change', () => { $('#daysField', bg).hidden = form.duration.value !== 'custom'; });
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            await api('/bans', { method: 'POST', body: {
+              name: form.name.value.trim(), discordId: form.discordId.value.trim(), reason: form.reason.value.trim(),
+              duration: form.duration.value, days: Number(form.days.value) } });
+            close();
+            toast(t('bans.created', { name: form.name.value.trim() }));
+            go('bans');
+          } catch (err) { toast(err.message, 'err'); }
+        });
+      }));
+      panel.addEventListener('click', async (e) => {
+        const r = e.target.closest('[data-revoke]');
+        if (!r || !(await confirmDialog(t('bans.revokeT'), t('bans.revokeD', { name: esc(r.dataset.name) })))) return;
+        try {
+          await api(`/bans/${r.dataset.revoke}/revoke`, { method: 'POST' });
+          toast(t('bans.revoked', { name: r.dataset.name }));
+          go(showAll ? 'bans/all' : 'bans');
+        } catch (err) { toast(err.message, 'err'); }
+      });
+    },
+
+    async support(panel, arg) {
+      if (arg && /^\d+$/.test(arg)) return supportTicket(panel, arg);
+      const filter = ['open', 'in_progress', 'closed'].includes(arg) ? arg : '';
+      const [{ tickets, counts }, { blocks }] = await Promise.all([api(`/support${filter ? `?status=${filter}` : ''}`), api('/support/blocks')]);
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+      const seg = [['', t('support.filterAll'), total], ...['open', 'in_progress', 'closed'].map((st) => [st, t(`support.status.${st}`), counts[st] || 0])];
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head"><div><h2>${t('tab.support')}</h2><p>${t('support.subtitle')}</p></div></div>
+          <div class="seg" style="margin-bottom:14px">${seg.map(([st, label, n]) => `<button class="${st === filter ? 'active' : ''}" data-go="support${st ? `/${st}` : ''}">${label} (${n})</button>`).join('')}</div>
+          <div class="card" style="margin-bottom:26px">${tickets.length ? tickets.map((x) => `
+            <a class="ticket-row" href="#support/${x.id}" data-open="${x.id}">
+              <span class="mono muted">#${x.id}</span>
+              <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">${catLabel(x.category)} · ${esc(x.username || x.user_id)} · ${esc(fmtRelative(x.updated_at))} · ${t('support.messages', { n: x.message_count })}</span></span>
+              ${x.status !== 'closed' && !x.last_is_staff ? `<span class="pill high">${t('support.awaiting')}</span>` : ''}
+              ${statusPill(x.status)}
+            </a>`).join('') : `<div class="card-pad muted">${t('support.none')}</div>`}</div>
+          <div class="panel-head"><h2 style="font-size:19px">${t('support.blocks')}</h2></div>
+          <div class="card">${blocks.length ? blocks.map((b) => `
+            <div class="ticket-row"><span class="mono muted">${esc(b.discord_id)}</span><span class="ticket-title"><b>${esc(b.username || '—')}</b><span class="muted">${esc(b.reason || '')} · ${esc(fmtDate(b.created_at))}</span></span>
+            ${perms.managePlayers ? `<button class="btn btn-sm" data-unblock="${esc(b.discord_id)}">${t('support.unblock')}</button>` : ''}</div>`).join('') : `<div class="card-pad muted">${t('support.noBlocks')}</div>`}</div>
+        </div>`;
+      panel.addEventListener('click', async (e) => {
+        const g = e.target.closest('[data-go]');
+        if (g) return go(g.dataset.go);
+        const o = e.target.closest('[data-open]');
+        if (o) { e.preventDefault(); return go(`support/${o.dataset.open}`); }
+        const u = e.target.closest('[data-unblock]');
+        if (u) {
+          try { await api(`/support/blocks/${u.dataset.unblock}`, { method: 'DELETE' }); go(`support${filter ? `/${filter}` : ''}`); }
+          catch (err) { toast(err.message, 'err'); }
+        }
+      });
+    },
+
+    async storage(panel) {
+      const d = await api('/storage');
+      const pct = Math.min(100, Math.round((d.used / d.limit) * 100));
+      const canEdit = perms.managePlayers;
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head"><div><h2>${t('tab.storage')}</h2><p>${t('storage.subtitle')}</p></div></div>
+          <div class="card card-pad" style="margin-bottom:20px">
+            <div class="usage-top"><b>${t('storage.used', { used: fmtBytes(d.used), limit: fmtBytes(d.limit) })}</b><span class="mono">${pct}%</span></div>
+            <div class="usage-bar"><span style="width:${pct}%" class="${pct > 85 ? 'hot' : ''}"></span></div>
+            <div class="usage-stats">
+              <div><span class="muted">${t('storage.images')}</span><b>${d.images.n} · ${fmtBytes(d.images.bytes)}</b></div>
+              <div><span class="muted">${t('storage.closedImages')}</span><b>${d.closedImages.n} · ${fmtBytes(d.closedImages.bytes)}</b></div>
+              ${canEdit && d.closedImages.n ? `<button class="btn btn-danger btn-sm" id="cleanup">${t('storage.cleanup')}</button>` : ''}
+            </div>
+          </div>
+          <div class="card">${d.attachments.length ? `<div class="table-wrap"><table class="data">
+            <thead><tr><th>${t('col.image')}</th><th>${t('col.ticket')}</th><th>${t('col.size')}</th><th>${t('col.date')}</th><th></th></tr></thead>
+            <tbody>${d.attachments.map((a, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
+              <td><a href="/api/support/attachments/${a.id}" target="_blank" rel="noopener"><img class="thumb" src="/api/support/attachments/${a.id}" alt="" loading="lazy"></a></td>
+              <td><a class="link-more" href="#support/${a.ticket_id}" data-open="${a.ticket_id}">#${a.ticket_id}</a> <span class="muted">${esc(a.title)}</span> ${statusPill(a.status)}</td>
+              <td class="mono">${fmtBytes(a.size)}</td>
+              <td class="muted" style="font-size:13px">${esc(fmtDate(a.created_at))}</td>
+              <td>${canEdit ? `<div class="actions"><button class="btn btn-sm btn-danger" data-delimg="${a.id}">${t('common.delete')}</button></div>` : ''}</td>
+            </tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('storage.empty')}</div>`}</div>
+        </div>`;
+      panel.addEventListener('click', async (e) => {
+        const o = e.target.closest('[data-open]');
+        if (o) { e.preventDefault(); return go(`support/${o.dataset.open}`); }
+        try {
+          const del = e.target.closest('[data-delimg]');
+          if (del && await confirmDialog(t('storage.deleteImgT'), t('storage.deleteImgD'))) {
+            await api(`/storage/attachments/${del.dataset.delimg}`, { method: 'DELETE' });
+            go('storage');
+          }
+          if (e.target.closest('#cleanup') && await confirmDialog(t('storage.cleanup'), t('storage.cleanupD', { n: d.closedImages.n, size: fmtBytes(d.closedImages.bytes) }))) {
+            const r = await api('/storage/cleanup', { method: 'POST' });
+            toast(t('storage.cleaned', { n: r.deleted }));
+            go('storage');
           }
         } catch (err) { toast(err.message, 'err'); }
       });
@@ -315,6 +465,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
   };
 
+  async function supportTicket(panel, id) {
+    const res = await fetch(`/api/support/tickets/${id}`, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return go('support');
+    const d = await res.json();
+    const tk = d.ticket;
+    panel.innerHTML = `
+      <div class="panel">
+        <a href="#support" class="link-more" data-go="support" style="display:inline-block;margin-bottom:14px">${t('support.back')}</a>
+        <div class="ticket-head"><div><span class="mono muted">#${tk.id} · ${catLabel(tk.category)} · ${esc(tk.username || tk.user_id)} (<span class="mono">${esc(tk.user_id)}</span>)</span><h2>${esc(tk.title)}</h2></div>
+          <div class="actions">
+            <label class="select-wrap"><select id="stSel" aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></label>
+            ${perms.managePlayers ? `<button class="btn btn-sm" id="blockUser">${t('support.block')}</button><button class="btn btn-sm btn-danger" id="delTicket">${t('common.delete')}</button>` : ''}
+          </div>
+        </div>
+        <div class="thread">${threadHtml(d, (m) => !!m.is_staff)}</div>
+        ${composerHtml()}
+      </div>`;
+    $('[data-go]', panel).addEventListener('click', (e) => { e.preventDefault(); go('support'); });
+    bindComposer(panel, tk.id, () => go(`support/${tk.id}`));
+    $('#stSel', panel).addEventListener('change', async (e) => {
+      try { await api(`/support/${tk.id}`, { method: 'PATCH', body: { status: e.target.value } }); go(`support/${tk.id}`); }
+      catch (err) { toast(err.message, 'err'); }
+    });
+    $('#blockUser', panel)?.addEventListener('click', async () => {
+      if (!(await confirmDialog(t('support.blockT'), t('support.blockD', { name: esc(tk.username || tk.user_id) })))) return;
+      try { await api('/support/blocks', { method: 'POST', body: { discordId: tk.user_id, reason: `#${tk.id}` } }); toast(t('support.toastBlocked', { name: tk.username || tk.user_id })); }
+      catch (err) { toast(err.message, 'err'); }
+    });
+    $('#delTicket', panel)?.addEventListener('click', async () => {
+      if (!(await confirmDialog(t('support.deleteT'), t('support.deleteD', { id: tk.id })))) return;
+      try { await api(`/support/${tk.id}`, { method: 'DELETE' }); toast(t('support.toastDeleted')); go('support'); }
+      catch (err) { toast(err.message, 'err'); }
+    });
+  }
+
   function showKey(key) {
     modal(`
       <h3>${t('keys.createdT')}</h3>
@@ -369,5 +554,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  addEventListener('hashchange', () => go(location.hash.slice(1) || 'overview'));
   go(location.hash.slice(1) || 'overview');
 });

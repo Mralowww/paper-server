@@ -16,6 +16,8 @@
     chevron: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
     discord: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.3a18.4 18.4 0 0 0-5.5 0L8.6 3a19.7 19.7 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.9 19.9 0 0 0 6 3l1.3-2a13 13 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4-2 1 1.3 2a19.8 19.8 0 0 0 6-3c.5-5.1-.8-9.6-3.6-13.6ZM8 15.3c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.5 8 10.5s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>',
     booster: '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#ff73fa" d="M12 2 20 8.5 12 22 4 8.5Z"/><path fill="#ffb3fc" d="M12 2 20 8.5H4Z"/></svg>',
+    server: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
+    image: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
     media: '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#ff4d4d"/><path d="m10 9 5 3-5 3Z" fill="#fff"/></svg>',
   };
 
@@ -65,6 +67,7 @@
   }
 
   // ---------- Chrome (nav + footer) ----------
+  const SERVER = 'Mc.Tierlist.Asia';
   const brandHtml = '<img class="brand-cube" src="/assets/cube.svg" alt=""><span class="brand-text"><span class="brand-title">TIERLIST</span><span class="brand-sub">MC · ASIA</span></span>';
 
   function renderChrome(page) {
@@ -72,7 +75,7 @@
     loader.className = 'page-loader';
     document.body.prepend(loader);
 
-    const links = [['home', '/', 'nav.home'], ['rankings', '/rankings', 'nav.rankings'], ['docs', '/docs', 'nav.docs']];
+    const links = [['home', '/', 'nav.home'], ['rankings', '/rankings', 'nav.rankings'], ['support', '/support', 'nav.support'], ['docs', '/docs', 'nav.docs']];
     const { LANGS, lang } = window.I18N;
     const current = LANGS.find((l) => l.id === lang);
     const nav = document.createElement('header');
@@ -82,6 +85,7 @@
         <a class="brand" href="/" aria-label="Mc.Tierlist.Asia">${brandHtml}</a>
         <nav class="nav-links">${links.map(([id, href, key]) => `<a href="${href}" class="${id === page ? 'active' : ''}">${t(key)}</a>`).join('')}<span class="nav-extra"></span></nav>
         <div class="nav-right">
+          <button class="server-chip" data-copy-ip title="${t('server.copyHint')}">${icon.server}<span>${SERVER}</span></button>
           <form class="nav-search" role="search">${icon.search}<input name="q" placeholder="${t('nav.search')}" autocomplete="off" aria-label="${t('nav.search')}"><kbd>/</kbd></form>
           <div class="dropdown lang-dd">
             <button class="btn btn-sm btn-ghost dd-toggle" aria-label="${t('nav.language')}">${icon.globe}<span>${current.short}</span>${icon.chevron}</button>
@@ -245,7 +249,7 @@
       <a class="board-row reveal${top}" data-player="${esc(p.name)}" style="--d:${Math.min(i, 12) * 0.04}s" href="/player/${encodeURIComponent(p.name)}">
         <div class="rank-cell"><span class="n">${p.rank}.</span><img src="${avatarUrl(p.name)}" alt="" loading="lazy" onerror="${fallbackImg}"></div>
         <div class="player-cell">
-          <div class="pname">${esc(p.name)}${badgesHtml(p.badges)}</div>
+          <div class="pname">${esc(p.name)}${badgesHtml(p.badges)}${p.banned ? `<span class="ban-tag">${t('ban.tag')}</span>` : ''}</div>
           <div class="psub">${icon.trophy.replace('width="20" height="20"', 'width="14" height="14"')} <b>${p.points}</b> ${t('common.pts')}${v.retired ? ` · ${t('common.retired')}` : ''}</div>
         </div>
         <div class="region-cell">${regionBadge(p.region)}</div>
@@ -280,7 +284,8 @@
       record = `<a class="pcard-locked" href="${loginUrl()}">${icon.discord}${t('card.loginToView')}</a>`;
     }
     return `
-      <div class="pcard-avatar"><img src="${avatarUrl(p.name, 160)}" alt="" onerror="${fallbackImg}"></div>
+      ${p.banned ? `<div class="pcard-ban">⛔ ${t('ban.cardNote')}</div>` : ''}
+      <div class="pcard-avatar${p.banned ? ' banned' : ''}"><img src="${avatarUrl(p.name, 160)}" alt="" onerror="${fallbackImg}"></div>
       <h2 class="pcard-name">${esc(p.name)}${badgesHtml(p.badges)}</h2>
       <div class="title-pill ${TITLE_STYLE[p.title] || 'rookie'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 22 10 12 22 2 10Z"/></svg>${esc(p.title)}</div>
       <div class="pcard-region">${esc(regionName(p.region))}</div>
@@ -320,6 +325,12 @@
     }
   }
 
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest?.('[data-copy-ip]')) return;
+    try { await navigator.clipboard.writeText(SERVER); toast(t('server.copied', { ip: SERVER })); }
+    catch { toast(SERVER); }
+  });
+
   document.addEventListener('click', (e) => {
     const row = e.target.closest?.('[data-player]');
     if (!row || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -336,6 +347,68 @@
     </table></div>`;
   const resultCell = (x) => `${x.prev_tier ? tierBadge(x.prev_tier) : '<span class="tier t5">—</span>'} <span class="muted">→</span> ${tierBadge(x.new_tier)}`;
   const scoreCell = (x) => `<span class="mono"><b class="win">${x.wins}</b> – <b class="loss">${x.losses}</b></span>`;
+
+  // ---------- Support tickets (shared with the staff panel) ----------
+  const statusPill = (st) => `<span class="st-pill ${st}">${t(`support.status.${st}`)}</span>`;
+  const catLabel = (c) => t(`support.cat.${c}`);
+  const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
+
+  /** Chat thread. `mine(msg)` decides which side a message sits on. */
+  function threadHtml(payload, mine) {
+    return payload.messages.map((m, i) => `
+      <div class="msg ${mine(m) ? 'mine' : ''} ${m.is_staff ? 'staff' : ''}" style="animation-delay:${Math.min(i, 10) * 0.03}s">
+        <div class="msg-meta"><b>${esc(m.author_name || m.author_id)}</b>${m.is_staff ? `<span class="role admin">${t('support.staff')}</span>` : ''}<time>${esc(fmtDate(m.created_at))}</time></div>
+        <div class="msg-body">${nl2br(m.body)}</div>
+        ${m.attachments.length ? `<div class="msg-images">${m.attachments.map((a) => `<a href="/api/support/attachments/${a.id}" target="_blank" rel="noopener"><img src="/api/support/attachments/${a.id}" alt="${esc(a.orig_name || '')}" loading="lazy"></a>`).join('')}</div>` : ''}
+      </div>`).join('');
+  }
+
+  const fileInputHtml = (max) => `
+    <label class="file-pick">${icon.image}<span>${t('support.addImages')}</span>
+      <input type="file" name="files" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-max="${max}"></label>
+    <span class="file-names muted"></span>`;
+
+  function bindFileInput(root) {
+    const input = $('input[type=file]', root);
+    input?.addEventListener('change', () => {
+      const max = Number(input.dataset.max) || 3;
+      const files = [...input.files];
+      if (files.length > max) { toast(t('error.too_many_files'), 'err'); input.value = ''; }
+      else if (files.some((f) => f.size > 5 * 1024 * 1024)) { toast(t('error.file_too_large'), 'err'); input.value = ''; }
+      $('.file-names', root).textContent = [...input.files].map((f) => f.name).join('、');
+    });
+  }
+
+  async function postForm(url, form) {
+    const res = await fetch(url, { method: 'POST', body: new FormData(form) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const key = `error.${data.error}`;
+      throw new Error(window.I18N.has(key) ? t(key) : (data.message || t('common.error')));
+    }
+    return data;
+  }
+
+  /** Reply box under a thread; calls onSent after a successful post. */
+  function composerHtml() {
+    return `<form class="composer">
+      <textarea name="body" rows="3" maxlength="4000" placeholder="${t('support.replyPh')}" required></textarea>
+      <div class="composer-bar">${fileInputHtml(3)}<button class="btn btn-gold btn-sm">${t('support.send')}</button></div>
+    </form>`;
+  }
+
+  function bindComposer(root, ticketId, onSent) {
+    const form = $('.composer', root);
+    if (!form) return;
+    bindFileInput(form);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('button', form);
+      btn.disabled = true;
+      try { await postForm(`/api/support/tickets/${ticketId}/messages`, form); onSent(); }
+      catch (err) { toast(err.message, 'err'); btn.disabled = false; }
+    });
+  }
 
   // ---------- Pages ----------
   const pages = {
@@ -493,6 +566,82 @@
       initReveal();
     },
 
+    async support() {
+      const root = $('#supportRoot');
+      const { user } = await session;
+      if (!user) {
+        root.innerHTML = emptyHtml(t('support.title'), t('support.loginD'),
+          `<p style="margin-top:20px"><a class="btn btn-discord" href="${loginUrl()}">${icon.discord}${t('nav.loginDiscord')}</a></p>`);
+        return initReveal();
+      }
+      const head = `<div class="panel-head reveal"><div><div class="kicker">Support</div><h2>${t('support.title')}</h2><p>${t('support.subtitle')}</p></div></div>`;
+
+      async function showList() {
+        history.replaceState(null, '', '/support');
+        const d = await request('/api/support/tickets');
+        root.innerHTML = `${head}
+          ${d.blocked ? `<div class="callout reveal" style="margin-bottom:16px">${t('support.blocked')}${d.blockReason ? ` — ${esc(d.blockReason)}` : ''}</div>` : `<div class="reveal" style="margin-bottom:16px"><button class="btn btn-gold" id="newTicket">${t('support.new')}</button></div>`}
+          <div class="card reveal">${d.tickets.length ? d.tickets.map((x) => `
+            <a class="ticket-row" href="#${x.id}" data-open="${x.id}">
+              <span class="mono muted">#${x.id}</span>
+              <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">${catLabel(x.category)} · ${esc(fmtRelative(x.updated_at))}</span></span>
+              ${statusPill(x.status)}
+            </a>`).join('') : `<div class="card-pad muted">${t('support.empty')}</div>`}</div>`;
+        $('#newTicket')?.addEventListener('click', () => showNew(d));
+        root.onclick = (e) => {
+          const a = e.target.closest('[data-open]');
+          if (a) { e.preventDefault(); showTicket(a.dataset.open); }
+        };
+        initReveal();
+      }
+
+      function showNew(d) {
+        root.innerHTML = `${head}
+          <form class="card card-pad reveal in" id="ticketForm" style="max-width:720px">
+            <h3 style="margin:0 0 16px">${t('support.newTitle')}</h3>
+            <div class="field"><label>${t('support.category')}</label><select class="input" name="category">${d.categories.map((c) => `<option value="${c}">${catLabel(c)}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('support.subject')}</label><input class="input" name="title" maxlength="100" required></div>
+            <div class="field"><label>${t('support.body')}</label><textarea class="input" name="body" rows="7" maxlength="4000" placeholder="${t('support.bodyPh')}" required></textarea></div>
+            <div class="field"><label>${t('support.images', { n: d.maxFiles })}</label><div class="composer-bar" style="justify-content:flex-start">${fileInputHtml(d.maxFiles)}</div></div>
+            <div class="modal-actions"><button type="button" class="btn" id="cancelNew">${t('common.cancel')}</button><button class="btn btn-gold">${t('support.submit')}</button></div>
+          </form>`;
+        const form = $('#ticketForm');
+        bindFileInput(form);
+        $('#cancelNew').addEventListener('click', showList);
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = $('button.btn-gold', form);
+          btn.disabled = true;
+          try {
+            const { id } = await postForm('/api/support/tickets', form);
+            toast(t('support.created'));
+            showTicket(id);
+          } catch (err) { toast(err.message, 'err'); btn.disabled = false; }
+        });
+      }
+
+      async function showTicket(id) {
+        history.replaceState(null, '', `/support#${id}`);
+        let d;
+        try { d = await request(`/api/support/tickets/${id}`); } catch { return showList(); }
+        const tk = d.ticket;
+        root.innerHTML = `
+          <a href="/support" class="link-more" id="backList" style="display:inline-block;margin-bottom:16px">${t('support.back')}</a>
+          <div class="ticket-head reveal in"><div><span class="mono muted">#${tk.id} · ${catLabel(tk.category)}</span><h2>${esc(tk.title)}</h2></div>${statusPill(tk.status)}</div>
+          <div class="thread">${threadHtml(d, (m) => m.author_id === user.id)}</div>
+          ${tk.status === 'closed' ? `<div class="callout">${t('support.closedNote')}</div>` : composerHtml()}`;
+        $('#backList').addEventListener('click', (e) => { e.preventDefault(); showList(); });
+        bindComposer(root, tk.id, () => showTicket(tk.id));
+      }
+
+      const route = () => {
+        const hashId = location.hash.slice(1);
+        if (/^\d+$/.test(hashId)) showTicket(hashId); else showList();
+      };
+      addEventListener('hashchange', route);
+      route();
+    },
+
     docs() {
       $$('.code').forEach((block) => {
         const btn = $('.copy-btn', block);
@@ -519,6 +668,7 @@
   window.MCTL = {
     $, $$, esc, icon, t, tierBadge, regionBadge, badgesHtml, avatarUrl, discordAvatar, toast, countUp, initReveal,
     session, levelChips, loginUrl, emptyHtml, testsTable, resultCell, scoreCell,
+    statusPill, catLabel, threadHtml, composerHtml, bindComposer, request,
   };
 
   document.addEventListener('DOMContentLoaded', () => {

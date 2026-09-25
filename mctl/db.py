@@ -80,6 +80,54 @@ CREATE TABLE IF NOT EXISTS cooldowns (
   discord_id  TEXT PRIMARY KEY,
   until       INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS bans (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  mc_name          TEXT NOT NULL,
+  uuid             TEXT,
+  discord_id       TEXT,
+  reason           TEXT NOT NULL,
+  created_by       TEXT,
+  created_by_name  TEXT,
+  created_at       INTEGER NOT NULL,
+  expires_at       INTEGER,
+  revoked_at       INTEGER,
+  revoked_by_name  TEXT
+);
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id           TEXT NOT NULL,
+  username          TEXT,
+  category          TEXT NOT NULL,
+  title             TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'open',
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_messages (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id   INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  author_id   TEXT NOT NULL,
+  author_name TEXT,
+  is_staff    INTEGER NOT NULL DEFAULT 0,
+  body        TEXT NOT NULL,
+  created_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_attachments (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id   INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  message_id  INTEGER NOT NULL REFERENCES support_messages(id) ON DELETE CASCADE,
+  stored_name TEXT NOT NULL,
+  orig_name   TEXT,
+  mime        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  created_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_blocks (
+  discord_id  TEXT PRIMARY KEY,
+  reason      TEXT,
+  created_by  TEXT,
+  created_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT
@@ -130,6 +178,9 @@ def init():
         conn.execute("CREATE INDEX IF NOT EXISTS players_discord ON players (discord_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS tests_tester ON tests (tester_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS tests_discord ON tests (discord_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS bans_active ON bans (revoked_at, expires_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS support_user ON support_tickets (user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS support_msg_ticket ON support_messages (ticket_id)")
 
 
 # ---------------------------------------------------------------- generic helpers
@@ -176,6 +227,45 @@ def cooldown_until(conn, discord_id):
     return row["until"] if row and row["until"] > now_ms() else None
 
 
+# ---------------------------------------------------------------- bans
+ACTIVE_BAN_SQL = "revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)"
+
+
+def active_bans(conn):
+    return [dict(r) for r in conn.execute(f"SELECT * FROM bans WHERE {ACTIVE_BAN_SQL} ORDER BY id DESC", (now_ms(),))]
+
+
+def find_active_ban(conn, discord_id=None, name=None, uuid=None):
+    """The active ban matching any of the given identities, or None."""
+    clauses, args = [], []
+    if discord_id:
+        clauses.append("discord_id = ?")
+        args.append(str(discord_id))
+    if name:
+        clauses.append("mc_name = ? COLLATE NOCASE")
+        args.append(name)
+    if uuid:
+        clauses.append("REPLACE(uuid, '-', '') = ?")
+        args.append(uuid.replace("-", "").lower())
+    if not clauses:
+        return None
+    row = conn.execute(f"SELECT * FROM bans WHERE {ACTIVE_BAN_SQL} AND ({' OR '.join(clauses)}) ORDER BY id DESC LIMIT 1",
+                       (now_ms(), *args)).fetchone()
+    return dict(row) if row else None
+
+
+def banned_keys(conn):
+    """(names, uuids, discord ids) with an active ban — for flagging players in bulk."""
+    names, uuids, ids = set(), set(), set()
+    for b in active_bans(conn):
+        names.add(b["mc_name"].lower())
+        if b["uuid"]:
+            uuids.add(b["uuid"].replace("-", "").lower())
+        if b["discord_id"]:
+            ids.add(b["discord_id"])
+    return names, uuids, ids
+
+
 # ---------------------------------------------------------------- players
 def ranked_players(conn):
     """All players with points and competition-style rank (ties share a rank)."""
@@ -186,6 +276,10 @@ def ranked_players(conn):
         p["points"] = C.TIER_POINTS.get(p["tier"], 0)
         roles = {int(r) for r in json.loads(p.pop("member_roles") or "[]")}
         p["badges"] = [name for rid, name in C.BADGE_ROLES.items() if rid in roles]
+    names, uuids, ids = banned_keys(conn)
+    for p in rows:
+        p["banned"] = (p["name"].lower() in names or (p["uuid"] or "").replace("-", "").lower() in uuids
+                       or (p["discord_id"] or "") in ids)
     rows.sort(key=lambda p: (-p["points"], p["retired"], p["name"].lower()))
     rank = 0
     for i, p in enumerate(rows):
@@ -208,6 +302,7 @@ def public_player(p, detailed=False):
         "points": p["points"],
         "title": C.title_for(p["points"]),
         "badges": p["badges"],
+        "banned": p["banned"],
         "tiers": {"vanilla": {"tier": p["tier"], "points": p["points"], "retired": bool(p["retired"])}},
         "updatedAt": iso(p["updated_at"]),
     }
