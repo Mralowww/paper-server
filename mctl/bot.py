@@ -10,6 +10,7 @@ from discord import app_commands
 from . import bridge
 from . import config as C
 from . import db as D
+from . import links as L
 from . import panel as P
 
 log = logging.getLogger("mctl.bot")
@@ -81,7 +82,7 @@ class TierBot(discord.Client):
         self.tree.clear_commands(guild=None)
         await self.tree.sync()
         self.tree.clear_commands(guild=guild)
-        for cmd in (cmd_setuptier, cmd_setupapply, cmd_setupsupport, cmd_result, cmd_roleup):
+        for cmd in (cmd_setuptier, cmd_setupapply, cmd_setupsupport, cmd_result, cmd_roleup, cmd_verify):
             self.tree.add_command(cmd, guild=guild)
         synced = await self.tree.sync(guild=guild)
         log.info("Registered %d guild commands: %s", len(synced), ", ".join(c.name for c in synced))
@@ -412,10 +413,17 @@ class ApplyView(discord.ui.View):
         with conn() as c:
             block = application_block(c, interaction.user.id)
             ready = D.get_setting(c, "ticket_category_id")
+            link = L.link_for(c, interaction.user.id)
+            need_link = L.required(c)
         if block:
             return await reply(interaction, block)
         if not ready:
             return await reply(interaction, "⚠️ 考試系統尚未設定完成，請聯絡管理員。")
+        if link:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            return await start_ticket(interaction, {"name": link["mc_name"], "id": L.dashed(link["uuid"])})
+        if need_link:
+            return await reply(interaction, embed=verify_help_embed())
         modal = discord.ui.Modal(title="申請 Vanilla 考試", custom_id=APPLY_MODAL_ID, timeout=600)
         modal.add_item(discord.ui.TextInput(label="Minecraft ID", placeholder="例如：Steve", min_length=3,
                                             max_length=16, custom_id="mc_name"))
@@ -433,6 +441,21 @@ async def handle_apply(interaction: discord.Interaction, name):
         return await reply(interaction, "⚠️ 目前無法連線到 Mojang 驗證帳號，請稍後再試。")
     if not profile:
         return await reply(interaction, f"❌ 找不到 Minecraft 帳號 **{name}**，請確認拼字（需為正版 Java 帳號）。")
+    with conn() as c:
+        link = L.link_for(c, interaction.user.id)
+        need_link = L.required(c)
+        owner = L.link_by_uuid(c, profile["id"])
+    if link:  # linked after opening the form: always use the verified account
+        profile = {"name": link["mc_name"], "id": L.dashed(link["uuid"])}
+    elif need_link:
+        return await reply(interaction, embed=verify_help_embed())
+    elif owner and owner["discord_id"] != str(interaction.user.id):
+        return await reply(interaction, f"❌ **{profile['name']}** 已綁定其他 Discord 帳號，如有疑問請聯絡管理員。")
+    await start_ticket(interaction, profile)
+
+
+async def start_ticket(interaction: discord.Interaction, profile):
+    """Opens a test ticket for a verified Minecraft profile {'name', 'id'}; the interaction must be deferred."""
     user = interaction.user
     guild = interaction.guild
     with conn() as c:
@@ -498,6 +521,41 @@ async def handle_apply(interaction: discord.Interaction, name):
     ping = f"<@&{C.ROLE_SENIOR_TESTER}>" if high else f"<@&{C.ROLE_TESTER}>"
     await channel.send(f"{user.mention} {ping}", embed=embed, view=CloseView())
     await reply(interaction, f"✅ 已驗證 **{profile['name']}**，你的考試單：{channel.mention}")
+
+
+# ---------------------------------------------------------------- /verify
+def verify_help_embed():
+    embed = discord.Embed(
+        title="請先綁定 Minecraft 帳號",
+        color=0xF2C14E,
+        description=(f"申請考試前需要先綁定你的正版 Minecraft 帳號：\n\n"
+                     f"**1.** 用你的帳號進入伺服器 `{C.SERVER_ADDRESS}`\n"
+                     f"**2.** 畫面會顯示 6 位數驗證碼\n"
+                     f"**3.** 在這裡使用 `/verify 驗證碼`，或到 {C.BASE_URL}/me 輸入\n\n"
+                     "綁定完成後再按一次「申請考試」即可。"))
+    embed.set_footer(text="Mc.Tierlist.Asia")
+    return embed
+
+
+@app_commands.command(name="verify", description="輸入伺服器給你的驗證碼，綁定 Minecraft 帳號")
+@app_commands.describe(code="進入伺服器時顯示的 6 位數驗證碼")
+@app_commands.guild_only()
+async def cmd_verify(interaction: discord.Interaction, code: str):
+    user = interaction.user
+    actor = {"id": str(user.id), "username": user.display_name}
+    try:
+        with conn() as c:
+            link = L.redeem(c, actor, code)
+            player = c.execute("SELECT tier FROM players WHERE discord_id = ?", (str(user.id),)).fetchone()
+    except L.LinkError as exc:
+        return await reply(interaction, f"❌ {exc}")
+    embed = discord.Embed(title="綁定成功", color=0x3DDC97,
+                          description=f"{user.mention} 已綁定 Minecraft 帳號 **{link['mc_name']}**。\n之後申請考試會自動使用這個帳號。")
+    embed.set_thumbnail(url=f"{C.BASE_URL}/heads/avatar/{L.dashed(link['uuid'])}/128.png")
+    embed.set_footer(text="Mc.Tierlist.Asia")
+    await reply(interaction, embed=embed)
+    if player:
+        await sync_tier_role(user.id, player["tier"])
 
 
 # ---------------------------------------------------------------- /result

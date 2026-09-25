@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['bans', 'tab.bans', true, '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'],
     ['support', 'tab.support', true, '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'],
     ['tickets', 'tab.tickets', true, '<path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/>'],
+    ['links', 'tab.links', true, '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'],
     ['tests', 'tab.tests', true, '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>'],
     ['keys', 'tab.keys', perms.manageKeys, '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/>'],
     ['team', 'tab.team', true, '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'],
@@ -377,7 +378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <thead><tr><th>${t('col.name')}</th><th>Key</th><th>${t('col.status')}</th><th>${t('col.calls')}</th><th>${t('col.lastUsed')}</th><th>${t('col.createdBy')}</th><th></th></tr></thead>
               <tbody>${keys.map((k, i) => `
                 <tr style="animation-delay:${i * 0.03}s">
-                  <td><b>${esc(k.name)}</b><div class="muted" style="font-size:12px">${esc(fmtDate(k.created_at))}</div></td>
+                  <td><b>${esc(k.name)}</b>${k.scope === 'server' ? ` <span class="pill gold">${t('keys.server')}</span>` : ''}<div class="muted" style="font-size:12px">${esc(fmtDate(k.created_at))}</div></td>
                   <td class="mono muted">${esc(k.prefix)}…</td>
                   <td>${k.revoked ? `<span class="pill off">${t('keys.revoked')}</span>` : `<span class="pill on">${t('keys.active')}</span>`}</td>
                   <td class="mono">${k.usage_count.toLocaleString()}</td>
@@ -399,12 +400,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         <h3>${t('keys.createTitle')}</h3>
         <form id="keyForm">
           <div class="field"><label>${t('keys.nameLabel')}</label><input class="input" name="name" maxlength="48" placeholder="${t('keys.namePh')}" required></div>
+          <div class="field"><label>${t('keys.scope')}</label><select class="input" name="scope">
+            <option value="read">${t('keys.scopeRead')}</option><option value="server">${t('keys.scopeServer')}</option></select></div>
           <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-gold">${t('common.create')}</button></div>
         </form>`, (bg, close) => {
         $('#keyForm', bg).addEventListener('submit', async (e) => {
           e.preventDefault();
           try {
-            const { key } = await api('/keys', { method: 'POST', body: { name: e.target.name.value } });
+            const { key } = await api('/keys', { method: 'POST', body: { name: e.target.name.value, scope: e.target.scope.value } });
             close();
             showKey(key);
           } catch (err) { toast(err.message, 'err'); }
@@ -631,6 +634,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('#toggleApps', panel).addEventListener('click', async () => {
         try { saved(await api('/applications', { method: 'PUT', body: { open: !a.open } })); go('settings'); }
         catch (err) { toast(err.message, 'err'); }
+      });
+    },
+
+    async links(panel, arg) {
+      const q = arg ? decodeURIComponent(arg) : '';
+      const [{ links, total }, settings] = await Promise.all([
+        api(`/links${q ? `?q=${encodeURIComponent(q)}` : ''}`), perms.manageSettings ? api('/settings') : null]);
+      const req = settings?.linkRequired;
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head"><div><h2>${t('tab.links')}${readOnly}</h2><p>${t('links.subtitle', { n: total })}</p></div></div>
+          ${settings ? `<div class="apps-toggle card card-pad ${req ? 'is-open' : 'is-paused'}" style="margin-bottom:20px">
+            <div><h3>${t('links.reqT')}</h3><span class="st-pill ${req ? 'open' : 'closed'}"><i></i>${t(req ? 'links.reqOn' : 'links.reqOff')}</span>
+              <p class="muted" style="margin:8px 0 0;font-size:13px">${t('links.reqD')}</p></div>
+            <button class="btn ${req ? 'btn-danger' : 'btn-gold'}" id="toggleReq">${t(req ? 'links.disable' : 'links.enable')}</button>
+          </div>` : ''}
+          <form class="toolbar" id="linkSearch" style="margin-bottom:14px"><input class="input" name="q" value="${esc(q)}" placeholder="${t('links.search')}" style="max-width:420px"></form>
+          <div class="card">${links.length ? `<div class="table-wrap"><table class="data">
+            <thead><tr><th>Minecraft</th><th>Discord</th><th>${t('col.date')}</th><th></th></tr></thead>
+            <tbody>${links.map((l, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
+              <td><div class="cell-player"><img src="${avatarUrl(l.uuid, 32)}" alt="">${esc(l.mc_name)}</div><div class="mono muted" style="font-size:11px">${esc(l.uuid)}</div></td>
+              <td><div class="cell-player"><img src="${discordAvatar(l.discord_id, l.avatar)}" alt="" style="border-radius:50%">${esc(l.username || '—')}</div><div class="mono muted" style="font-size:11px">${esc(l.discord_id)}</div></td>
+              <td class="muted" style="font-size:13px">${esc(fmtDate(l.linked_at))}</td>
+              <td>${perms.managePlayers ? `<div class="actions"><button class="btn btn-sm btn-danger" data-unlink="${esc(l.discord_id)}" data-name="${esc(l.mc_name)}">${t('links.unlink')}</button></div>` : ''}</td>
+            </tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('links.empty')}</div>`}</div>
+        </div>`;
+      $('#linkSearch', panel).addEventListener('submit', (e) => { e.preventDefault(); go(`links/${encodeURIComponent(e.target.q.value.trim())}`); });
+      $('#toggleReq', panel)?.addEventListener('click', async () => {
+        try { await api('/link-required', { method: 'PUT', body: { on: !req } }); go(`links/${encodeURIComponent(q)}`); } catch (err) { toast(err.message, 'err'); }
+      });
+      panel.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-unlink]');
+        if (!b || !(await confirmDialog(t('links.unlinkT'), t('links.unlinkD', { name: esc(b.dataset.name) })))) return;
+        try { await api(`/links/${b.dataset.unlink}`, { method: 'DELETE' }); toast(t('links.unlinked')); go(`links/${encodeURIComponent(q)}`); } catch (err) { toast(err.message, 'err'); }
       });
     },
 

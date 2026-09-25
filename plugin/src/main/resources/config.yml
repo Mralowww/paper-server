@@ -1,0 +1,32 @@
+# ============================================================
+#  TierlistLink — Mc.Tierlist.Asia 帳號綁定插件
+# ============================================================
+
+# 網站網址（結尾不要加 /）
+api-url: "https://tierlist.asia"
+
+# 伺服器金鑰：網站後台 → API Keys → 建立金鑰，類型選「官方伺服器插件」
+server-key: ""
+
+# 沒綁定的玩家要不要踢出並顯示驗證碼
+#   true  = 踢出，畫面顯示驗證碼（綁定完才能進來玩）
+#   false = 允許進入，只在聊天室提示驗證碼
+require-link: true
+
+# OP 是否可以不用綁定就進入（封禁仍然有效）
+ops-bypass-link: true
+
+# 網站連不上時的處理方式
+#   true  = 讓玩家進入（網站掛掉時伺服器照常運作，但這段時間封禁不會生效）
+#   false = 拒絕進入
+fail-open: true
+
+# 連線逾時（毫秒）
+timeout-ms: 5000
+
+# 已綁定的玩家進服時，是否在聊天室顯示綁定的 Discord 名稱
+show-linked-message: false
+
+messages:
+  unavailable: "&c目前無法連線到 Mc.Tierlist.Asia，請稍後再試。"
+  linked: "&6[Tierlist] &f已綁定 Discord：&e{discord}"

@@ -38,6 +38,8 @@ def main():
     db.init()
     from mctl import ddns
     ddns.start()
+    from mctl import links
+    links.start()
     if C.DISCORD_BOT_TOKEN and C.GUILD_ID:
         threading.Thread(target=serve_web, name="web", daemon=True).start()
         from mctl import bot

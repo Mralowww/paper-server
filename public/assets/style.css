@@ -1123,3 +1123,25 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--gold)
 .ann-admin-row .ann { flex: 1; min-width: 0; }
 .ann-admin-row .meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 12px; }
 .site-save { display: flex; justify-content: flex-end; margin-top: 14px; }
+
+/* ---------- Minecraft account link ---------- */
+.pill.gold { background: rgba(242, 193, 78, 0.14); color: var(--gold-2); }
+.mc-link { margin-bottom: 18px; }
+.mc-link.linked { display: flex; gap: 16px; align-items: center; border-color: rgba(61, 220, 151, 0.25); background: linear-gradient(135deg, rgba(61, 220, 151, 0.07), transparent 60%); }
+.mc-link-head { width: 64px; height: 64px; border-radius: 14px; image-rendering: pixelated; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.6); flex: none; }
+.mc-link-body { min-width: 0; }
+.mc-link-name { font-family: var(--font-display); font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mc-link-uuid { font-size: 11.5px; word-break: break-all; }
+.mc-link-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.mc-link-top h3 { margin: 0; font-family: var(--font-display); font-size: 19px; }
+.mc-steps { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 10px; font-size: 14px; }
+.mc-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.mc-steps li > span { flex: none; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #1a1204; background: var(--gold-grad); }
+.mc-steps code { font-family: var(--font-mono); font-size: 12.5px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.06); }
+.ip-chip { border: 1px solid rgba(242, 193, 78, 0.3); background: rgba(242, 193, 78, 0.08); color: var(--gold-2); border-radius: 8px; padding: 2px 8px; font-size: 12.5px; cursor: pointer; margin-left: 4px; }
+.ip-chip:hover { background: rgba(242, 193, 78, 0.16); }
+.mc-code-row { display: flex; gap: 10px; }
+.mc-code { flex: 1; min-width: 0; font-size: 26px !important; font-weight: 800; letter-spacing: 0.5em; text-align: center; padding: 10px 12px !important; }
+.mc-code::placeholder { color: var(--dim); opacity: 0.5; }
+.shake { animation: shake 0.4s; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }

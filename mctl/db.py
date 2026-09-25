@@ -138,6 +138,19 @@ CREATE TABLE IF NOT EXISTS user_keys (
   last_used_at  INTEGER,
   usage_count   INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS mc_links (
+  discord_id  TEXT PRIMARY KEY,
+  uuid        TEXT NOT NULL UNIQUE,
+  mc_name     TEXT NOT NULL,
+  linked_at   INTEGER NOT NULL,
+  checked_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS link_codes (
+  code        TEXT PRIMARY KEY,
+  uuid        TEXT NOT NULL UNIQUE,
+  mc_name     TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT
@@ -151,6 +164,8 @@ MIGRATIONS = [
     ("players", "losses", "INTEGER NOT NULL DEFAULT 0"),
     # Last known roles while in the guild; survives leaving so /roleup can restore them.
     ("members", "saved_roles", "TEXT NOT NULL DEFAULT '[]'"),
+    # 'read' = developer API key, 'server' = the official Minecraft server plugin.
+    ("api_keys", "scope", "TEXT NOT NULL DEFAULT 'read'"),
 ]
 
 

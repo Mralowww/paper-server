@@ -1,0 +1,16 @@
+name: TierlistLink
+version: '${project.version}'
+main: asia.tierlist.link.TierlistLink
+api-version: '1.21'
+description: Mc.Tierlist.Asia — Discord 帳號綁定與封禁同步
+author: Mc.Tierlist.Asia
+website: https://tierlist.asia
+commands:
+  tierlist:
+    description: TierlistLink 管理指令
+    usage: /tierlist <reload|status>
+    permission: tierlist.admin
+permissions:
+  tierlist.admin:
+    description: 使用 /tierlist 管理指令
+    default: op

@@ -551,6 +551,53 @@
       ${extra}
     </div>`;
 
+  // ---------- Minecraft account link (My Profile) ----------
+  function linkCardHtml(d) {
+    if (d.link) {
+      return `<div class="mc-link linked card card-pad reveal">
+        <img class="mc-link-head" src="${avatarUrl(d.link.uuid, 96)}" alt="" onerror="${fallbackImg}">
+        <div class="mc-link-body"><div class="kicker">${t('link.title')}</div>
+          <div class="mc-link-name">${esc(d.link.name)} <span class="pill on">✓ ${t('link.linked')}</span></div>
+          <div class="mono muted mc-link-uuid">${esc(d.link.uuid)}</div>
+          <div class="muted" style="font-size:12px">${t('link.since', { date: esc(fmtDate(d.link.linkedAt)) })}</div></div>
+      </div>`;
+    }
+    return `<form class="mc-link card card-pad reveal" id="linkForm">
+      <div class="mc-link-top"><div><div class="kicker">${t('link.title')}</div><h3>${t('link.bindT')}</h3></div>
+        ${d.linkRequired ? `<span class="pill off">${t('link.required')}</span>` : ''}</div>
+      <ol class="mc-steps">
+        <li><span>1</span><div>${t('link.step1')} <button type="button" class="mono ip-chip" data-copy-ip>${esc(d.serverAddress)}</button></div></li>
+        <li><span>2</span><div>${t('link.step2')}</div></li>
+        <li><span>3</span><div>${t('link.step3')}</div></li>
+      </ol>
+      <div class="mc-code-row">
+        <input class="input mono mc-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required aria-label="${t('link.code')}">
+        <button class="btn btn-gold">${t('link.submit')}</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin:10px 0 0">${t('link.hint')}</p>
+    </form>`;
+  }
+
+  function bindLinkCard(root, onDone) {
+    const form = $('#linkForm', root);
+    if (!form) return;
+    form.code.addEventListener('input', () => { form.code.value = form.code.value.replace(/\D/g, '').slice(0, 6); });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('button.btn-gold', form);
+      btn.disabled = true;
+      try {
+        const { link } = await send('/api/me/link', 'POST', { code: form.code.value });
+        toast(t('link.done', { name: link.name }));
+        onDone();
+      } catch (err) {
+        toast(err.message, 'err');
+        form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+        btn.disabled = false;
+      }
+    });
+  }
+
   async function renderKeys(root) {
     let box = $('#keysBox', root);
     if (!box) {
@@ -728,6 +775,7 @@
               ? `<div class="modal pcard pcard-page">${playerCardHtml(d.player)}</div>`
               : emptyHtml(t('me.notLinkedT'), t('me.notLinkedD')).replace('reveal', '')}</div>
             <div class="me-side">
+              ${linkCardHtml(d)}
               <div class="kv2">
                 <div class="stat spot reveal" style="--d:.05s">${cd}</div>
                 <div class="stat spot reveal" style="--d:.1s">${ticket}</div>
@@ -741,6 +789,7 @@
               ]) : `<div class="card-pad muted">${t('me.noTests')}</div>`}</div>
             </div>
           </div>`;
+        bindLinkCard(root, () => pages.me());
         const { permissions: perms } = await session;
         if (perms.accountKeys) renderKeys(root);
       } catch {

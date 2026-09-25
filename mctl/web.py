@@ -20,6 +20,7 @@ from . import db as D
 from . import ddns
 from . import panel as P
 from . import site as S
+from . import links as L
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$", re.I)
@@ -69,6 +70,7 @@ class RateLimiter:
 
 api_limiter = RateLimiter(C.API_RATE_LIMIT)
 site_limiter = RateLimiter(C.SITE_RATE_LIMIT)
+server_limiter = RateLimiter(1200)  # the official server calls once per join
 
 app = Flask(__name__, static_folder=None)
 class OriginGuard:
@@ -478,7 +480,28 @@ def my_profile():
         "cooldownUntil": D.cooldown_until(conn, user["id"]),
         "openTicket": dict(ticket) if ticket else None,
         "guildId": str(C.GUILD_ID) if C.GUILD_ID else None,
+        "link": L.public_link(L.link_for(conn, user["id"])),
+        "linkRequired": L.required(conn),
+        "serverAddress": C.SERVER_ADDRESS,
     })
+
+
+@route("/api/me/link", methods=["POST"])
+def link_account():
+    allowed, headers = site_limiter.hit(f"link:{current_user()['id']}")
+    g.extra_headers = headers
+    if not allowed:
+        return error(429, "rate_limited")
+    conn = db()
+    try:
+        link = L.redeem(conn, current_user(), body().get("code"))
+    except L.LinkError as exc:
+        return bad(exc.code, str(exc))
+    player = conn.execute("SELECT tier FROM players WHERE discord_id = ?", (current_user()["id"],)).fetchone()
+    conn.commit()
+    if player:
+        bridge.submit(_sync_role, current_user()["id"], player["tier"])
+    return jsonify({"ok": True, "link": L.public_link(link)})
 
 
 @route("/api/tester/overview", perm="testerPanel")
@@ -635,7 +658,7 @@ def list_tests():
 @route("/api/admin/keys", perm="manageKeys")
 def list_keys():
     rows = db().execute("""
-        SELECT k.id, k.name, k.prefix, k.created_at, k.last_used_at, k.usage_count, k.revoked, k.created_by,
+        SELECT k.id, k.name, k.prefix, k.scope, k.created_at, k.last_used_at, k.usage_count, k.revoked, k.created_by,
                m.username AS created_by_name
         FROM api_keys k LEFT JOIN members m ON m.discord_id = k.created_by ORDER BY k.id DESC""").fetchall()
     return jsonify({"keys": [dict(r) for r in rows]})
@@ -646,11 +669,12 @@ def create_key():
     name = str(body().get("name") or "").strip()
     if not name or len(name) > 48:
         return bad("invalid_key_name", "請輸入 1–48 字的名稱")
-    key = f"mctl_{secrets.token_urlsafe(24)}"
+    scope = "server" if body().get("scope") == "server" else "read"
+    key = f"{'mctls' if scope == 'server' else 'mctl'}_{secrets.token_urlsafe(24)}"
     conn = db()
-    conn.execute("INSERT INTO api_keys (name, prefix, key_hash, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
-                 (name, key[:12], sha256(key), current_user()["id"], D.now_ms()))
-    D.audit(conn, current_user(), "key_create", name)
+    conn.execute("INSERT INTO api_keys (name, prefix, key_hash, created_by, created_at, scope) VALUES (?, ?, ?, ?, ?, ?)",
+                 (name, key[:12], sha256(key), current_user()["id"], D.now_ms(), scope))
+    D.audit(conn, current_user(), "key_create", f"{name} ({scope})")
     conn.commit()
     return jsonify({"key": key}), 201
 
@@ -704,6 +728,7 @@ def settings():
         "ticketCategory": D.get_setting(conn, "ticket_category_id"),
         "cooldownDays": C.TEST_COOLDOWN_DAYS,
         "discordInvite": discord_invite(conn),
+        "linkRequired": L.required(conn),
         "ddns": {"enabled": ddns.enabled(), **ddns.state},
     })
 
@@ -715,6 +740,92 @@ def audit_list():
     return jsonify({"entries": [dict(r) for r in rows]})
 
 
+
+
+# ---------------------------------------------------------------- official Minecraft server
+def server_key_ok():
+    key = request_api_key()
+    row = db().execute("SELECT id FROM api_keys WHERE key_hash = ? AND scope = 'server' AND revoked = 0",
+                       (sha256(key),)).fetchone() if key else None
+    if row:
+        db().execute("UPDATE api_keys SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?", (D.now_ms(), row["id"]))
+    return row
+
+
+def taipei_time(ms):
+    return time.strftime("%Y/%m/%d %H:%M", time.gmtime(ms / 1000 + 8 * 3600))
+
+
+BAN_KICK = "§c§l你已被封禁\n\n§7原因：§f{reason}\n§7期限：§f{until}\n\n§8申訴請至 {host}/support"
+LINK_KICK = ("§6§lMc.Tierlist.Asia\n\n§f進入伺服器前，請先綁定你的 Discord 帳號\n\n§7你的驗證碼\n§e§l{code}\n\n"
+             "§7到 §f{host}/me §7輸入驗證碼\n§7或在 Discord 使用 §f/verify {code}\n\n§8驗證碼 10 分鐘內有效")
+LINK_CHAT = "§6[Tierlist] §f你尚未綁定 Discord，驗證碼 §e§l{code}§r§f：到 §e{host}/me §f或在 Discord 使用 §e/verify {code}"
+
+
+@app.post("/api/server/join")
+def server_join():
+    """Called by the Paper plugin before a player joins: ban check, link code, name sync."""
+    allowed, headers = server_limiter.hit(f"ip:{request.remote_addr}")
+    g.extra_headers = headers
+    if not allowed:
+        return error(429, "rate_limited")
+    if not server_key_ok():
+        return error(401, "invalid_server_key")
+    data = body()
+    uuid, name = L.norm_uuid(str(data.get("uuid") or "")), str(data.get("name") or "")
+    if not re.fullmatch(r"[0-9a-f]{32}", uuid) or not re.fullmatch(r"[A-Za-z0-9_]{1,16}", name):
+        return bad("invalid_player", "uuid / name missing")
+    host = urllib.parse.urlsplit(C.BASE_URL).netloc
+    conn = db()
+    L.sync_name(conn, uuid, name)
+    link = L.link_by_uuid(conn, uuid)
+    ban = D.find_active_ban(conn, name=name, uuid=uuid, discord_id=link and link["discord_id"])
+    if ban:
+        conn.commit()
+        until = taipei_time(ban["expires_at"]) + "（台灣時間）" if ban["expires_at"] else "永久"
+        return jsonify({"allow": False, "reason": "banned",
+                        "kickMessage": BAN_KICK.format(reason=ban["reason"], until=until, host=host)})
+    if link:
+        conn.commit()
+        m = D.member(conn, link["discord_id"])
+        return jsonify({"allow": True, "linked": True,
+                        "discord": {"id": link["discord_id"], "name": m and m["username"]}})
+    code, expires = L.issue_code(conn, uuid, name)
+    conn.commit()
+    return jsonify({"allow": False, "reason": "unlinked", "linked": False, "code": code, "expiresAt": expires,
+                    "kickMessage": LINK_KICK.format(code=code, host=host),
+                    "chatMessage": LINK_CHAT.format(code=code, host=host)})
+
+
+@route("/api/admin/links", perm="viewStaff")
+def list_links():
+    q = (request.args.get("q") or "").strip()
+    like = f"%{q}%"
+    rows = db().execute("""
+        SELECT l.*, m.username, m.avatar FROM mc_links l LEFT JOIN members m ON m.discord_id = l.discord_id
+        WHERE ? = '' OR l.mc_name LIKE ? OR l.discord_id LIKE ? OR m.username LIKE ? OR l.uuid LIKE ?
+        ORDER BY l.linked_at DESC LIMIT 300""", (q, like, like, like, like.replace("-", ""))).fetchall()
+    total = db().execute("SELECT COUNT(*) FROM mc_links").fetchone()[0]
+    return jsonify({"total": total, "links": [{**dict(r), "uuid": L.dashed(r["uuid"])} for r in rows]})
+
+
+@route("/api/admin/links/<did>", methods=["DELETE"], perm="managePlayers")
+def delete_link(did):
+    conn = db()
+    if not L.unlink(conn, current_user(), did):
+        return error(404, "not_found")
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/link-required", methods=["PUT"], perm="manageSettings")
+def set_link_required():
+    on = bool(body().get("on"))
+    conn = db()
+    D.set_setting(conn, "link_required", "1" if on else "0")
+    D.audit(conn, current_user(), "link_required", "on" if on else "off")
+    conn.commit()
+    return jsonify({"ok": True, "linkRequired": on})
 
 
 # ---------------------------------------------------------------- pages & static files
