@@ -1,5 +1,6 @@
 """Flask website: public pages, developer API, member pages and the staff panel."""
 import hashlib
+import hmac
 import json
 import re
 import secrets
@@ -12,7 +13,6 @@ from datetime import timedelta
 from functools import wraps
 
 from flask import Flask, abort, g, jsonify, redirect, request, send_from_directory, session
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import bridge
 from . import config as C
@@ -70,7 +70,35 @@ api_limiter = RateLimiter(C.API_RATE_LIMIT)
 site_limiter = RateLimiter(C.SITE_RATE_LIMIT)
 
 app = Flask(__name__, static_folder=None)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+class OriginGuard:
+    """Trusts client IP/scheme headers only on requests that carry Cloudflare's secret header.
+
+    With ORIGIN_ENFORCE on, anything else (someone hitting the host's IP:port directly) is refused,
+    so Cloudflare can't be bypassed and client IPs can't be spoofed for rate limiting.
+    """
+
+    def __init__(self, wsgi):
+        self.wsgi = wsgi
+
+    def __call__(self, environ, start_response):
+        secret = C.ORIGIN_SECRET
+        trusted = bool(secret) and hmac.compare_digest(environ.pop("HTTP_X_ORIGIN_SECRET", ""), secret)
+        environ["mctl.via_cloudflare"] = trusted
+        if not trusted and secret and C.ORIGIN_ENFORCE:
+            start_response("403 Forbidden", [("Content-Type", "text/plain; charset=utf-8")])
+            return [b"Forbidden: please use https://tierlist.asia"]
+        if trusted or not C.ORIGIN_ENFORCE:
+            # Until enforcement is switched on, keep honouring Cloudflare's headers so rate limits stay per-visitor.
+            ip = environ.get("HTTP_CF_CONNECTING_IP")
+            if ip:
+                environ["REMOTE_ADDR"] = ip
+            proto = environ.get("HTTP_X_FORWARDED_PROTO")
+            if proto in ("http", "https"):
+                environ["wsgi.url_scheme"] = proto
+        return self.wsgi(environ, start_response)
+
+
+app.wsgi_app = OriginGuard(app.wsgi_app)
 app.config.update(
     SECRET_KEY=C.SESSION_SECRET,
     SESSION_COOKIE_NAME="mctl_session",
@@ -343,14 +371,26 @@ def refresh_member(user):
     db().commit()
 
 
+SAFE_NEXT_RE = re.compile(r"^/(?![/\\])[A-Za-z0-9\-._~/%?=&#]*$")
+
+
+def safe_next(nxt):
+    """Only same-site paths — rejects //host, /\\host and anything with odd characters."""
+    return nxt if isinstance(nxt, str) and SAFE_NEXT_RE.match(nxt) and "\\" not in nxt else "/"
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"ok": True, "viaCloudflare": bool(request.environ.get("mctl.via_cloudflare"))})
+
+
 @app.get("/auth/discord")
 def discord_login():
     if not C.DISCORD_CLIENT_ID or not C.DISCORD_CLIENT_SECRET:
         return redirect("/?login_error=not_configured")
     state = secrets.token_hex(16)
     session["oauth_state"] = state
-    nxt = request.args.get("next", "/")
-    session["login_next"] = nxt if nxt.startswith("/") and not nxt.startswith("//") else "/"
+    session["login_next"] = safe_next(request.args.get("next", "/"))
     params = urllib.parse.urlencode({
         "client_id": C.DISCORD_CLIENT_ID,
         "redirect_uri": C.DISCORD_REDIRECT_URI,

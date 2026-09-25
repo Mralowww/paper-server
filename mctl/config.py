@@ -50,6 +50,10 @@ OWNER_IDS = set(_list("SUPER_ADMIN_IDS", "995145509897523221"))
 API_RATE_LIMIT = _int("API_RATE_LIMIT_PER_MIN", 60)
 SITE_RATE_LIMIT = _int("SITE_RATE_LIMIT_PER_MIN", 240)
 TEST_COOLDOWN_DAYS = _int("TEST_COOLDOWN_DAYS", 7)
+# Origin protection: Cloudflare adds X-Origin-Secret (Transform Rule); only those requests are trusted.
+ORIGIN_SECRET = os.environ.get("ORIGIN_SECRET", "")
+ORIGIN_ENFORCE = os.environ.get("ORIGIN_ENFORCE", "false").lower() == "true"
+
 # Cloudflare dynamic DNS: keeps these A records pointed at this host's public IP.
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN", "")
 CF_ZONE_ID = os.environ.get("CF_ZONE_ID", "")
