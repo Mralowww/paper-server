@@ -5,3 +5,4 @@ venv/
 data/
 .env
 plugin/target/
+downloads/
