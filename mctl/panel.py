@@ -59,3 +59,56 @@ def applications_open(conn):
 
 def render(text):
     return text.replace("{cooldown}", str(C.TEST_COOLDOWN_DAYS))
+
+
+# ---------------------------------------------------------------- result embed template
+RESULT_DEFAULTS = {
+    "title": "{player} 的考試結果 🏆",
+    "tester": "考官",
+    "region": "地區",
+    "region_value": "台灣",
+    "username": "玩家名稱",
+    "previous": "原本段位",
+    "earned": "獲得段位",
+    "wins": "勝場",
+    "losses": "敗場",
+    "tier_format": "{level} Tier {n}",
+    "high": "高階",
+    "low": "低階",
+    "unranked": "未排名",
+    "footer": "Mc.Tierlist.Asia",
+}
+RESULT_LIMITS = {"title": 200, "tier_format": 60, "footer": 200}
+
+
+def load_result(conn):
+    raw = D.get_setting(conn, "result_template")
+    data = dict(RESULT_DEFAULTS)
+    if raw:
+        try:
+            data.update({k: v for k, v in json.loads(raw).items() if k in RESULT_DEFAULTS})
+        except ValueError:
+            pass
+    return data
+
+
+def validate_result(body):
+    out = {}
+    for key, default in RESULT_DEFAULTS.items():
+        value = str(body.get(key, default) or "").strip()
+        if not value or len(value) > RESULT_LIMITS.get(key, 100):
+            return None, key
+        out[key] = value
+    return out, None
+
+
+def save_result(conn, data):
+    D.set_setting(conn, "result_template", json.dumps(data, ensure_ascii=False))
+
+
+def tier_label(tpl, tier):
+    """LT5 → e.g. "低階 Tier 5" using the template; None → the unranked text."""
+    if not tier:
+        return tpl["unranked"]
+    return (tpl["tier_format"].replace("{code}", tier).replace("{n}", tier[2])
+            .replace("{level}", tpl["high"] if tier[0] == "H" else tpl["low"]))

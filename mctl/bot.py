@@ -29,7 +29,8 @@ def tracked_role_ids(member):
 
 
 def rank_name(tier):
-    return C.TIER_NAMES[tier] if tier else "Unranked"
+    with conn() as c:
+        return P.tier_label(P.load_result(c), tier)
 
 
 APPLY_MODAL_ID = "mctl:apply_modal"
@@ -214,18 +215,21 @@ async def sync_tier_role(discord_id, tier):
 
 
 def result_embed(mc_name, tester_id, prev_tier, new_tier, wins, losses, preview=False):
-    e = discord.Embed(title=f"{mc_name}'s Test Results 🏆", color=TIER_COLORS[new_tier[2]])
+    """Result embed built from the template edited in the staff settings."""
+    with conn() as c:
+        tpl = P.load_result(c)
+    e = discord.Embed(title=tpl["title"].replace("{player}", mc_name), color=TIER_COLORS[new_tier[2]])
     if preview:
         e.set_author(name="預覽 — 按下「確認發送」後才會發布")
     e.set_thumbnail(url=f"https://mc-heads.net/body/{mc_name}/128")
-    e.add_field(name="Tester:", value=f"<@{tester_id}>", inline=False)
-    e.add_field(name="Region:", value=REGION_LABEL, inline=False)
-    e.add_field(name="Username:", value=mc_name, inline=False)
-    e.add_field(name="Previous Rank:", value=rank_name(prev_tier), inline=False)
-    e.add_field(name="Rank Earned:", value=rank_name(new_tier), inline=False)
-    e.add_field(name="Wins:", value=str(wins), inline=True)
-    e.add_field(name="Losses:", value=str(losses), inline=True)
-    e.set_footer(text="Mc.Tierlist.Asia")
+    e.add_field(name=f"{tpl['tester']}:", value=f"<@{tester_id}>", inline=False)
+    e.add_field(name=f"{tpl['region']}:", value=tpl["region_value"], inline=False)
+    e.add_field(name=f"{tpl['username']}:", value=mc_name, inline=False)
+    e.add_field(name=f"{tpl['previous']}:", value=P.tier_label(tpl, prev_tier), inline=False)
+    e.add_field(name=f"{tpl['earned']}:", value=P.tier_label(tpl, new_tier), inline=False)
+    e.add_field(name=f"{tpl['wins']}:", value=str(wins), inline=True)
+    e.add_field(name=f"{tpl['losses']}:", value=str(losses), inline=True)
+    e.set_footer(text=tpl["footer"])
     e.timestamp = discord.utils.utcnow()
     return e
 
@@ -581,7 +585,7 @@ def confirm_view(channel_id, tier, wins, losses):
 class ResultTierSelect(discord.ui.DynamicItem[discord.ui.Select], template=r"mctl:rt:(?P<ch>\d+)"):
     def __init__(self, channel_id, draft=None):
         if draft:
-            options = [discord.SelectOption(label=f"{t} • {C.TIER_NAMES[t]}", value=t, default=(t == draft.new_tier),
+            options = [discord.SelectOption(label=f"{t} • {rank_name(t)}", value=t, default=(t == draft.new_tier),
                                             description="目前段位" if t == draft.prev_tier else None)
                        for t in reversed(draft.allowed)]
         else:

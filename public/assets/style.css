@@ -898,7 +898,7 @@ textarea.input { height: auto; padding: 10px 12px; border: 1px solid var(--borde
 .color-row { display: flex; gap: 10px; align-items: center; }
 .color-row input[type=color] { width: 46px; height: 42px; padding: 0; border: 1px solid var(--border-strong); border-radius: 10px; background: none; cursor: pointer; }
 .dc-preview-wrap { position: sticky; top: 90px; }
-#dcPreview { padding: 16px; border-radius: 14px; background: #313338; font-family: 'gg sans', 'Noto Sans TC', var(--font); }
+#dcPreview, .dc-preview { padding: 16px; border-radius: 14px; background: #313338; font-family: 'gg sans', 'Noto Sans TC', var(--font); }
 .dc-msg { display: flex; gap: 14px; }
 .dc-avatar { width: 40px; height: 40px; border-radius: 50%; background: #1e1f22; padding: 6px; flex: none; }
 .dc-body { min-width: 0; flex: 1; }
@@ -1043,3 +1043,9 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--gold)
 
 .nsel .nsel-dot { flex: 0 0 10px; width: 10px; height: 10px; }
 .nsel-btn > span:not(.nsel-dot) { flex: 1; }
+
+.dc-embed.with-thumb { position: relative; padding-right: 100px; }
+.dc-thumb { position: absolute; top: 12px; right: 12px; width: 76px; height: auto; image-rendering: pixelated; }
+.dc-inline { display: flex; gap: 40px; }
+.dc-field.inline { margin-top: 10px; }
+.dc-mention { background: rgba(88, 101, 242, 0.3); color: #c9cdfb; border-radius: 3px; padding: 0 2px; }

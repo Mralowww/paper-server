@@ -1229,6 +1229,23 @@ def set_applications():
     return jsonify({"ok": True, "panelUpdated": bool(posted), "botError": bool(err)})
 
 
+@route("/api/admin/result-template", perm="viewStaff")
+def get_result_template():
+    return jsonify({"template": P.load_result(db()), "defaults": P.RESULT_DEFAULTS})
+
+
+@route("/api/admin/result-template", methods=["PUT"], perm="manageSettings")
+def set_result_template():
+    tpl, bad_field = P.validate_result(body())
+    if bad_field:
+        return bad("invalid_template", f"欄位不可空白或過長：{bad_field}")
+    conn = db()
+    P.save_result(conn, tpl)
+    D.audit(conn, current_user(), "result_template_update", tpl["title"])
+    conn.commit()
+    return jsonify({"ok": True})
+
+
 @route("/api/admin/tickets", perm="viewStaff")
 def list_tickets():
     status = request.args.get("status", "open")

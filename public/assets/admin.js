@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     async settings(panel) {
-      const [s, a] = await Promise.all([api('/settings'), api('/applications')]);
+      const [s, a, rt] = await Promise.all([api('/settings'), api('/applications'), api('/result-template')]);
       const ch = (id) => (id ? `<span class="mono">#${esc(id)}</span>${s.guildId ? ` <a class="btn btn-sm" href="https://discord.com/channels/${s.guildId}/${id}" target="_blank" rel="noopener">↗</a>` : ''}` : `<span class="muted">${t('settings.notSet')}</span>`);
       const row = (label, value) => `<div class="set-row"><span>${label}</span><div>${value}</div></div>`;
       const field = (key, multi) => `<div class="field"><label>${t(`panel.f.${key}`)}</label>${multi
@@ -528,8 +528,60 @@ document.addEventListener('DOMContentLoaded', async () => {
             </form>
             <div class="dc-preview-wrap"><div class="muted" style="font-size:12px;font-weight:700;letter-spacing:.12em;margin-bottom:8px">${t('panel.preview').toUpperCase()}</div><div id="dcPreview"></div></div>
           </div>
+
+          <div class="panel-head" style="margin-top:34px"><div><h2 style="font-size:20px">${t('rt.title')}</h2><p>${t('rt.desc')}</p></div></div>
+          <div class="panel-editor">
+            <form class="card card-pad" id="rtForm">
+              <div class="field"><label>${t('rt.f.title')}</label><input class="input" name="title" value="${esc(rt.template.title)}"></div>
+              <div class="row2">
+                ${['tester', 'region', 'username', 'previous', 'earned', 'wins', 'losses'].map((k) => `<div class="field"><label>${t(`rt.f.${k}`)}</label><input class="input" name="${k}" value="${esc(rt.template[k])}"></div>`).join('')}
+                <div class="field"><label>${t('rt.f.region_value')}</label><input class="input" name="region_value" value="${esc(rt.template.region_value)}"></div>
+              </div>
+              <div class="field"><label>${t('rt.f.tier_format')}</label><input class="input mono" name="tier_format" value="${esc(rt.template.tier_format)}"><small class="muted">${t('rt.tierHint')}</small></div>
+              <div class="row2">
+                <div class="field"><label>${t('rt.f.high')}</label><input class="input" name="high" value="${esc(rt.template.high)}"></div>
+                <div class="field"><label>${t('rt.f.low')}</label><input class="input" name="low" value="${esc(rt.template.low)}"></div>
+                <div class="field"><label>${t('rt.f.unranked')}</label><input class="input" name="unranked" value="${esc(rt.template.unranked)}"></div>
+                <div class="field"><label>${t('rt.f.footer')}</label><input class="input" name="footer" value="${esc(rt.template.footer)}"></div>
+              </div>
+              <div class="modal-actions"><button type="button" class="btn" id="resetRt">${t('panel.reset')}</button><button class="btn btn-gold">${t('common.save')}</button></div>
+            </form>
+            <div class="dc-preview-wrap"><div class="muted" style="font-size:12px;font-weight:700;letter-spacing:.12em;margin-bottom:8px">${t('panel.preview').toUpperCase()}</div><div id="rtPreview" class="dc-preview"></div></div>
+          </div>
           <p class="muted" style="font-size:14px;margin-top:14px">${t('settings.howto')}</p>
         </div>`;
+      const rtForm = $('#rtForm', panel);
+      const rtKeys = Object.keys(rt.defaults);
+      const rtValues = () => Object.fromEntries(rtKeys.map((k) => [k, rtForm[k].value]));
+      const tierLabel = (v, tier) => (tier ? v.tier_format.replaceAll('{code}', tier).replaceAll('{n}', tier[2]).replaceAll('{level}', tier[0] === 'H' ? v.high : v.low) : v.unranked);
+      const rtPreview = () => {
+        const v = rtValues();
+        const f = (name, value, inline) => `<div class="dc-field ${inline ? 'inline' : ''}"><b>${esc(name)}:</b><div class="dc-text">${value}</div></div>`;
+        $('#rtPreview', panel).innerHTML = `
+          <div class="dc-msg"><img class="dc-avatar" src="/assets/cube.svg" alt=""><div class="dc-body">
+            <div class="dc-name">TierTest <span class="dc-bot">BOT</span></div>
+            <div class="dc-text" style="margin-bottom:4px"><span class="dc-mention">@Steve</span></div>
+            <div class="dc-embed with-thumb" style="border-left-color:#8a93a6">
+              <img class="dc-thumb" src="https://mc-heads.net/body/Steve/128" alt="">
+              <div class="dc-title">${esc(v.title.replaceAll('{player}', 'Steve'))}</div>
+              ${f(v.tester, `<span class="dc-mention">@${esc(me.username)}</span>`)}
+              ${f(v.region, esc(v.region_value))}
+              ${f(v.username, 'Steve')}
+              ${f(v.previous, esc(tierLabel(v, 'LT3')))}
+              ${f(v.earned, esc(tierLabel(v, 'HT2')))}
+              <div class="dc-inline">${f(v.wins, '3', true)}${f(v.losses, '1', true)}</div>
+              <div class="dc-footer">${esc(v.footer)}</div>
+            </div>
+          </div></div>`;
+      };
+      rtForm.addEventListener('input', rtPreview);
+      rtPreview();
+      $('#resetRt', panel).addEventListener('click', () => { rtKeys.forEach((k) => { rtForm[k].value = rt.defaults[k]; }); rtPreview(); });
+      rtForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try { await api('/result-template', { method: 'PUT', body: rtValues() }); toast(t('rt.saved')); }
+        catch (err) { toast(err.message, 'err'); }
+      });
       const form = $('#panelForm', panel);
       const md = (x) => esc(x.replaceAll('{cooldown}', s.cooldownDays)).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^- /gm, '• ').replace(/\n/g, '<br>');
       const values = () => Object.fromEntries(['title', 'description', 'rules_title', 'rules', 'types_title', 'types', 'button', 'paused_button', 'color'].map((k) => [k, form[k].value]));
