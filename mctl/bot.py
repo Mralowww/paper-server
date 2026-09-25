@@ -224,16 +224,17 @@ async def cmd_setupapply(interaction: discord.Interaction, channel: discord.Text
     if not category.permissions_for(me).manage_channels:
         return await reply(interaction, f"❌ 機器人在類別「{category.name}」沒有「管理頻道」權限。")
     embed = discord.Embed(
-        title="📝 考試申請 · Tier Test",
+        title="Vanilla 考試申請",
         color=0xF2C14E,
-        description=(
-            "點擊下方按鈕並輸入你的 **Minecraft ID** 即可申請 Vanilla 考試。\n\n"
-            f"⏳ **冷卻時間**：每次考試結果發出後需等待 **{C.TEST_COOLDOWN_DAYS} 天**\n"
-            "🟢 **普通考試**：目前段位 **LT3 以下**（含未排名），由考官負責\n"
-            "🟣 **高階考試**：目前段位 **HT3 以上**，由高階考官負責\n\n"
-            "送出後系統會自動驗證帳號並為你建立專屬考試頻道。"
-        ),
+        description="點擊下方按鈕並輸入你的 Minecraft ID，即可申請 Vanilla 考試。",
     )
+    embed.add_field(name="申請須知", inline=False, value=(
+        f"- 考試結果公布後，需等待 {C.TEST_COOLDOWN_DAYS} 天才能再次申請\n"
+        "- 請使用正版 Java 帳號的 ID，系統會自動驗證\n"
+        "- 送出後會為你建立專屬的考試頻道"))
+    embed.add_field(name="考試類型", inline=False, value=(
+        "- 一般考試：目前段位 LT3 以下（含未排名），由考官負責\n"
+        "- 高階考試：目前段位 HT3 以上，由高階考官負責"))
     embed.set_footer(text="Mc.Tierlist.Asia")
     await channel.send(embed=embed, view=ApplyView())
     with conn() as c:
@@ -338,7 +339,7 @@ class ApplyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="申請考試", emoji="📝", style=discord.ButtonStyle.success, custom_id="mctl:apply")
+    @discord.ui.button(label="申請考試", style=discord.ButtonStyle.success, custom_id="mctl:apply")
     async def apply(self, interaction: discord.Interaction, _button):
         with conn() as c:
             block = application_block(c, interaction.user.id)
