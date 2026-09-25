@@ -695,6 +695,21 @@ def assets(filename):
     return send_from_directory(C.PUBLIC / "assets", filename, max_age=3600)
 
 
+MANAGE_BLOCK_RE = re.compile(r"<!--MANAGE-->.*?<!--/MANAGE-->", re.S)
+
+
+@app.get("/docs")
+def docs_page():
+    """The Management API section is only sent to staff and testers who can hold account keys."""
+    html = (C.PUBLIC / "docs.html").read_text(encoding="utf-8")
+    if not key_eligible(current_user()):
+        html = MANAGE_BLOCK_RE.sub("", html)
+    resp = app.response_class(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = "private, no-cache"
+    resp.headers["Vary"] = "Cookie"
+    return resp
+
+
 @app.get("/<name>")
 def named_page(name):
     if re.fullmatch(r"[a-z0-9-]+", name) and name != "404" and (C.PUBLIC / f"{name}.html").is_file():

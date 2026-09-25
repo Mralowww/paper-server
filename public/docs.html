@@ -18,7 +18,7 @@
 <main class="container docs">
   <nav>
     <a href="#auth" data-i18n="docs.nav.auth"></a><a href="#limits" data-i18n="docs.nav.limits"></a><a href="#stats" data-i18n="docs.nav.stats"></a><a href="#modes" data-i18n="docs.nav.modes"></a>
-    <a href="#rankings" data-i18n="docs.nav.rankings"></a><a href="#player" data-i18n="docs.nav.player"></a><a href="#bans" data-i18n="docs.nav.bans"></a><a href="#manage" data-i18n="docs.nav.manage"></a><a href="#errors" data-i18n="docs.nav.errors"></a><a href="#examples" data-i18n="docs.nav.examples"></a>
+    <a href="#rankings" data-i18n="docs.nav.rankings"></a><a href="#player" data-i18n="docs.nav.player"></a><a href="#bans" data-i18n="docs.nav.bans"></a><!--MANAGE--><a href="#manage" data-i18n="docs.nav.manage"></a><!--/MANAGE--><a href="#errors" data-i18n="docs.nav.errors"></a><a href="#examples" data-i18n="docs.nav.examples"></a>
   </nav>
   <article>
     <div class="kicker reveal">Developer API · v1</div>
@@ -95,6 +95,7 @@
   }
 }</pre></div>
 
+    <!--MANAGE-->
     <h2 id="manage" data-i18n="docs.nav.manage"></h2>
     <p data-i18n-html="docs.manage"></p>
     <div class="code"><div class="code-head">HTTP Header<button class="copy-btn">複製</button></div><pre>Authorization: Bearer mctlu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</pre></div>
@@ -115,6 +116,7 @@
     <div class="code"><div class="code-head">bash<button class="copy-btn">複製</button></div><pre>curl -X POST -H <span class="s">"Authorization: Bearer mctlu_…"</span> -H <span class="s">"Content-Type: application/json"</span> \
   -d <span class="s">'{"name":"Steve","tier":"LT3","wins":3,"losses":1}'</span> \
   <span class="s">"<span class="base-url"></span>/api/results"</span></pre></div>
+    <!--/MANAGE-->
 
     <h2 id="errors" data-i18n="docs.nav.errors"></h2>
     <table class="simple"><tr><th data-i18n="docs.th.status"></th><th>error</th><th data-i18n="docs.th.desc"></th></tr>
