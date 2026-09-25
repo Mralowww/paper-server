@@ -1,16 +1,13 @@
 # Mc.Tierlist.Asia
 
-亞洲 Minecraft Vanilla PvP Tier 排行榜，包含：
+Minecraft Vanilla PvP Tier 排行榜 + Discord 考試機器人。
 
-- **公開網站**：首頁、排行榜（地區／Tier 篩選、搜尋）、玩家頁、開發者 API 文件
-- **開發者 API**（`/api/v1`）：需要 API Key，每把 Key 每分鐘 60 次請求
-- **管理後台**（`/admin`）：Discord 登入，管理玩家 Tier、API Key、管理員，並保留操作紀錄
+- **網站**：首頁、排行榜、玩家卡片、開發者 API 文件；中文／English／Tiếng Việt
+- **會員頁**（Discord 登入）：我的資料、考官面板、管理後台，依 Discord 身分組顯示不同內容
+- **開發者 API**（`/api/v1`）：需要 API Key
+- **Discord 機器人**：考試申請、考試單、`/result`、`/setuptier`、`/setupapply`、`/roleup`
 
-## 需求
-
-- Python **3.9 以上**（資料庫使用內建 SQLite，不需另外安裝）
-
-## 安裝與啟動
+## 啟動
 
 ```bash
 pip install -r requirements.txt
@@ -18,24 +15,36 @@ cp .env.example .env   # 填入設定
 python app.py
 ```
 
-- 伺服器使用 waitress，監聽 `PORT`（或託管提供的 `SERVER_PORT`），預設 3000。
-- 資料存放在 `data/tierlist.db`，請定期備份這個資料夾。
+設定了 `DISCORD_BOT_TOKEN` 與 `DISCORD_GUILD_ID` 時，網站與機器人會在同一個程式中執行；否則只啟動網站。資料存在 `data/tierlist.db`。
 
-## Discord 登入設定
+## Discord 設定
 
-1. 到 <https://discord.com/developers/applications> 建立 Application
-2. OAuth2 → 把 **Client ID** 與 **Client Secret** 填到 `.env`
-3. OAuth2 → Redirects 加入 `{BASE_URL}/auth/discord/callback`
+1. Developer Portal → Bot：開啟 **Server Members Intent**
+2. OAuth2 → Redirects 加入 `{BASE_URL}/auth/discord/callback`
+3. 邀請機器人（權限：管理頻道、管理身分組、發送訊息、嵌入連結），並把機器人身分組拉到所有 Tier 身分組之上
+4. 在伺服器使用 `/setuptier <頻道>` 與 `/setupapply <頻道> <類別>`
 
-## 權限
+## 機器人指令
 
-| 角色 | 可以做的事 |
+| 指令 | 權限 | 說明 |
+| --- | --- | --- |
+| `/setuptier <頻道>` | 管理員以上 | 設定考試結果發送頻道 |
+| `/setupapply <頻道> <類別>` | 管理員以上 | 放置「申請考試」按鈕並設定考試單類別 |
+| `/result` | 考官／高階考官 | 在考試單內登錄結果：選段位 → 輸入比分 → 預覽確認 |
+| `/roleup` | 所有人 | 依資料庫恢復身分組；管理身分組需創始人／開發者核准 |
+
+- 考官可給 LT5～LT3，高階考官可給 LT5～HT1
+- 目前段位 HT3 以上的申請為高階考試，只有高階考官看得到
+- 考試結果發出後開始 7 天冷卻
+
+## 網站權限
+
+| 身分 | 可以看到 |
 | --- | --- |
-| 超級管理員 | 所有功能 + 新增／移除管理員、變更權限 |
-| 管理員 | 管理玩家、API Key，查看紀錄 |
-
-`SUPER_ADMIN_IDS` 裡的帳號受保護，無法在後台被移除或降級。
-
-## 反向代理
-
-若放在 Nginx / Cloudflare 後方，請轉發 `Host` 與 `X-Forwarded-*` 標頭。`BASE_URL` 使用 `https://` 時，登入 Cookie 會自動設為 Secure。
+| 訪客 | 排行榜、玩家卡片 |
+| 登入成員 | ＋ 我的資料、勝敗場 |
+| 考官 | ＋ 考官面板 |
+| 小幫手 | ＋ 後台唯讀 |
+| Moderator | ＋ 管理玩家、重置冷卻 |
+| 管理員 | ＋ API Key、設定 |
+| 創始人／開發者 | 全部 |

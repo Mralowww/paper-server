@@ -9,51 +9,52 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Press+Start+2P&family=JetBrains+Mono:wght@500;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
+<script src="/assets/i18n.js" defer></script>
 <script src="/assets/main.js" defer></script>
-<title>開發者 API · Mc.Tierlist.Asia</title>
+<title>Developer API · Mc.Tierlist.Asia</title>
 </head>
 <body data-page="docs">
 <main class="container docs">
   <nav>
-    <a href="#auth">驗證</a><a href="#limits">速率限制</a><a href="#stats">統計</a><a href="#modes">模式與 Tier</a>
-    <a href="#rankings">排行榜</a><a href="#player">玩家查詢</a><a href="#errors">錯誤碼</a><a href="#examples">範例程式</a>
+    <a href="#auth" data-i18n="docs.nav.auth"></a><a href="#limits" data-i18n="docs.nav.limits"></a><a href="#stats" data-i18n="docs.nav.stats"></a><a href="#modes" data-i18n="docs.nav.modes"></a>
+    <a href="#rankings" data-i18n="docs.nav.rankings"></a><a href="#player" data-i18n="docs.nav.player"></a><a href="#errors" data-i18n="docs.nav.errors"></a><a href="#examples" data-i18n="docs.nav.examples"></a>
   </nav>
   <article>
     <div class="kicker reveal">Developer API · v1</div>
-    <h1 class="reveal" style="--d:.05s">開發者 API</h1>
-    <p class="reveal" style="--d:.1s">透過 REST API 讀取 Mc.Tierlist.Asia 的排行榜與玩家資料。所有回應皆為 JSON，Base URL 為 <code><span class="base-url"></span>/api/v1</code>。</p>
+    <h1 class="reveal" style="--d:.05s" data-i18n="docs.title"></h1>
+    <p class="reveal" style="--d:.1s"><span data-i18n="docs.intro"></span> Base URL: <code><span class="base-url"></span>/api/v1</code></p>
 
-    <h2 id="auth">驗證</h2>
-    <p>每個請求都必須附上 API Key。請聯絡管理員申請，Key 只會在建立時顯示一次，請妥善保存，不要公開在前端程式碼中。</p>
+    <h2 id="auth" data-i18n="docs.nav.auth"></h2>
+    <p data-i18n="docs.auth"></p>
     <div class="code"><div class="code-head">HTTP Header<button class="copy-btn">複製</button></div><pre>X-API-Key: mctl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</pre></div>
-    <p>也可以使用 <code>Authorization: Bearer &lt;key&gt;</code>。</p>
+    <p data-i18n-html="docs.authAlt"></p>
 
-    <h2 id="limits">速率限制</h2>
-    <p>每把 Key 每分鐘最多 60 次請求。回應標頭會包含：</p>
-    <table class="simple"><tr><th>Header</th><th>說明</th></tr>
-      <tr><td><code>X-RateLimit-Limit</code></td><td>每分鐘上限</td></tr>
-      <tr><td><code>X-RateLimit-Remaining</code></td><td>本分鐘剩餘次數</td></tr>
-      <tr><td><code>X-RateLimit-Reset</code></td><td>重置時間（Unix 秒）</td></tr></table>
+    <h2 id="limits" data-i18n="docs.nav.limits"></h2>
+    <p data-i18n="docs.limits"></p>
+    <table class="simple"><tr><th>Header</th><th data-i18n="docs.th.desc"></th></tr>
+      <tr><td><code>X-RateLimit-Limit</code></td><td data-i18n="docs.rl.limit"></td></tr>
+      <tr><td><code>X-RateLimit-Remaining</code></td><td data-i18n="docs.rl.remaining"></td></tr>
+      <tr><td><code>X-RateLimit-Reset</code></td><td data-i18n="docs.rl.reset"></td></tr></table>
 
-    <h2 id="stats">統計</h2>
-    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/stats</span><span class="desc">網站整體統計</span></div>
-    <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{ <span class="k">"players"</span>: <span class="n">128</span>, <span class="k">"tier1"</span>: <span class="n">6</span>, <span class="k">"tier2"</span>: <span class="n">14</span>, <span class="k">"regions"</span>: <span class="n">1</span>, <span class="k">"modes"</span>: <span class="n">1</span> }</pre></div>
+    <h2 id="stats" data-i18n="docs.nav.stats"></h2>
+    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/stats</span><span class="desc" data-i18n="docs.ep.stats"></span></div>
+    <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{ <span class="k">"players"</span>: <span class="n">128</span>, <span class="k">"tier1"</span>: <span class="n">6</span>, <span class="k">"tier2"</span>: <span class="n">14</span>, <span class="k">"regions"</span>: <span class="n">1</span>, <span class="k">"modes"</span>: <span class="n">1</span>, <span class="k">"tests"</span>: <span class="n">342</span> }</pre></div>
 
-    <h2 id="modes">模式與 Tier</h2>
-    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/modes</span><span class="desc">可用模式、Tier 積分表與地區代碼</span></div>
-    <table class="simple"><tr><th>Tier</th><th>積分</th><th>Tier</th><th>積分</th></tr>
+    <h2 id="modes" data-i18n="docs.nav.modes"></h2>
+    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/modes</span><span class="desc" data-i18n="docs.ep.modes"></span></div>
+    <table class="simple"><tr><th>Tier</th><th data-i18n="docs.th.points"></th><th>Tier</th><th data-i18n="docs.th.points"></th></tr>
       <tr><td>HT1</td><td>60</td><td>LT1</td><td>45</td></tr><tr><td>HT2</td><td>30</td><td>LT2</td><td>20</td></tr>
       <tr><td>HT3</td><td>10</td><td>LT3</td><td>6</td></tr><tr><td>HT4</td><td>4</td><td>LT4</td><td>3</td></tr>
       <tr><td>HT5</td><td>2</td><td>LT5</td><td>1</td></tr></table>
 
-    <h2 id="rankings">排行榜</h2>
-    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/rankings/vanilla</span><span class="desc">依積分排序的玩家列表</span></div>
-    <table class="simple"><tr><th>參數</th><th>說明</th></tr>
-      <tr><td><code>limit</code></td><td>每頁筆數，1–100，預設 50</td></tr>
-      <tr><td><code>offset</code></td><td>略過筆數，預設 0</td></tr>
-      <tr><td><code>region</code></td><td>地區代碼，目前只有 <code>TW</code>（台灣）</td></tr>
-      <tr><td><code>tier</code></td><td>精確 Tier（<code>HT1</code>）或 Tier 群組（<code>1</code> = HT1 + LT1）</td></tr>
-      <tr><td><code>search</code></td><td>玩家名稱關鍵字</td></tr></table>
+    <h2 id="rankings" data-i18n="docs.nav.rankings"></h2>
+    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/rankings/vanilla</span><span class="desc" data-i18n="docs.ep.rankings"></span></div>
+    <table class="simple"><tr><th data-i18n="docs.th.param"></th><th data-i18n="docs.th.desc"></th></tr>
+      <tr><td><code>limit</code></td><td data-i18n="docs.p.limit"></td></tr>
+      <tr><td><code>offset</code></td><td data-i18n="docs.p.offset"></td></tr>
+      <tr><td><code>region</code></td><td data-i18n-html="docs.p.region"></td></tr>
+      <tr><td><code>tier</code></td><td data-i18n-html="docs.p.tier"></td></tr>
+      <tr><td><code>search</code></td><td data-i18n="docs.p.search"></td></tr></table>
     <div class="code"><div class="code-head">Response<button class="copy-btn">複製</button></div><pre>{
   <span class="k">"mode"</span>: <span class="s">"vanilla"</span>,
   <span class="k">"total"</span>: <span class="n">1</span>, <span class="k">"limit"</span>: <span class="n">50</span>, <span class="k">"offset"</span>: <span class="n">0</span>,
@@ -65,26 +66,28 @@
       <span class="k">"region"</span>: <span class="s">"TW"</span>,
       <span class="k">"points"</span>: <span class="n">60</span>,
       <span class="k">"title"</span>: <span class="s">"Combat Specialist"</span>,
+      <span class="k">"badges"</span>: [<span class="s">"booster"</span>],
       <span class="k">"tiers"</span>: { <span class="k">"vanilla"</span>: { <span class="k">"tier"</span>: <span class="s">"HT1"</span>, <span class="k">"points"</span>: <span class="n">60</span>, <span class="k">"retired"</span>: <span class="n">false</span> } },
+      <span class="k">"stats"</span>: { <span class="k">"wins"</span>: <span class="n">12</span>, <span class="k">"losses"</span>: <span class="n">4</span> },
       <span class="k">"updatedAt"</span>: <span class="s">"2026-09-25T08:00:00.000Z"</span>
     }
   ]
 }</pre></div>
-    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/players</span><span class="desc">同上（Vanilla 排行榜的別名）</span></div>
+    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/players</span><span class="desc" data-i18n="docs.ep.alias"></span></div>
 
-    <h2 id="player">玩家查詢</h2>
-    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/players/{name 或 uuid}</span><span class="desc">單一玩家資料（不分大小寫）</span></div>
-    <p>回應格式與排行榜中的單一玩家物件相同；找不到時回傳 <code>404 player_not_found</code>。</p>
+    <h2 id="player" data-i18n="docs.nav.player"></h2>
+    <div class="endpoint"><span class="method">GET</span><span class="path">/api/v1/players/{name | uuid}</span><span class="desc" data-i18n="docs.ep.player"></span></div>
+    <p data-i18n-html="docs.playerNote"></p>
 
-    <h2 id="errors">錯誤碼</h2>
-    <table class="simple"><tr><th>狀態</th><th>error</th><th>說明</th></tr>
-      <tr><td>401</td><td><code>missing_api_key</code></td><td>沒有附上 API Key</td></tr>
-      <tr><td>401</td><td><code>invalid_api_key</code></td><td>Key 錯誤或已被停用</td></tr>
-      <tr><td>400</td><td><code>invalid_region</code></td><td>地區代碼錯誤</td></tr>
-      <tr><td>404</td><td><code>player_not_found</code></td><td>找不到玩家</td></tr>
-      <tr><td>429</td><td><code>rate_limited</code></td><td>超過速率限制，請依 <code>Retry-After</code> 等待</td></tr></table>
+    <h2 id="errors" data-i18n="docs.nav.errors"></h2>
+    <table class="simple"><tr><th data-i18n="docs.th.status"></th><th>error</th><th data-i18n="docs.th.desc"></th></tr>
+      <tr><td>401</td><td><code>missing_api_key</code></td><td data-i18n="docs.err.missing"></td></tr>
+      <tr><td>401</td><td><code>invalid_api_key</code></td><td data-i18n="docs.err.invalid"></td></tr>
+      <tr><td>400</td><td><code>invalid_region</code></td><td data-i18n="docs.err.region"></td></tr>
+      <tr><td>404</td><td><code>player_not_found</code></td><td data-i18n="docs.err.notFound"></td></tr>
+      <tr><td>429</td><td><code>rate_limited</code></td><td data-i18n-html="docs.err.rate"></td></tr></table>
 
-    <h2 id="examples">範例程式</h2>
+    <h2 id="examples" data-i18n="docs.nav.examples"></h2>
     <h3>cURL</h3>
     <div class="code"><div class="code-head">bash<button class="copy-btn">複製</button></div><pre>curl -H <span class="s">"X-API-Key: YOUR_KEY"</span> \
   <span class="s">"<span class="base-url"></span>/api/v1/rankings/vanilla?limit=10"</span></pre></div>
@@ -104,7 +107,7 @@ r = requests.get(
 )
 <span class="k">for</span> p <span class="k">in</span> r.json()[<span class="s">"players"</span>]:
     print(p[<span class="s">"rank"</span>], p[<span class="s">"name"</span>], p[<span class="s">"tiers"</span>][<span class="s">"vanilla"</span>][<span class="s">"tier"</span>])</pre></div>
-    <div class="callout" style="margin-top:24px">請勿在瀏覽器前端直接使用 API Key，否則任何人都能看到並濫用你的 Key。請從你自己的伺服器或 Bot 呼叫 API。</div>
+    <div class="callout" style="margin-top:24px" data-i18n="docs.warn"></div>
   </article>
 </main>
 </body>
