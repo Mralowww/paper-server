@@ -463,6 +463,18 @@
     'docs.nav.manage': ['管理 API', 'Management API', 'API quản trị'],
     'docs.manage': ['管理團隊可以在「我的資料」建立個人 API Key（<code>mctlu_</code> 開頭），用它呼叫下列端點，權限與你在網站上的身分相同。', 'Staff can create a personal key (starting with <code>mctlu_</code>) under My Profile and call the endpoints below with the same permissions as on the website.', 'Đội ngũ có thể tạo key cá nhân (bắt đầu bằng <code>mctlu_</code>) trong Hồ sơ và gọi các endpoint dưới đây với quyền giống trên web.'],
 
+    // ---- command palette
+    'cmd.placeholder': ['輸入指令或搜尋玩家…', 'Type a command or search players…', 'Nhập lệnh hoặc tìm người chơi…'],
+    'cmd.pages': ['頁面', 'Pages', 'Trang'],
+    'cmd.actions': ['動作', 'Actions', 'Hành động'],
+    'cmd.staff': ['管理後台', 'Staff panel', 'Bảng quản trị'],
+    'cmd.players': ['玩家', 'Players', 'Người chơi'],
+    'cmd.searchPlayer': ['搜尋玩家「{q}」', 'Search player "{q}"', 'Tìm người chơi "{q}"'],
+    'cmd.copyIp': ['複製伺服器 IP', 'Copy server IP', 'Sao chép IP máy chủ'],
+    'cmd.empty': ['沒有符合的結果', 'No results', 'Không có kết quả'],
+    'cmd.navigate': ['選擇', 'navigate', 'di chuyển'],
+    'cmd.select': ['執行', 'run', 'chạy'],
+
     // ---- docs
     'docs.title': ['開發者 API', 'Developer API', 'API cho nhà phát triển'],
     'docs.intro': ['透過 REST API 讀取 Mc.Tierlist.Asia 的排行榜與玩家資料。所有回應皆為 JSON。', 'Read Mc.Tierlist.Asia rankings and player data through a REST API. All responses are JSON.', 'Đọc bảng xếp hạng và dữ liệu người chơi Mc.Tierlist.Asia qua REST API. Mọi phản hồi đều là JSON.'],

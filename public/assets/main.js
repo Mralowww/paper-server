@@ -68,9 +68,15 @@
     if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.textContent = msg;
+    const ico = type === 'err'
+      ? '<path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/>'
+      : '<path d="m7 12 3.5 3.5L17 9"/><circle cx="12" cy="12" r="9"/>';
+    el.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ico}</svg><span></span><i class="toast-bar"></i>`;
+    $('span', el).textContent = msg;
     box.append(el);
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2800);
+    const remove = () => { el.classList.add('out'); setTimeout(() => el.remove(), 320); };
+    const timer = setTimeout(remove, 3200);
+    el.addEventListener('click', () => { clearTimeout(timer); remove(); });
   }
 
   function levelChips(user) {
@@ -100,7 +106,7 @@
         <nav class="nav-links">${links.map(([id, href, key]) => `<a href="${href}" class="${id === page ? 'active' : ''}">${t(key)}</a>`).join('')}<span class="nav-extra"></span></nav>
         <div class="nav-right">
           <button class="server-chip" data-copy-ip title="${t('server.copyHint')}">${icon.server}<span>${SERVER}</span></button>
-          <form class="nav-search" role="search">${icon.search}<input name="q" placeholder="${t('nav.search')}" autocomplete="off" aria-label="${t('nav.search')}"><kbd>/</kbd></form>
+          <form class="nav-search" role="search">${icon.search}<input name="q" placeholder="${t('nav.search')}" autocomplete="off" aria-label="${t('nav.search')}" readonly><kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'} K</kbd></form>
           <div class="dropdown lang-dd">
             <button class="btn btn-sm btn-ghost dd-toggle" aria-label="${t('nav.language')}">${icon.globe}<span>${current.short}</span>${icon.chevron}</button>
             <div class="dd-menu">${LANGS.map((l) => `<button data-lang="${l.id}" class="${l.id === lang ? 'active' : ''}">${l.label}</button>`).join('')}</div>
@@ -128,13 +134,12 @@
     document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown')) $$('.dropdown.open', nav).forEach((d) => d.classList.remove('open')); });
 
     const form = $('.nav-search', nav);
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const q = form.q.value.trim();
-      if (q) location.href = `/player/${encodeURIComponent(q)}`;
-    });
+    const palette = () => window.MCTL_UI?.openPalette();
+    form.addEventListener('submit', (e) => e.preventDefault());
+    form.addEventListener('mousedown', (e) => { e.preventDefault(); palette(); });
+    form.q.addEventListener('focus', () => { form.q.blur(); palette(); });
     addEventListener('keydown', (e) => {
-      if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); form.q.focus(); }
+      if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName) && !document.querySelector('.cmdk-bg')) { e.preventDefault(); palette(); }
     });
 
     session.then(({ user, permissions: perms }) => {
@@ -320,6 +325,32 @@
       ${record}`;
   }
 
+  /** Count-up for record numbers and a subtle 3D tilt on the avatar. */
+  function animateCard(root) {
+    $$('.pcard-record b', root).forEach((b) => {
+      const m = b.textContent.match(/^(\d+)(%?)$/);
+      if (!m) return;
+      const to = Number(m[1]);
+      const start = performance.now();
+      const step = (now) => {
+        const p = Math.min(1, (now - start) / 900);
+        b.textContent = `${Math.round(to * (1 - (1 - p) ** 3))}${m[2]}`;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    const av = $('.pcard-avatar', root);
+    if (!av || reduceMotion) return;
+    const card = av.closest('.pcard');
+    card.addEventListener('pointermove', (e) => {
+      const r = av.getBoundingClientRect();
+      const x = (e.clientX - (r.left + r.width / 2)) / r.width;
+      const y = (e.clientY - (r.top + r.height / 2)) / r.height;
+      av.style.transform = `perspective(500px) rotateY(${Math.max(-1, Math.min(1, x)) * 14}deg) rotateX(${Math.max(-1, Math.min(1, -y)) * 14}deg)`;
+    });
+    card.addEventListener('pointerleave', () => { av.style.transform = ''; });
+  }
+
   async function openPlayerCard(name) {
     const bg = document.createElement('div');
     bg.className = 'modal-bg';
@@ -334,6 +365,7 @@
     document.body.append(bg);
     try {
       $('.pcard-body', bg).innerHTML = playerCardHtml(await api(`/players/${encodeURIComponent(name)}`));
+      animateCard(bg);
     } catch (err) {
       $('.pcard-body', bg).innerHTML = emptyHtml(t(err.status === 404 ? 'empty.notFoundT' : 'empty.errT'), t('empty.errD')).replace('reveal', '');
     }
@@ -619,6 +651,7 @@
         const p = await api(`/players/${encodeURIComponent(name)}`);
         document.title = `${p.name} · Mc.Tierlist.Asia`;
         root.innerHTML = `<div class="modal pcard pcard-page reveal">${playerCardHtml(p)}</div>`;
+        animateCard(root);
       } catch (err) {
         root.innerHTML = err.status === 404
           ? emptyHtml(t('empty.notFoundT'), esc(t('empty.notFoundD', { name })))
@@ -712,6 +745,7 @@
             ['col.score', scoreCell],
           ]) : `<div class="card-pad muted">${t('me.noTests')}</div>`}</div>`;
         bindGiveForm(root, () => pages.tester());
+        if (location.hash === '#give') setTimeout(() => $('#giveForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
       } catch {
         root.innerHTML = emptyHtml(t('empty.errT'), t('empty.errD'));
       }
@@ -795,11 +829,14 @@
         });
       }
 
+      let lastCount = {};
       async function showTicket(id) {
         root.onclick = null;
         history.replaceState(null, '', `/support#${id}`);
         let d;
         try { d = await request(`/api/support/tickets/${id}`); } catch { return showList(); }
+        const grew = lastCount[id] !== undefined && d.messages.length > lastCount[id];
+        lastCount[id] = d.messages.length;
         const tk = d.ticket;
         root.innerHTML = `
           <a href="/support" class="link-more back-link" id="backList">${t('support.back')}</a>
@@ -809,12 +846,15 @@
         $('#backList').addEventListener('click', (e) => { e.preventDefault(); showList(); });
         bindComposer(root, tk.id, () => showTicket(tk.id));
         const last = $('.thread .msg-row:last-child');
-        if (last && d.messages.length > 3) last.scrollIntoView({ block: 'center' });
+        if (grew && last) last.classList.add('msg-new');
+        if (last && (grew || d.messages.length > 3)) last.scrollIntoView({ block: 'center', behavior: grew ? 'smooth' : 'auto' });
       }
 
-      const route = () => {
+      const route = async () => {
         const hashId = location.hash.slice(1);
-        if (/^\d+$/.test(hashId)) showTicket(hashId); else showList();
+        if (/^\d+$/.test(hashId)) return showTicket(hashId);
+        await showList();
+        if (hashId === 'new') $('#newTicket')?.click();
       };
       addEventListener('hashchange', route);
       route();

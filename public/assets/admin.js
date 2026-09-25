@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ${ticketHeadHtml(tk, `<div class="ticket-hero-side">
           <div class="muted" style="font-size:13px">${esc(tk.username || tk.user_id)} · <span class="mono">${esc(tk.user_id)}</span></div>
           <div class="actions">
-            <label class="select-wrap"><select id="stSel" aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></label>
+            <div class="select-wrap"><select id="stSel" aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></div>
             ${perms.managePlayers ? `<button class="btn btn-sm" id="blockUser">${t('support.block')}</button><button class="btn btn-sm btn-danger" id="delTicket">${t('common.delete')}</button>` : ''}
           </div></div>`)}
         <div class="thread">${threadHtml(d, (m) => !!m.is_staff)}</div>
