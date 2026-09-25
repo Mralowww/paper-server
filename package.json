@@ -1,0 +1,17 @@
+{
+  "name": "mc-tierlist-asia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mc.Tierlist.Asia — Minecraft Vanilla PvP tier list with developer API and Discord-authenticated admin panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.1",
+    "express": "^5.2.1"
+  }
+}

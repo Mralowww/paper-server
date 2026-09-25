@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07080c">
+<link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/style.css">
+<script src="/assets/main.js" defer></script>
+<title>排行榜 · Mc.Tierlist.Asia</title>
+</head>
+<body data-page="rankings">
+<main class="container" style="padding-top:36px">
+  <div class="section-head reveal">
+    <div><div class="kicker">Leaderboard</div><h2>Vanilla 排行榜</h2></div>
+    <span id="boardCount" class="link-more"></span>
+  </div>
+  <div class="board-shell reveal" style="--d:.06s">
+    <div class="mode-tabs">
+      <button class="mode-tab active"><img src="/assets/vanilla.svg" alt="" style="image-rendering:pixelated">Vanilla</button>
+    </div>
+    <div class="filters">
+      <div class="chips" id="regionChips">
+        <button class="chip active" data-v="">全部地區</button>
+        <button class="chip" data-v="AS">AS</button><button class="chip" data-v="NA">NA</button><button class="chip" data-v="EU">EU</button>
+        <button class="chip" data-v="SA">SA</button><button class="chip" data-v="OC">OC</button><button class="chip" data-v="AF">AF</button>
+      </div>
+      <div class="chips" id="tierChips">
+        <button class="chip active" data-v="">全部 Tier</button>
+        <button class="chip" data-v="1">T1</button><button class="chip" data-v="2">T2</button><button class="chip" data-v="3">T3</button>
+        <button class="chip" data-v="4">T4</button><button class="chip" data-v="5">T5</button>
+      </div>
+      <label class="search-inline"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="boardSearch" placeholder="篩選玩家名稱…" autocomplete="off"></label>
+    </div>
+    <div class="board-head"><span>#</span><span>玩家</span><span>地區</span><span style="text-align:right">Tier</span></div>
+    <div id="board"></div>
+    <div class="board-more"><button class="btn" id="loadMore" hidden>載入更多</button></div>
+  </div>
+</main>
+</body>
+</html>

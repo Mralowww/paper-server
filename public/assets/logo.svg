@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff1b8"/><stop offset=".35" stop-color="#ffd46a"/>
+      <stop offset=".7" stop-color="#f2b52c"/><stop offset="1" stop-color="#b8740c"/>
+    </linearGradient>
+    <linearGradient id="d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1f2b"/><stop offset="1" stop-color="#0b0d13"/>
+    </linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f6fb"/><stop offset="1" stop-color="#8a93a6"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 6 112 22v38c0 30-20 50-48 62C36 110 16 90 16 60V22Z" fill="url(#g)"/>
+  <path d="M64 15 103 28v32c0 25-16 42-39 52C41 102 25 85 25 60V28Z" fill="url(#d)"/>
+  <!-- pixel sword -->
+  <g shape-rendering="crispEdges">
+    <path fill="url(#b)" d="M78 30h8v8h-8zM70 38h8v8h-8zM62 46h8v8h-8zM54 54h8v8h-8zM86 30h4v4h-4zM82 38h4v4h-4zM74 46h4v4h-4zM66 54h4v4h-4z"/>
+    <path fill="url(#g)" d="M42 58h8v8h-8zM50 66h8v8h-8zM38 70h8v8h-8zM46 62h8v8h-8zM34 78h8v8h-8z"/>
+  </g>
+  <path d="M64 15 103 28v32c0 25-16 42-39 52" fill="none" stroke="#fff5cf" stroke-opacity=".18" stroke-width="2"/>
+</svg>
