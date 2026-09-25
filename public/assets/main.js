@@ -32,9 +32,9 @@
     'Combat Grandmaster': 'grandmaster', 'Combat Master': 'master', 'Combat Ace': 'ace',
     'Combat Specialist': 'specialist', 'Combat Cadet': 'cadet', 'Combat Novice': 'novice', Rookie: 'rookie',
   };
-  const avatarUrl = (name, size = 64) => `https://mc-heads.net/avatar/${encodeURIComponent(name)}/${size}`;
+  const avatarUrl = (name, size = 64) => `/heads/avatar/${encodeURIComponent(name)}/${size}.png`;
   const discordAvatar = (id, hash) => (hash ? `https://cdn.discordapp.com/avatars/${id}/${hash}.png?size=64` : 'https://cdn.discordapp.com/embed/avatars/0.png');
-  const fallbackImg = "this.onerror=null;this.src='https://mc-heads.net/avatar/MHF_Steve/64'";
+  const fallbackImg = "this.onerror=null;this.src='/heads/avatar/MHF_Steve/64.png'";
   const loginUrl = () => `/auth/discord?next=${encodeURIComponent(location.pathname + location.hash)}`;
   const discordLink = (guildId, channelId) => `https://discord.com/channels/${guildId}/${channelId}`;
 
@@ -306,7 +306,7 @@
       ${p.banned ? `<div class="pcard-ban">⛔ ${t('ban.cardNote')}</div>` : ''}
       <div class="pcard-avatar${p.banned ? ' banned' : ''}"><img src="${avatarUrl(p.name, 160)}" alt="" onerror="${fallbackImg}"></div>
       <h2 class="pcard-name">${esc(p.name)}${badgesHtml(p.badges)}</h2>
-      <div class="title-pill ${TITLE_STYLE[p.title] || 'rookie'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 22 10 12 22 2 10Z"/></svg>${esc(p.title)}</div>
+      <div class="title-pill ${TITLE_STYLE[p.title] || 'rookie'}" title="${esc(p.title)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 22 10 12 22 2 10Z"/></svg>${esc(t(`title.${TITLE_STYLE[p.title] || 'rookie'}`))}</div>
       <div class="pcard-region">${esc(regionName(p.region))}</div>
       <a class="btn btn-sm pcard-namemc" href="https://namemc.com/profile/${encodeURIComponent(p.name)}" target="_blank" rel="noopener">NameMC <span aria-hidden="true">↗</span></a>
       <div class="pcard-label">POSITION <span>${t('card.position')}</span></div>

@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="dc-name">TierTest <span class="dc-bot">BOT</span></div>
             <div class="dc-text" style="margin-bottom:4px"><span class="dc-mention">@Steve</span></div>
             <div class="dc-embed with-thumb" style="border-left-color:#8a93a6">
-              <img class="dc-thumb" src="https://mc-heads.net/body/Steve/128" alt="">
+              <img class="dc-thumb" src="/heads/body/Steve/128.png" alt="">
               <div class="dc-title">${esc(v.title.replaceAll('{player}', 'Steve'))}</div>
               ${f(v.tester, `<span class="dc-mention">@${esc(me.username)}</span>`)}
               ${f(v.region, esc(v.region_value))}

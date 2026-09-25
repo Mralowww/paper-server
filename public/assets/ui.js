@@ -220,7 +220,7 @@
       listEl.innerHTML = items.length ? items.map((it, i) => {
         const head = it.group !== lastGroup ? `<div class="cmdk-group">${t(it.group)}</div>` : '';
         lastGroup = it.group;
-        const ico = it.avatar ? `<img src="https://mc-heads.net/avatar/${encodeURIComponent(it.avatar)}/32" alt="">` : svg(it.icon || 'go');
+        const ico = it.avatar ? `<img src="/heads/avatar/${encodeURIComponent(it.avatar)}/32.png" alt="">` : svg(it.icon || 'go');
         return `${head}<div class="cmdk-item ${i === idx ? 'act' : ''}" data-i="${i}" style="--i:${Math.min(i, 12)}">${ico}<span>${esc(it.label)}</span>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</div>`;
       }).join('') : `<div class="cmdk-empty">${t('cmd.empty')}</div>`;
       $('.cmdk-item.act', listEl)?.scrollIntoView({ block: 'nearest' });

@@ -502,6 +502,14 @@
     'error.invalid_template': ['欄位不可空白或過長', 'Fields cannot be empty or too long', 'Các trường không được trống hoặc quá dài'],
     'action.result_template_update': ['修改考試結果格式', 'edited the result embed', 'đã sửa embed kết quả'],
 
+    'title.grandmaster': ['戰鬥宗師', 'Combat Grandmaster', 'Đại tôn sư chiến đấu'],
+    'title.master': ['戰鬥大師', 'Combat Master', 'Bậc thầy chiến đấu'],
+    'title.ace': ['戰鬥王牌', 'Combat Ace', 'Át chủ bài chiến đấu'],
+    'title.specialist': ['戰鬥專家', 'Combat Specialist', 'Chuyên gia chiến đấu'],
+    'title.cadet': ['戰鬥學員', 'Combat Cadet', 'Học viên chiến đấu'],
+    'title.novice': ['戰鬥新手', 'Combat Novice', 'Tân binh chiến đấu'],
+    'title.rookie': ['新人', 'Rookie', 'Người mới'],
+
     // ---- docs
     'docs.title': ['開發者 API', 'Developer API', 'API cho nhà phát triển'],
     'docs.intro': ['透過 REST API 讀取 Mc.Tierlist.Asia 的排行榜與玩家資料。所有回應皆為 JSON。', 'Read Mc.Tierlist.Asia rankings and player data through a REST API. All responses are JSON.', 'Đọc bảng xếp hạng và dữ liệu người chơi Mc.Tierlist.Asia qua REST API. Mọi phản hồi đều là JSON.'],

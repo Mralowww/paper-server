@@ -692,6 +692,22 @@ def player_page(_name):
     return page("player.html")
 
 
+@app.get("/heads/<kind>/<ident>/<int:size>.png")
+def head_image(kind, ident, size):
+    """Player head/body rendered from the official Mojang skin (cached on disk and by Cloudflare)."""
+    from . import heads
+    if kind not in ("avatar", "body") or not re.fullmatch(r"[A-Za-z0-9_-]{1,36}", ident):
+        abort(404)
+    try:
+        data = heads.render(kind, ident, size)
+    except Exception as exc:  # Mojang unreachable and nothing cached
+        print(f"[heads] {kind}/{ident}: {exc}")
+        return redirect(f"https://mc-heads.net/{kind}/{ident}/{size}")
+    resp = app.response_class(data, mimetype="image/png")
+    resp.headers["Cache-Control"] = "public, max-age=21600"
+    return resp
+
+
 @app.get("/assets/<path:filename>")
 def assets(filename):
     return send_from_directory(C.PUBLIC / "assets", filename, max_age=3600)

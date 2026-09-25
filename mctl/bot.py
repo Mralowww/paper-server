@@ -221,7 +221,7 @@ def result_embed(mc_name, tester_id, prev_tier, new_tier, wins, losses, preview=
     e = discord.Embed(title=tpl["title"].replace("{player}", mc_name), color=TIER_COLORS[new_tier[2]])
     if preview:
         e.set_author(name="預覽 — 按下「確認發送」後才會發布")
-    e.set_thumbnail(url=f"https://mc-heads.net/body/{mc_name}/128")
+    e.set_thumbnail(url=f"{C.BASE_URL}/heads/body/{mc_name}/128.png")
     e.add_field(name=f"{tpl['tester']}:", value=f"<@{tester_id}>", inline=False)
     e.add_field(name=f"{tpl['region']}:", value=tpl["region_value"], inline=False)
     e.add_field(name=f"{tpl['username']}:", value=mc_name, inline=False)
@@ -489,7 +489,7 @@ async def handle_apply(interaction: discord.Interaction, name):
         description=("考官會盡快與你聯繫，請耐心等候並準備好上線。\n"
                      "考官完成考試後請在此頻道使用 **`/result`** 登錄結果。"),
     )
-    embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{profile['id']}/128")
+    embed.set_thumbnail(url=f"{C.BASE_URL}/heads/avatar/{profile['name']}/128.png")
     embed.add_field(name="考生", value=user.mention)
     embed.add_field(name="Minecraft ID", value=profile["name"])
     embed.add_field(name="目前段位", value=rank_name(prev_tier))
@@ -521,7 +521,7 @@ class Draft:
             color=0xA66CE0 if self.ticket["kind"] == "high" else 0x3DDC97,
             description="**1. 選擇考後段位** → 2. 輸入比分 → 3. 確認發送",
         )
-        e.set_thumbnail(url=f"https://mc-heads.net/avatar/{self.ticket['mc_name']}/96")
+        e.set_thumbnail(url=f"{C.BASE_URL}/heads/avatar/{self.ticket['mc_name']}/96.png")
         e.add_field(name="考生", value=f"<@{self.ticket['applicant_id']}>")
         e.add_field(name="Minecraft ID", value=self.ticket["mc_name"])
         e.add_field(name="目前段位", value=rank_name(self.prev_tier))
