@@ -241,24 +241,65 @@
   /* ---------- 複製 ---------- */
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); } catch { const ta = Object.assign(document.createElement("textarea"), { value: text }); document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } sfx("copy"); ok(t("copied"), text.length > 60 ? text.slice(0, 60) + "…" : text, 1400); };
 
-  /* ---------- 自訂下拉選單（強化原生 select.enhance） ---------- */
+  /* ---------- 自訂下拉選單（強化原生 select.enhance；清單浮在最上層，不會被卡片裁切） ---------- */
+  let openSelect = null;
+  function closeSelect() {
+    if (!openSelect) return;
+    const { wrap, list } = openSelect; openSelect = null;
+    wrap.classList.remove("open"); list.classList.add("closing"); setTimeout(() => list.remove(), 160);
+  }
+  function openSelectList(sel, wrap) {
+    closeSelect();
+    const list = document.createElement("div"); list.className = "select-list floating"; list.setAttribute("role", "listbox");
+    list.innerHTML = [...sel.options].map((o, i) => `<div data-i="${i}" role="option" class="${i === sel.selectedIndex ? "selected" : ""} ${o.disabled ? "disabled" : ""}" style="animation:itemIn .22s ${Math.min(i, 12) * 18}ms both">${esc(o.textContent)}</div>`).join("");
+    document.body.appendChild(list);
+    const place = () => {
+      const r = wrap.getBoundingClientRect(); const h = Math.min(list.scrollHeight, 280);
+      const below = innerHeight - r.bottom - 8; const up = below < h && r.top > below;
+      list.style.left = Math.max(8, Math.min(r.left, innerWidth - Math.max(r.width, 160) - 8)) + "px";
+      list.style.minWidth = r.width + "px";
+      list.style.top = (up ? r.top - h - 6 : r.bottom + 6) + "px";
+      list.style.transformOrigin = up ? "bottom" : "top";
+    };
+    place();
+    let active = sel.selectedIndex;
+    const mark = () => $$("[data-i]", list).forEach((el) => el.classList.toggle("active", +el.dataset.i === active));
+    const pick = (i) => {
+      if (sel.options[i]?.disabled) return;
+      sel.selectedIndex = i; sel.dispatchEvent(new Event("change", { bubbles: true })); sel._sync && sel._sync(); closeSelect(); sfx("switch");
+    };
+    list.addEventListener("mousedown", (e) => e.preventDefault());
+    list.addEventListener("click", (e) => { const it = e.target.closest("[data-i]"); if (it) pick(+it.dataset.i); });
+    const onKey = (e) => {
+      if (!openSelect || openSelect.list !== list) return document.removeEventListener("keydown", onKey, true);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); active = (active + (e.key === "ArrowDown" ? 1 : -1) + sel.options.length) % sel.options.length; mark(); $(".active", list)?.scrollIntoView({ block: "nearest" }); sfx("tick"); }
+      else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); pick(active); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSelect(); }
+    };
+    document.addEventListener("keydown", onKey, true);
+    wrap.classList.add("open"); openSelect = { wrap, list, place }; sfx("menu");
+    $(".selected", list)?.scrollIntoView({ block: "nearest" });
+  }
   function enhanceSelects(root = document) {
     $$("select.enhance", root).forEach((sel) => {
       if (sel._enhanced) return sel._sync && sel._sync(); sel._enhanced = true; sel.style.display = "none";
       const wrap = document.createElement("div"); wrap.className = "select"; sel.after(wrap);
       const render = () => {
         const cur = sel.options[sel.selectedIndex];
-        wrap.innerHTML = `<button type="button" class="select-btn"><span>${esc(cur ? cur.textContent : "")}</span><span class="chev">▾</span></button><div class="select-list">${[...sel.options].map((o, i) => `<div data-i="${i}" class="${i === sel.selectedIndex ? "selected" : ""}" style="animation:itemIn .25s ${i * 25}ms both">${esc(o.textContent)}</div>`).join("")}</div>`;
+        wrap.innerHTML = `<button type="button" class="select-btn" aria-haspopup="listbox"><span>${esc(cur ? cur.textContent : "")}</span><span class="chev">▾</span></button>`;
       };
       sel._sync = render; render();
+      sel.addEventListener("change", render);
       wrap.addEventListener("click", (e) => {
-        const item = e.target.closest("[data-i]");
-        if (item) { sel.selectedIndex = +item.dataset.i; sel.dispatchEvent(new Event("change", { bubbles: true })); wrap.classList.remove("open"); render(); sfx("switch"); return; }
-        if (e.target.closest(".select-btn")) { $$(".select.open").forEach((s) => s !== wrap && s.classList.remove("open")); wrap.classList.toggle("open"); sfx("menu"); }
+        if (!e.target.closest(".select-btn")) return;
+        e.stopPropagation();
+        if (openSelect && openSelect.wrap === wrap) closeSelect(); else openSelectList(sel, wrap);
       });
     });
   }
-  document.addEventListener("click", (e) => { if (!e.target.closest(".select")) $$(".select.open").forEach((s) => s.classList.remove("open")); });
+  document.addEventListener("click", (e) => { if (openSelect && !e.target.closest(".select-list.floating")) closeSelect(); });
+  addEventListener("resize", () => openSelect && openSelect.place());
+  addEventListener("scroll", (e) => { if (openSelect && !(e.target instanceof Element && e.target.closest(".select-list"))) openSelect.place(); }, true);
 
   /* ---------- 分頁標籤 ---------- */
   function tabs(container, onChange) {

@@ -975,6 +975,13 @@ details.fold[open] summary .ico { transform: rotate(180deg); }
 .role-chip i { width: 10px; height: 10px; border-radius: 50%; }
 @media (max-width: 760px) { .info-table > div { grid-template-columns: minmax(0, 1fr); } .info-table > div > span { border-right: 0; padding-bottom: 0; } .lk-card { flex-wrap: wrap; } .lk-av { width: 64px; height: 64px; } }
 
+/* 浮動下拉清單 */
+.select-list.floating { position: fixed; z-index: 3000; right: auto; max-height: 280px; max-width: calc(100vw - 16px); display: block; }
+.select-list.floating.closing { animation: dropOut .16s ease-in forwards; }
+.select-list div.active { background: var(--sunken); }
+.select-list div.disabled { opacity: .4; cursor: not-allowed; }
+@keyframes dropOut { to { opacity: 0; transform: translateY(-4px) scale(.98); } }
+
 /* ---------- 手機版 ---------- */
 @media (max-width: 1360px) {
   .nav .container { gap: 10px; }
