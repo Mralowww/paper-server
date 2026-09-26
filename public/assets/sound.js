@@ -132,7 +132,7 @@
   });
 
   const ADDED = [
-    ['.toast.err', 'error'], ['.toast', 'success'], ['.sp-success', 'big'], ['.ctx', 'pop'],
+    ['.nt-bg.err', 'error'], ['.nt-bg', 'success'], ['.sp-success', 'big'], ['.ctx', 'pop'],
     ['.modal-bg, .pfx-bg, .lightbox, .cmdk-bg', 'open'],
   ];
   new MutationObserver((muts) => {
@@ -141,7 +141,7 @@
         if (n.nodeType !== 1) continue;
         const hit = ADDED.find(([sel]) => n.matches(sel));
         // Toasts right after an action (e.g. a copy) don't add a second sound.
-        if (hit) { play(hit[1], { weak: n.matches('.toast:not(.err)') ? 200 : false }); continue; }
+        if (hit) { play(hit[1], { weak: n.matches('.nt-bg.ok') ? 200 : false }); continue; }
         // Support chat: new bubbles that slide in.
         if (n.matches('.sp-msg.sp-in')) { play(n.classList.contains('mine') ? 'send' : 'message'); continue; }
         if (n.matches('.sp-sys.sp-in')) play('notify');
@@ -150,7 +150,8 @@
         const el = m.target;
         const was = m.oldValue || '';
         const has = (c) => el.classList.contains(c);
-        if (el.matches('.au-drawer') && has('open') !== was.includes('open')) play(has('open') ? 'open' : 'close');
+        if (el.matches('.nt-bg') && has('out') && !was.includes('out')) play('close', { weak: true });
+        else if (el.matches('.au-drawer') && has('open') !== was.includes('open')) play(has('open') ? 'open' : 'close');
         else if ((el.matches('.modal-bg, .pfx-bg, .lightbox') && has('closing') && !was.includes('closing'))
           || (el.matches('.lightbox, .cmdk-bg') && has('out') && !was.includes('out'))) play('close');
         else if (el === document.body && has('gate-open') && !was.includes('gate-open')) play('launch');

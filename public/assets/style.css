@@ -1791,3 +1791,26 @@ body.pfx-open { overflow: hidden; }
 #sndVol::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--gold); }
 .snd-preview { display: flex; flex-wrap: wrap; gap: 8px; }
 #sound.muted-off .snd-vol, #sound.muted-off .snd-preview { opacity: 0.45; }
+
+/* ---------- centered notice dialog (replaces toasts) ---------- */
+.nt-bg { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px; background: rgba(4, 5, 9, 0.45); backdrop-filter: blur(3px); animation: pfx-fade 0.2s ease both; }
+.nt-bg.out { animation: pfx-fade 0.2s ease reverse both; }
+.nt { position: relative; width: min(380px, 100%); padding: 30px 28px 24px; border-radius: 20px; border: 1px solid var(--border-strong); background: linear-gradient(180deg, color-mix(in srgb, var(--c) 9%, transparent), transparent 140px), var(--bg-2); box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.85), 0 0 0 1px color-mix(in srgb, var(--c) 14%, transparent); text-align: center; overflow: hidden; animation: nt-pop 0.42s cubic-bezier(.2, 1.35, .35, 1) both; }
+.nt-bg.out .nt { animation: pfx-out 0.2s ease both; }
+.nt-bg.ok { --c: var(--success); }
+.nt-bg.err { --c: #ff5a5f; }
+@keyframes nt-pop { from { opacity: 0; transform: translateY(18px) scale(0.9); } }
+.nt-ico { width: 76px; height: 76px; fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
+.nt-ico circle { stroke-dasharray: 145; stroke-dashoffset: 145; animation: sp-draw 0.5s 0.08s ease-out forwards; }
+.nt-ico path { stroke-dasharray: 48; stroke-dashoffset: 48; animation: sp-draw 0.3s 0.45s ease-out forwards; }
+.nt-bg.err .nt-ico { animation: nt-shake 0.4s 0.5s; }
+@keyframes nt-shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.nt h3 { margin: 12px 0 6px; font-family: var(--font-display); font-size: 24px; }
+.nt p { margin: 0 0 20px; color: var(--muted); font-size: 15px; line-height: 1.6; word-break: break-word; white-space: pre-line; }
+.nt-ok { min-width: 96px; background: var(--c); color: #0b0d12; border-color: transparent; font-weight: 800; box-shadow: 0 8px 22px -8px var(--c); }
+.nt-ok:hover { background: var(--c); filter: brightness(1.08); transform: translateY(-1px); }
+.nt-ok:focus-visible { outline: 3px solid color-mix(in srgb, var(--c) 45%, transparent); outline-offset: 2px; }
+.nt-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--c); transform-origin: left; animation: nt-bar 2.2s linear forwards; }
+.nt.hold .nt-bar { animation-play-state: paused; }
+@keyframes nt-bar { to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .nt, .nt-ico circle, .nt-ico path { animation: none; stroke-dashoffset: 0; } }

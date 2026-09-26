@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   const CAUSES = ['crystal', 'anchor', 'melee', 'projectile', 'explosion', 'other'];
   const causeIcon = (c) => `<img class="mc-ico" src="/assets/icons/${CAUSES.includes(c) ? c : 'other'}.svg" alt="">`;
-  const WORLD_ART = ['plains', 'desert', 'badlands', 'mushroom', 'snow', 'nether', 'end'];
+  const WORLD_ART = ['lobby', 'plains', 'desert', 'badlands', 'mushroom', 'snow', 'nether', 'end'];
   let worldMap = g.worlds || {};
   const worldInfo = (w) => {
     const info = worldMap[w] || {};

@@ -63,21 +63,56 @@
   // Current user (null when signed out); resolved once per page.
   const session = request('/api/me').catch(() => ({ user: null, permissions: {} }));
 
+  /**
+   * Centered notice dialog (replaces bottom toasts). Success closes itself after a moment;
+   * errors stay until OK is pressed. A new notice replaces the one on screen.
+   */
+  let noticeClose = null;
   function toast(msg, type = 'ok') {
-    let box = $('.toasts');
-    if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    const ico = type === 'err'
-      ? '<path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/>'
-      : '<path d="m7 12 3.5 3.5L17 9"/><circle cx="12" cy="12" r="9"/>';
-    el.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ico}</svg><span></span><i class="toast-bar"></i>`;
-    $('span', el).textContent = msg;
-    box.append(el);
-    const remove = () => { el.classList.add('out'); setTimeout(() => el.remove(), 320); };
-    const timer = setTimeout(remove, 3200);
-    el.addEventListener('click', () => { clearTimeout(timer); remove(); });
+    const err = type === 'err';
+    noticeClose?.(true);
+    const bg = document.createElement('div');
+    bg.className = `nt-bg ${err ? 'err' : 'ok'}`;
+    bg.innerHTML = `
+      <div class="nt" role="alertdialog" aria-modal="true" aria-live="assertive">
+        <svg class="nt-ico" viewBox="0 0 52 52"><circle cx="26" cy="26" r="23"/>${err ? '<path d="M18 18l16 16M34 18 18 34"/>' : '<path d="m15 27 7 7 15-15"/>'}</svg>
+        <h3>${t(err ? 'nt.err' : 'nt.ok')}</h3>
+        <p></p>
+        <button class="btn nt-ok">OK</button>
+        ${err ? '' : '<i class="nt-bar"></i>'}
+      </div>`;
+    $('p', bg).textContent = msg;
+    document.body.append(bg);
+    const prevFocus = document.activeElement;
+    const ok = $('.nt-ok', bg);
+    let timer = null;
+    const close = (instant) => {
+      if (!bg.isConnected || bg.classList.contains('out')) return;
+      clearTimeout(timer);
+      removeEventListener('keydown', onKey, true);
+      if (noticeClose === close) noticeClose = null;
+      if (instant) { bg.remove(); return; }
+      bg.classList.add('out');
+      setTimeout(() => bg.remove(), 220);
+      if (prevFocus?.focus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true });
+    };
+    const onKey = (e) => {
+      if (['Enter', 'Escape', ' '].includes(e.key)) { e.preventDefault(); e.stopPropagation(); close(); }
+    };
+    addEventListener('keydown', onKey, true);
+    ok.addEventListener('click', () => close());
+    bg.addEventListener('mousedown', (e) => { if (e.target === bg && !err) close(); });
+    noticeClose = close;
+    requestAnimationFrame(() => ok.focus({ preventScroll: true }));
+    if (!err) {
+      const card = $('.nt', bg);
+      const start = () => { timer = setTimeout(() => close(), 2200); card.classList.remove('hold'); };
+      card.addEventListener('mouseenter', () => { clearTimeout(timer); card.classList.add('hold'); });
+      card.addEventListener('mouseleave', start);
+      start();
+    }
   }
+
 
   function levelChips(user) {
     const chips = [`<span class="role ${user.levelName}">${t(`level.${user.levelName}`)}</span>`];

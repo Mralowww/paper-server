@@ -227,6 +227,7 @@
     'set.account': ['帳號', 'Account', 'Tài khoản'],
     'set.viewProfile': ['查看我的玩家頁', 'View my player page', 'Xem trang người chơi'],
     'me.linkToProfile': ['綁定 Minecraft 帳號後，「我的資料」會直接顯示你的玩家頁（段位、伺服器戰績、對戰紀錄）。', 'Once your Minecraft account is linked, My Profile opens your player page (tier, server stats, matches).', 'Sau khi liên kết Minecraft, Hồ sơ sẽ mở trang người chơi của bạn.'],
+    'world.lobby': ['大廳', 'Lobby', 'Sảnh chờ'],
     'world.plains': ['平原世界', 'Plains', 'Đồng bằng'],
     'world.desert': ['沙漠世界', 'Desert', 'Sa mạc'],
     'world.badlands': ['惡地世界', 'Badlands', 'Vùng đất xấu'],
@@ -400,6 +401,8 @@
     'snd.n.message': ['新訊息', 'Message', 'Tin nhắn'],
     'snd.n.send': ['送出', 'Send', 'Gửi'],
     'snd.n.launch': ['開站', 'Launch', 'Ra mắt'],
+    'nt.ok': ['成功', 'Success', 'Thành công'],
+    'nt.err': ['錯誤', 'Error', 'Lỗi'],
     'ann.close': ['關閉公告', 'Dismiss', 'Đóng'],
 
     // ---- staff: site status tab
