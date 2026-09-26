@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import activity, config, db, discord_api
+from . import activity, config, db, discord_api, security
 from .deps import current_user, roles_of
 
 log = logging.getLogger("rewards.roles")
@@ -110,6 +110,7 @@ class ToggleIn(BaseModel):
 
 @router.post("/api/notify-roles/{role_id}")
 async def toggle(role_id: str, body: ToggleIn, user: dict = Depends(current_user)):
+    security.ratelimit(f"nrole:{user['id']}", 15, 60)
     role = next((r for r in notify_roles() if r["id"] == role_id), None)
     if not role:
         raise HTTPException(404, "找不到這個通知身分組")

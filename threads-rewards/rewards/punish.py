@@ -11,6 +11,7 @@
   POST /api/plugin/link       玩家輸入 /link <code> {code, uuid, name}
 """
 import asyncio
+import hmac
 import json
 import logging
 import re
@@ -501,7 +502,7 @@ async def staff_stats(_: dict = Depends(require(MOD))):
 
 def plugin_auth(x_api_key: str = Header(default="")) -> None:
     key = config.setting_or_env("plugin_api_key", config.PLUGIN_API_KEY)
-    if not key or x_api_key != key:
+    if not key or not hmac.compare_digest(x_api_key.encode(), key.encode()):
         raise HTTPException(401, "invalid api key")
 
 

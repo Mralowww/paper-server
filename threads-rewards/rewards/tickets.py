@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from . import activity, config, db, discord_api, push
+from . import activity, config, db, discord_api, push, security
 from .deps import MOD, SUPPORT, current_user, display_name, public_user, require, user_level, protect_owner
 
 router = APIRouter()
@@ -65,9 +65,12 @@ async def upload(file: UploadFile = File(...), user: dict = Depends(current_user
     ext = IMAGE_TYPES.get(file.content_type or "")
     if not ext:
         raise HTTPException(400, "只接受 PNG / JPG / GIF / WebP 圖片")
+    security.ratelimit(f"upload:{user['id']}", 30, 600, "上傳太頻繁，請稍後再試")
     data = await file.read(5 * 1024 * 1024 + 1)
     if len(data) > 5 * 1024 * 1024:
         raise HTTPException(413, "圖片不可超過 5MB")
+    if not security.image_ok(ext, data):
+        raise HTTPException(400, "檔案內容不是有效的圖片")
     name = f"{secrets.token_urlsafe(12)}{ext}"
     Path(config.UPLOAD_DIR, name).write_bytes(data)
     db.audit(user, "upload", name)
@@ -140,6 +143,7 @@ async def create_ticket(body: TicketIn, user: dict = Depends(current_user)):
         raise HTTPException(400, "請選擇分類")
     if user.get("ticket_banned"):
         raise HTTPException(403, "你已被禁止開立支援單，如有疑問請聯絡管理團隊")
+    security.ratelimit(f"ticket:{user['id']}", 6, 3600, "開單太頻繁，請稍後再試")
     subject, text = body.subject.strip()[:120], body.body.strip()[:5000]
     if not subject or not text:
         raise HTTPException(400, "請填寫標題與內容")
@@ -222,6 +226,7 @@ async def get_ticket(ticket_id: int, request: Request, after: int = 0, user: dic
 async def post_message(ticket_id: int, body: MessageIn, request: Request, user: dict = Depends(current_user)):
     t, level = await _load(ticket_id, request, user)
     staff = level >= SUPPORT
+    security.ratelimit(f"msg:{user['id']}", 30, 60, "訊息傳送太頻繁，請稍後再試")
     text, atts = body.body.strip()[:5000], _clean_attachments(body.attachments)
     if not text and not atts:
         raise HTTPException(400, "訊息不可為空")

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 
-from . import config, db, discord_api
+from . import config, db, discord_api, security
 from .deps import current_user
 
 router = APIRouter()
@@ -33,6 +33,7 @@ async def account(user: dict = Depends(current_user)):
 
 @router.post("/api/account/link-code")
 async def link_code(user: dict = Depends(current_user)):
+    security.ratelimit(f"linkcode:{user['id']}", 10, 600)
     db.execute("DELETE FROM link_codes WHERE user_id = ? OR expires_at <= ?", (user["id"], db.iso(db.now_utc())))
     code = "".join(secrets.choice(ALPHABET) for _ in range(6))
     expires = db.iso(db.now_utc() + timedelta(minutes=10))

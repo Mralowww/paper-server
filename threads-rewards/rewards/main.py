@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, maintenance, push, roles, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, maintenance, push, roles, security, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user, protect_owner, roles_of, save_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -54,10 +54,11 @@ async def lifespan(_: FastAPI):
         await bot.bot.close()
 
 
-app = FastAPI(title="鋸齒 SMP", lifespan=lifespan)
+app = FastAPI(title="鋸齒 SMP", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 # 操作紀錄要在 Session 內側才讀得到登入者，所以先加（越晚加的越外層）
 app.add_middleware(activity.ActivityMiddleware)
 app.add_middleware(maintenance.MaintenanceMiddleware)
+app.add_middleware(security.SecurityHeadersMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET, max_age=60 * 60 * 24 * 30,
                    same_site="lax", https_only=config.DISCORD_REDIRECT_URI.startswith("https"))
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -110,8 +111,8 @@ async def login(request: Request):
         raise HTTPException(500, "尚未設定 DISCORD_CLIENT_ID")
     state = secrets.token_urlsafe(16)
     request.session["oauth_state"] = state
-    nxt = request.query_params.get("next", "")
-    if nxt.startswith("/") and not nxt.startswith("//"):
+    nxt = security.safe_next(request.query_params.get("next", ""))
+    if nxt:
         request.session["next"] = nxt
     return RedirectResponse(discord_api.authorize_url(state))
 
@@ -144,7 +145,7 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
                    "level": status.get("level", 0), "guild_member": status.get("member"), "roles": status.get("roles"),
                    "username": user.get("username"), "email_verified": user.get("verified"), "locale": user.get("locale"),
                    "mfa": user.get("mfa_enabled"), "next": request.session.get("next")})
-    return RedirectResponse(request.session.pop("next", None) or "/account")
+    return RedirectResponse(security.safe_next(request.session.pop("next", None)) or "/account")
 
 
 @app.get("/auth/dev-login", include_in_schema=False)

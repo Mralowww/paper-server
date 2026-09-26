@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import config, db
+from . import config, db, security
 from .deps import SUPPORT, current_user
 
 log = logging.getLogger("rewards.push")
@@ -90,7 +90,7 @@ async def _send_one(client: httpx.AsyncClient, sub: dict, data: dict) -> None:
 async def send(user_ids: list[str] | None, data: dict, kind: str | None = "tickets") -> None:
     """推播給指定使用者（None = 所有訂閱者）。data：title / body / url / tag。"""
     rows = db.query("SELECT * FROM push_subs")
-    rows = [r for r in rows if (kind is None or kind in (r["kinds"] or "").split(",")) and (user_ids is None or r["user_id"] in user_ids)]
+    rows = [r for r in rows if security.push_host_ok(r["endpoint"]) and (kind is None or kind in (r["kinds"] or "").split(",")) and (user_ids is None or r["user_id"] in user_ids)]
     if not rows:
         return
     async with httpx.AsyncClient(timeout=10) as client:
@@ -128,8 +128,9 @@ async def push_status(user: dict = Depends(current_user)):
 
 @router.post("/api/push/subscribe")
 async def subscribe(body: SubIn, user: dict = Depends(current_user)):
-    if not body.endpoint.startswith("https://") or not body.keys.get("p256dh") or not body.keys.get("auth"):
+    if not security.push_host_ok(body.endpoint) or not body.keys.get("p256dh") or not body.keys.get("auth"):
         raise HTTPException(400, "訂閱資料不正確")
+    security.ratelimit(f"push:{user['id']}", 20, 3600)
     kinds = ",".join(k for k in body.kinds if k in ("tickets", "replies")) or "tickets"
     db.execute("""INSERT INTO push_subs(endpoint, user_id, p256dh, auth, kinds, created_at) VALUES (?,?,?,?,?,?)
                   ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, kinds = excluded.kinds""",
@@ -145,5 +146,6 @@ async def unsubscribe(body: dict, user: dict = Depends(current_user)):
 
 @router.post("/api/push/test")
 async def push_test(user: dict = Depends(current_user)):
+    security.ratelimit(f"pushtest:{user['id']}", 5, 300)
     await send([user["id"]], {"title": "鋸齒 SMP", "body": "桌面通知已開啟，之後有新的客服單或回覆會在這裡提醒你。", "url": "/settings", "tag": "test"}, kind=None)
     return {"ok": True}
