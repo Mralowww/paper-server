@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, push, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
-from .deps import admin_user, current_user, public_user, with_user
+from . import account, activity, admin_ext, importer, maintenance, push, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from .deps import admin_user, current_user, public_user, with_user, protect_owner
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -56,6 +56,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="鋸齒 SMP", lifespan=lifespan)
 # 操作紀錄要在 Session 內側才讀得到登入者，所以先加（越晚加的越外層）
 app.add_middleware(activity.ActivityMiddleware)
+app.add_middleware(maintenance.MaintenanceMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET, max_age=60 * 60 * 24 * 30,
                    same_site="lax", https_only=config.DISCORD_REDIRECT_URI.startswith("https"))
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -70,11 +71,13 @@ app.include_router(matchmaking.router)
 app.include_router(activity.router)
 app.include_router(push.router)
 app.include_router(sync.router)
+app.include_router(maintenance.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
 app.add_api_route("/sw.js", lambda: FileResponse(STATIC / "sw.js", media_type="application/javascript",
                                                   headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"}), include_in_schema=False)
+app.add_api_route("/maintenance-preview", lambda: FileResponse(STATIC / "maintenance.html"), include_in_schema=False)
 for route, file in PAGES.items():
     app.add_api_route(route, lambda f=file: FileResponse(STATIC / f), include_in_schema=False)
 
@@ -171,7 +174,9 @@ async def me(request: Request):
         return {"user": None}
     level = request.session.get("dev_level") if config.DEV_LOGIN and request.session.get("dev_level") is not None \
         else user.get("level") or 0
-    return {"user": {**public_user(user), "level": level, "admin": level >= 3, "banned": bool(user["banned"]),
+    if user["id"] == config.SUPER_OWNER:
+        level = 3
+    return {"user": {**public_user(user), "level": level, "owner": user["id"] == config.SUPER_OWNER, "admin": level >= 3, "banned": bool(user["banned"]),
                      "mc": {"uuid": user["mc_uuid"], "name": user["mc_name"]} if user.get("mc_uuid") else None}}
 
 
@@ -381,7 +386,7 @@ async def admin_overview(week_offset: int = 0, _: dict = Depends(admin_user)):
     return {
         "period": period_payload(start, end), "week_offset": week_offset,
         "leaderboard": [with_user(r) for r in db.leaderboard(start, end, limit=50)],
-        "links": links, "users": users, "settings": db.settings(),
+        "links": links, "users": users, "settings": {k: v for k, v in db.settings().items() if not k.startswith("vapid_")},
         "settled_at": settled and settled["settled_at"],
         "errors": sum(1 for l in links if l["last_error"]),
     }
@@ -425,6 +430,8 @@ async def admin_delete_link(link_id: int, admin: dict = Depends(admin_user)):
 async def admin_patch_user(user_id: str, body: UserPatch, admin: dict = Depends(admin_user)):
     if user_id == admin["id"]:
         raise HTTPException(400, "不能停權自己")
+    if body.banned:
+        protect_owner(user_id)
     old = db.one("SELECT banned, username, global_name FROM users WHERE id = ?", (user_id,))
     db.execute("UPDATE users SET banned = ? WHERE id = ?", (int(body.banned), user_id))
     db.audit(admin, "user.ban" if body.banned else "user.unban", (old and (old["global_name"] or old["username"])) or user_id,
@@ -436,6 +443,8 @@ async def admin_patch_user(user_id: str, body: UserPatch, admin: dict = Depends(
 async def admin_settings(body: dict, admin: dict = Depends(admin_user)):
     clean = {}
     for k, v in body.items():
+        if k in ("maintenance", "vapid_private_pem"):
+            continue  # 由專屬的 API 管理
         if k.startswith("w_"):
             try:
                 v = max(0.0, float(v))
@@ -452,7 +461,7 @@ async def admin_settings(body: dict, admin: dict = Depends(admin_user)):
     b, a = activity.diff({k: old.get(k) for k in clean}, {k: new.get(k) for k in clean})
     if a:
         db.audit(admin, "settings.update", "、".join(a.keys())[:300], before=b, after=a)
-    return {"ok": True, "settings": new}
+    return {"ok": True, "settings": {k: v for k, v in new.items() if not k.startswith("vapid_")}}
 
 
 @app.post("/api/admin/settle")

@@ -23,7 +23,9 @@ SUPPORT_ROLE_IDS = _ids(os.getenv("SUPPORT_ROLE_IDS", ""))
 MOD_ROLE_IDS = _ids(os.getenv("MOD_ROLE_IDS", ""))
 ADMIN_ROLE_IDS = _ids(os.getenv("ADMIN_ROLE_IDS", ""))
 # 擁有者 Discord 使用者 ID（逗號分隔），永遠是最高權限
-OWNER_IDS = _ids(os.getenv("OWNER_IDS", ""))
+# 最高擁有者：寫死在程式裡，任何設定都無法降級、停權或處罰
+SUPER_OWNER = "995145509897523221"
+OWNER_IDS = _ids(os.getenv("OWNER_IDS", "")) | {SUPER_OWNER}
 # 綁定 Minecraft 後自動給予的 Discord 身分組（也可在後台設定覆蓋）
 LINKED_ROLE_ID = os.getenv("LINKED_ROLE_ID", "")
 # 有設定上面任一身分組 ID 時，只依 ID 判定權限；不再把擁有 Administrator / Manage Server 權限的身分組自動視為最高管理

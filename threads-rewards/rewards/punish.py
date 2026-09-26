@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from . import activity, config, db, discord_api
-from .deps import ADMIN, MOD, display_name, public_user, require
+from .deps import ADMIN, MOD, display_name, public_user, require, protect_owner
 
 router = APIRouter()
 TYPES = ("ban", "mute", "warn", "kick", "ipban")
@@ -196,6 +196,7 @@ def create_punishment(player: dict, ptype: str, reason: str, duration: int | Non
                       silent: bool = False, discord_sync: bool = False) -> dict:
     if ptype not in TYPES:
         raise HTTPException(400, "不支援的懲處類型")
+    protect_owner(mc_uuid=player.get("uuid"))
     reason = reason.strip()[:500]
     if not reason:
         raise HTTPException(400, "請填寫原因")

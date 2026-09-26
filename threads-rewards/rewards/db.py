@@ -9,6 +9,7 @@ _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 
 DEFAULT_SETTINGS = {
+    "maintenance": "", "vapid_private_pem": "",
     "w_views": "1",
     "w_likes": "10",
     "w_replies": "15",

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from . import activity, config, db, discord_api, push
-from .deps import MOD, SUPPORT, current_user, display_name, public_user, require, user_level
+from .deps import MOD, SUPPORT, current_user, display_name, public_user, require, user_level, protect_owner
 
 router = APIRouter()
 CATEGORIES = ("report", "bug", "connection", "sponsor", "appeal", "other")
@@ -464,6 +464,8 @@ async def delete_ticket(ticket_id: int, staff: dict = Depends(require(MOD))):
 @router.post("/api/staff/ticket-ban/{user_id}")
 async def ticket_ban(user_id: str, body: dict, staff: dict = Depends(require(SUPPORT))):
     banned = bool(body.get("banned", True))
+    if banned:
+        protect_owner(user_id)
     db.execute("UPDATE users SET ticket_banned = ? WHERE id = ?", (int(banned), user_id))
     db.audit(staff, "ticket.ban" if banned else "ticket.unban", user_id)
     return {"ok": True}

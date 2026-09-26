@@ -565,7 +565,7 @@
      站內連結改成：抓新頁面 HTML → 換掉 body 內容 → 載入該頁專屬腳本 → 觸發 app:ready。
      各頁腳本在 document / window 上註冊的監聽、計時器與動畫迴圈會記錄下來，換頁時一併清除。 */
   const COMMON = ["i18n", "art", "core", "fx"];
-  const KEEP = new Set(["topbar", "scrollbar", "curtain"]);
+  const KEEP = new Set(["topbar", "scrollbar", "curtain", "mt-ribbon"]);
   let pageScripts = new Set(); let gen = 0; let scoped = []; let navigating = false;
   const scriptName = (src) => (src.match(/\/static\/js\/([\w-]+)\.js/) || [])[1];
   const collectPageScripts = (root) => new Set([...root.querySelectorAll("script[src]")].map((x) => scriptName(x.getAttribute("src"))).filter((n) => n && !COMMON.includes(n)));
@@ -788,7 +788,22 @@
     await mePromise; renderNav();
     document.dispatchEvent(new CustomEvent("app:ready", { detail: { me } }));
   });
-  document.addEventListener("langchange", () => { renderNav(); renderFooter(); });
+  document.addEventListener("langchange", () => { renderNav(); renderFooter(); maintRibbon(); });
+
+  /* ---------- 維修提示列 ---------- */
+  let maint = null;
+  async function maintRibbon(refresh = false) {
+    if (refresh || !maint) { try { maint = await api("/api/maintenance", { quiet: true }); } catch { return; } }
+    let el = document.getElementById("mt-ribbon");
+    if (!maint.active || document.body.classList.contains("standalone") && location.pathname !== "/desk") { el && el.remove(); return; }
+    const scope = maint.global ? t("mt.all") : [...maint.pages.map((p) => t("mt.p." + p)), ...maint.features.map((f) => t("mt.f." + f))].join("、");
+    if (!maint.bypass && maint.global) { el && el.remove(); return; }
+    if (!el) { el = document.createElement("div"); el.id = "mt-ribbon"; el.className = "mt-ribbon"; document.body.prepend(el); }
+    el.innerHTML = maint.bypass
+      ? `${window.ART ? ART.icon("settings", 15) : ""}<span><b>${t("mt.rb.on")}</b> · ${esc(scope)} · ${t("mt.rb.bypass")}</span>${me && me.level >= 3 ? `<a href="/admin#maintenance">${t("mt.rb.manage")}</a>` : ""}`
+      : `${window.ART ? ART.icon("alert", 15) : ""}<span><b>${t("mt.rb.part")}</b>${esc(scope)}</span>`;
+  }
+  document.addEventListener("app:ready", () => maintRibbon(true));
 
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,

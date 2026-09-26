@@ -18,13 +18,65 @@
     { id: "activity", icon: "list", min: 3 },
     { id: "settings", icon: "settings", min: 3 },
     { id: "status", icon: "activity", min: 3 },
+    { id: "maintenance", icon: "alert", min: 3 },
   ];
   let level = 0; let current = null; let cleanup = null; let openTickets = 0;
   const main = () => $("#main");
   const head = (id, extra = "") => `<div class="admin-title"><div><h2>${t("adm." + id)}</h2><p>${t("adm." + id + ".d")}</p></div><div class="row">${extra}</div></div>`;
-  const lvlTags = (l) => (l >= 3 ? `<span class="lvl-tag lvl-3">${t("lv.3")}</span>` : "") + (l === 2 ? `<span class="lvl-tag lvl-2">${t("lv.2")}</span>` : "") + (l === 1 ? `<span class="lvl-tag lvl-1">${t("lv.1")}</span>` : "");
+  const lvlTagsBase = (l) => (l >= 3 ? `<span class="lvl-tag lvl-3">${t("lv.3")}</span>` : "") + (l === 2 ? `<span class="lvl-tag lvl-2">${t("lv.2")}</span>` : "") + (l === 1 ? `<span class="lvl-tag lvl-1">${t("lv.1")}</span>` : "");
 
   // 側欄只建立一次，之後只更新目前頁面與徽章（避免重建造成捲動位置跳動）
+  const lvlTags = (l, owner = App.me && App.me.owner) => owner ? `<span class="lvl-tag lvl-owner">${t("lv.owner")}</span>` : lvlTagsBase(l);
+
+  /* ---------- 維修模式 ---------- */
+  async function maintenance(el) {
+    const d = await api("/api/admin/maintenance"); let st = { ...d.state };
+    const on = () => st.global || st.pages.length || st.features.length;
+    const toISOInput = (iso) => { if (!iso) return ""; const x = new Date(iso); if (isNaN(x)) return ""; x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 16); };
+    const tile = (kind, key) => { const sel = st[kind].includes(key); return `<button type="button" class="mt-tile ${sel ? "on" : ""}" data-kind="${kind}" data-key="${key}" ${st.global ? "disabled" : ""}>
+      <span class="sw"><i></i></span><b>${t(`mt.${kind === "pages" ? "p" : "f"}.${key}`)}</b><small>${t(`mt.${kind === "pages" ? "pd" : "fd"}.${key}`)}</small></button>`; };
+    const draw = () => {
+      el.innerHTML = head("maintenance", `<a class="btn" href="/maintenance-preview" target="_blank">${ART.icon("eye", 16)}${t("mt.preview")}</a>`) + `
+        <div class="card mt-master ${st.global ? "on" : on() ? "part" : ""}">
+          <div class="mt-master-l"><span class="mt-state-ic">${ART.icon(st.global ? "alert" : on() ? "settings" : "check", 22)}</span>
+            <div><b>${t(st.global ? "mt.state.all" : on() ? "mt.state.part" : "mt.state.off")}</b><small>${st.updated_at ? t("mt.lastBy", { name: esc(st.updated_by || ""), time: date(st.updated_at) }) : t("mt.globalD")}</small></div></div>
+          <label class="switch big"><input type="checkbox" id="mt-global" data-snd-cat="x" ${st.global ? "checked" : ""}><span></span></label>
+        </div>
+        <div class="grid grid-2 section tight">
+          <div class="card"><div class="card-title"><h3>${ART.icon("message", 17)} ${t("mt.msgTitle")}</h3></div>
+            <textarea class="input" id="mt-msg" rows="3" placeholder="${t("mt.msgPh")}">${esc(st.message || "")}</textarea>
+            <div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap"><label class="field" style="flex:1;min-width:200px"><span>${t("mt.etaLbl")}</span><input class="input" type="datetime-local" id="mt-eta" value="${toISOInput(st.eta)}"></label>
+              <label class="field" style="flex:1;min-width:200px"><span>${t("mt.bypassLbl")}</span><select class="enhance" id="mt-by">${[1, 2, 3].map((l) => `<option value="${l}" ${+st.bypass_level === l ? "selected" : ""}>${t("mt.by." + l)}</option>`).join("")}</select></label></div>
+            <p class="dim" style="font-size:12.5px;margin:10px 0 0">${t("mt.ownerNote")}</p></div>
+          <div class="card"><div class="card-title"><h3>${ART.icon("shield", 17)} ${t("mt.alwaysTitle")}</h3></div>
+            <ul class="mt-always">${["mt.al.login", "mt.al.admin", "mt.al.plugin", "mt.al.bypass"].map((k) => `<li>${ART.icon("check", 14)}${t(k)}</li>`).join("")}</ul></div>
+        </div>
+        <div class="card section tight"><div class="card-title"><h3>${ART.icon("grid", 17)} ${t("mt.pagesTitle")}</h3><span class="dim" style="margin-left:auto;font-size:12.5px">${st.global ? t("mt.coveredByAll") : ""}</span></div>
+          <div class="mt-tiles">${d.pages.map((k) => tile("pages", k)).join("")}</div></div>
+        <div class="card section tight"><div class="card-title"><h3>${ART.icon("settings", 17)} ${t("mt.featTitle")}</h3></div>
+          <div class="mt-tiles">${d.features.map((k) => tile("features", k)).join("")}</div></div>
+        <div class="mt-savebar"><span class="dim" id="mt-dirty"></span><button class="btn" id="mt-clear">${t("mt.clearAll")}</button><button class="btn gold" id="mt-save">${ART.icon("check", 16)}${t("save")}</button></div>`;
+      App.observe(el);
+    };
+    const dirty = () => { const b = $("#mt-dirty", el); if (b) b.textContent = t("mt.unsaved"); };
+    draw();
+    el.addEventListener("click", async (e) => {
+      const tl = e.target.closest(".mt-tile"); if (tl && !tl.disabled) { const arr = st[tl.dataset.kind]; const i = arr.indexOf(tl.dataset.key);
+        st[tl.dataset.kind] = i >= 0 ? arr.filter((x) => x !== tl.dataset.key) : [...arr, tl.dataset.key]; tl.classList.toggle("on", i < 0); sfx(i < 0 ? "toggleOn" : "toggleOff"); dirty(); return; }
+      if (e.target.closest("#mt-clear")) { st = { ...st, global: false, pages: [], features: [] }; sfx("toggleOff"); save(); return; }
+      if (e.target.closest("#mt-save")) save();
+    });
+    el.addEventListener("change", (e) => { if (e.target.id === "mt-global") { st.global = e.target.checked; sfx(st.global ? "toggleOn" : "toggleOff"); save(); } else dirty(); });
+    el.addEventListener("input", (e) => { if (e.target.id === "mt-msg") dirty(); });
+    async function save() {
+      st.message = $("#mt-msg", el).value; const eta = $("#mt-eta", el).value; st.eta = eta ? new Date(eta).toISOString() : null; st.bypass_level = +$("#mt-by", el).value;
+      if (st.global && !(await App.confirm(t("mt.confirmAll"), { danger: true }))) { st.global = false; draw(); return; }
+      try { const r = await api("/api/admin/maintenance", { method: "PUT", body: { global: st.global, pages: st.pages, features: st.features, message: st.message, eta: st.eta, bypass_level: st.bypass_level } });
+        st = { ...r.state }; draw(); App.ok(t(on() ? "mt.savedOn" : "mt.savedOff"), "", 1400); }
+      catch (err) { App.fail(err.message); }
+    }
+  }
+
   function renderSide() {
     const me = App.me; const card = $("#me-card"); const side = $("#side");
     const cardSig = me.avatar + me.name + level + App.lang;
@@ -449,7 +501,7 @@
   }
   document.addEventListener("click", (e) => { if (e.target.closest("[data-sync]")) openSync().catch((err) => App.fail(err.message)); });
 
-  const VIEWS = { activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
+  const VIEWS = { maintenance, activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
 
   document.addEventListener("app:ready", async () => {
     if (!App.me) return App.go("/login");

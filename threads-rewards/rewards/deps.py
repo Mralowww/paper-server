@@ -26,13 +26,15 @@ async def current_user(request: Request) -> dict:
     user = uid and db.one("SELECT * FROM users WHERE id = ?", (uid,))
     if not user:
         raise HTTPException(401, "請先登入")
-    if user["banned"]:
+    if user["banned"] and user["id"] != config.SUPER_OWNER:
         raise HTTPException(403, "你的帳號已被停權")
     return user
 
 
 async def user_level(request: Request, user: dict) -> int:
     """重新向 Discord 確認權限（快取 60 秒），並同步回資料庫。"""
+    if user["id"] == config.SUPER_OWNER:
+        return ADMIN
     if config.DEV_LOGIN and request.session.get("dev_level") is not None:
         return int(request.session["dev_level"])
     status = await discord_api.member_status(user["id"])
@@ -54,3 +56,15 @@ def require(min_level: int):
 
 
 admin_user = require(ADMIN)
+
+
+def is_owner(user_id: str | None) -> bool:
+    return bool(user_id) and user_id == config.SUPER_OWNER
+
+
+def protect_owner(user_id: str | None = None, mc_uuid: str | None = None) -> None:
+    """最高擁有者（及其綁定的 Minecraft 帳號）不能被停權或處罰。"""
+    if is_owner(user_id):
+        raise HTTPException(403, "無法對最高擁有者執行此操作")
+    if mc_uuid and db.one("SELECT 1 FROM users WHERE id = ? AND mc_uuid = ?", (config.SUPER_OWNER, mc_uuid)):
+        raise HTTPException(403, "無法處罰最高擁有者的 Minecraft 帳號")

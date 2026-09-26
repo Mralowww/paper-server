@@ -1514,3 +1514,57 @@ body.standalone:has(.desk) { overflow: hidden; }
   .nav-links { top: 58px !important; left: 10px !important; right: 10px !important; width: auto; }
 }
 .select-list { overscroll-behavior: contain; touch-action: pan-y; }
+
+/* ================= 維修中頁面 ================= */
+.mt { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; position: relative; overflow: hidden; }
+.mt-bg { position: absolute; inset: 0; pointer-events: none; }
+.mt-bg i { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .35; animation: mtFloat 14s ease-in-out infinite alternate; }
+.mt-bg i:nth-child(1) { width: 420px; height: 420px; left: -120px; top: -80px; background: var(--accent); }
+.mt-bg i:nth-child(2) { width: 360px; height: 360px; right: -100px; bottom: -120px; background: color-mix(in srgb, var(--accent) 50%, #e8a33d); animation-delay: -5s; }
+.mt-bg i:nth-child(3) { width: 240px; height: 240px; left: 55%; top: 10%; background: color-mix(in srgb, var(--accent) 60%, var(--blue)); opacity: .2; animation-delay: -9s; }
+@keyframes mtFloat { to { transform: translate(40px, 30px) scale(1.1); } }
+.mt-card { position: relative; width: min(520px, 100%); padding: 40px 32px 28px; border-radius: 24px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-lg); text-align: center; display: grid; justify-items: center; gap: 12px; animation: popIn .6s var(--ease-spring) both; }
+.mt-icon { position: relative; width: 84px; height: 84px; color: var(--accent); margin-bottom: 4px; }
+.mt-icon .gear { position: absolute; }
+.mt-icon .g1 { width: 64px; height: 64px; left: 0; top: 0; animation: spin 8s linear infinite; }
+.mt-icon .g2 { width: 40px; height: 40px; right: 0; bottom: 0; color: color-mix(in srgb, var(--accent) 60%, var(--text)); animation: spin 5s linear infinite reverse; }
+.mt-logo { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 9px; opacity: .9; }
+.mt h1 { font-family: var(--font-head); font-weight: 400; font-size: clamp(36px, 7vw, 52px); margin: 0; line-height: 1.05; }
+.mt-msg { margin: 0; color: var(--text-2); line-height: 1.7; white-space: pre-wrap; }
+.mt-scope { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; } .mt-scope:empty { display: none; }
+.mt-scope span { padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; }
+.mt-eta { display: grid; gap: 2px; padding: 12px 22px; border-radius: 14px; background: var(--sunken); border: 1px solid var(--border); }
+.mt-eta small { color: var(--text-3); font-size: 12px; } .mt-eta b { font-size: 26px; letter-spacing: .06em; color: var(--text); }
+.mt-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+.mt-foot { color: var(--text-3); font-size: 12px; margin-top: 4px; }
+:root[data-motion="reduce"] .mt-icon .gear, :root[data-motion="reduce"] .mt-bg i { animation: none; }
+
+/* 維修提示列（部分功能維修中 / 管理員略過中） */
+.mt-ribbon { position: sticky; top: 0; z-index: 70; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 7px 16px; font-size: 13px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, #e8a33d 22%, var(--bg)) 0 14px, color-mix(in srgb, #e8a33d 14%, var(--bg)) 14px 28px); color: var(--text); border-bottom: 1px solid color-mix(in srgb, #e8a33d 40%, var(--border)); animation: bannerIn .4s var(--ease-out); }
+.mt-ribbon b { color: #e8a33d; } .mt-ribbon a { color: var(--accent); text-decoration: underline; }
+.lvl-tag.lvl-owner { background: linear-gradient(135deg, #f9d66b, #e9a524); color: #1a1406; }
+
+/* ================= 後台：維修模式 ================= */
+.mt-master { display: flex; align-items: center; gap: 16px; justify-content: space-between; border-width: 1.5px; transition: border-color .3s, background .3s; }
+.mt-master.on { border-color: color-mix(in srgb, var(--red) 55%, var(--border)); background: linear-gradient(90deg, color-mix(in srgb, var(--red) 10%, var(--surface)), var(--surface)); }
+.mt-master.part { border-color: color-mix(in srgb, #e8a33d 55%, var(--border)); background: linear-gradient(90deg, color-mix(in srgb, #e8a33d 10%, var(--surface)), var(--surface)); }
+.mt-master-l { display: flex; align-items: center; gap: 14px; } .mt-master-l b { display: block; font-size: 17px; } .mt-master-l small { color: var(--text-3); }
+.mt-state-ic { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+.mt-master.on .mt-state-ic { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); animation: alPulse 1.8s infinite; }
+.mt-master.part .mt-state-ic { background: color-mix(in srgb, #e8a33d 16%, transparent); color: #e8a33d; }
+.switch.big { transform: scale(1.3); transform-origin: right center; }
+.field > span { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+.mt-always { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; } .mt-always li { display: flex; gap: 8px; align-items: flex-start; color: var(--text-2); font-size: 13.5px; line-height: 1.5; } .mt-always svg { color: var(--green); flex: none; margin-top: 3px; }
+.mt-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.mt-tile { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color .2s, background .2s, transform .2s var(--ease-spring); }
+.mt-tile .sw { grid-row: span 2; width: 34px; height: 20px; border-radius: 10px; background: var(--border-strong); position: relative; transition: background .25s; }
+.mt-tile .sw i { position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .3s var(--ease-spring); }
+.mt-tile b { font-size: 14px; } .mt-tile small { color: var(--text-3); font-size: 12px; line-height: 1.4; }
+.mt-tile:hover:not(:disabled) { border-color: var(--border-strong); transform: translateY(-1px); }
+.mt-tile.on { border-color: color-mix(in srgb, #e8a33d 60%, var(--border)); background: color-mix(in srgb, #e8a33d 8%, var(--bg)); }
+.mt-tile.on .sw { background: #e8a33d; } .mt-tile.on .sw i { transform: translateX(14px); }
+.mt-tile:disabled { opacity: .45; cursor: not-allowed; }
+.mt-savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); box-shadow: var(--shadow); }
+.mt-savebar #mt-dirty { margin-right: auto; color: #e8a33d; font-size: 13px; }
