@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的連結 · Threads 獎勵計畫</title>
+<meta name="theme-color" content="#07080c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='3' fill='%23f5c542'/%3E%3Cpath d='M3 4h10v2H9v7H7V6H3z' fill='%23140e02'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page">
+  <div class="container">
+    <div class="section-head reveal">
+      <div><h2 data-i18n="links.title"></h2><p class="muted" data-i18n="links.sub"></p></div>
+      <span class="tag ok live mono" id="period-label"></span>
+    </div>
+
+    <form class="card glass reveal" id="add-form" autocomplete="off">
+      <div class="input-group">
+        <input class="input mono" name="url" id="url" data-i18n-ph="links.placeholder" required>
+        <button class="btn gold" type="submit" id="submit-btn"><span data-i18n="links.submit"></span><span class="kbd hide-sm" style="background:rgba(0,0,0,.15);border-color:rgba(0,0,0,.2);color:#3a2a08">Ctrl ↵</span></button>
+      </div>
+      <div class="dim" style="font-size:13px;margin-top:10px" id="quota"></div>
+    </form>
+
+    <section class="section grid grid-4" id="summary">
+      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="trophy"></span><span data-i18n="links.rank"></span></span><span class="value" data-k="rank">—</span></div>
+      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="star"></span><span data-i18n="links.score"></span></span><span class="value" data-k="score">0</span></div>
+      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="chart"></span><span data-i18n="links.count"></span></span><span class="value" data-k="link_count">0</span></div>
+      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="heart"></span><span data-i18n="links.likes"></span></span><span class="value" data-k="likes">0</span></div>
+    </section>
+
+    <section class="section card reveal">
+      <div class="card-title"><span class="icon-spin" data-px="repost"></span><h3 data-i18n="links.list"></h3><span class="right tag warn pulse" id="new-badge" hidden data-i18n="links.newItems"></span></div>
+      <div class="board" id="list">
+        <div class="skeleton sk-row"></div><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div>
+      </div>
+    </section>
+  </div>
+  <button class="btn gold fab" id="jump" hidden>⇡ <span data-i18n="links.jumpNew"></span></button>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/links.js"></script>
+</body>
+</html>

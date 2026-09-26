@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設定 · Threads 獎勵計畫</title>
+<meta name="theme-color" content="#07080c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='3' fill='%23f5c542'/%3E%3Cpath d='M3 4h10v2H9v7H7V6H3z' fill='%23140e02'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page">
+  <div class="container" style="max-width:760px">
+    <div class="section-head reveal"><div><h2 data-i18n="set.title"></h2><p class="muted" data-i18n="set.sub"></p></div></div>
+    <div class="card reveal">
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="set.sound"></b><small data-i18n="set.soundd"></small></div>
+        <label class="switch"><input type="checkbox" id="sound"><span></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="set.volume"></b><small class="mono" id="vol-label"></small></div>
+        <input type="range" id="volume" min="0" max="100" step="1" style="max-width:220px">
+        <button class="btn sm" id="test" data-i18n="set.test"></button>
+      </div>
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="set.lang"></b></div>
+        <select class="enhance" id="lang"><option value="zh">中文</option><option value="en">English</option></select>
+      </div>
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="set.motion"></b><small data-i18n="set.motiond"></small></div>
+        <label class="switch"><input type="checkbox" id="motion"><span></span></label>
+      </div>
+    </div>
+    <div class="card reveal section">
+      <div class="card-title"><h3 data-i18n="set.shortcuts"></h3></div>
+      <div class="setting-row"><div class="txt" data-i18n="sc.search"></div><span class="kbd">Ctrl K</span></div>
+      <div class="setting-row"><div class="txt" data-i18n="sc.submit"></div><span class="kbd">Ctrl Enter</span></div>
+      <div class="setting-row"><div class="txt" data-i18n="sc.close"></div><span class="kbd">Esc</span></div>
+    </div>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/settings.js"></script>
+</body>
+</html>

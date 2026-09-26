@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threads 獎勵計畫</title>
+<meta name="theme-color" content="#07080c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='3' fill='%23f5c542'/%3E%3Cpath d='M3 4h10v2H9v7H7V6H3z' fill='%23140e02'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page">
+  <div class="container">
+    <section class="hero">
+      <div class="float-orb" style="width:260px;height:260px;left:5%;top:20px;background:#f5c542"></div>
+      <div class="float-orb" style="width:200px;height:200px;right:8%;top:120px;background:#e08a1e;animation-delay:-5s"></div>
+      <span class="eyebrow tag gold live"><span data-i18n="home.eyebrow"></span></span>
+      <h1><span data-i18n="home.title1"></span><br><span class="gold-text" data-i18n="home.title2"></span></h1>
+      <p class="lead" data-i18n="home.lead"></p>
+      <div class="row cta">
+        <a class="btn gold lg" href="/links" id="cta-join"><span data-i18n="home.cta"></span> →</a>
+        <a class="btn lg" href="#board" data-i18n="home.cta2"></a>
+      </div>
+      <div>
+        <div class="dim pixel" style="margin-top:30px" data-i18n="home.countdown"></div>
+        <div class="countdown" id="countdown">
+          <div class="unit"><b data-u="d">--</b><small data-i18n="cd.d"></small></div>
+          <div class="unit"><b data-u="h">--</b><small data-i18n="cd.h"></small></div>
+          <div class="unit"><b data-u="m">--</b><small data-i18n="cd.m"></small></div>
+          <div class="unit"><b data-u="s">--</b><small data-i18n="cd.s"></small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section grid grid-4" id="stats">
+      <div class="card hover glass stat reveal"><span class="label"><span class="icon-spin" data-px="chart"></span><span data-i18n="home.stats.links"></span></span><span class="value" data-k="links">0</span></div>
+      <div class="card hover glass stat reveal"><span class="label"><span class="icon-spin" data-px="user"></span><span data-i18n="home.stats.users"></span></span><span class="value" data-k="users">0</span></div>
+      <div class="card hover glass stat reveal"><span class="label"><span class="icon-spin" data-px="heart"></span><span data-i18n="home.stats.likes"></span></span><span class="value" data-k="likes">0</span></div>
+      <div class="card hover glass stat reveal"><span class="label"><span class="icon-spin" data-px="eye"></span><span data-i18n="home.stats.views"></span></span><span class="value" data-k="views">0</span></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head reveal">
+        <div><h2 data-i18n="home.podium"></h2><p class="muted" data-i18n="home.podium.sub"></p></div>
+        <span class="tag ok live mono" id="period-label"></span>
+      </div>
+      <div class="podium" id="podium">
+        <div class="card skeleton" style="height:230px"></div><div class="card skeleton" style="height:260px"></div><div class="card skeleton" style="height:230px"></div>
+      </div>
+    </section>
+
+    <section class="section split" id="board">
+      <div class="card reveal">
+        <div class="card-title"><span class="icon-spin" data-px="trophy"></span><h3 data-i18n="home.board"></h3><span class="right tag gold mono" id="board-count"></span></div>
+        <div class="board" id="board-list">
+          <div class="skeleton sk-row"></div><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card hover reveal-l">
+          <div class="card-title"><span class="icon-spin" data-px="star"></span><h3 data-i18n="home.how"></h3></div>
+          <div class="stack steps" id="steps">
+            <div class="step"><div><b data-i18n="home.step1"></b><p data-i18n="home.step1d"></p></div></div>
+            <div class="step"><div><b data-i18n="home.step2"></b><p id="step2d"></p></div></div>
+            <div class="step"><div><b data-i18n="home.step3"></b><p data-i18n="home.step3d"></p></div></div>
+            <div class="step"><div><b data-i18n="home.step4"></b><p data-i18n="home.step4d"></p></div></div>
+          </div>
+        </div>
+        <div class="card hover reveal-l">
+          <div class="card-title"><span class="icon-spin" data-px="chart"></span><h3 data-i18n="home.scoring"></h3></div>
+          <div class="stack" id="weights" style="gap:10px"></div>
+        </div>
+        <div class="card hover reveal-l">
+          <div class="card-title"><span class="icon-spin" data-px="crown"></span><h3 data-i18n="home.lastWinners"></h3></div>
+          <div class="board" id="last-winners"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head reveal"><h2 data-i18n="home.history"></h2></div>
+      <div class="grid grid-3" id="history"></div>
+    </section>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/home.js"></script>
+</body>
+</html>
