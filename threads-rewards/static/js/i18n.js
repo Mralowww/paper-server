@@ -416,3 +416,19 @@ Object.assign(window.I18N.en, {
 
 Object.assign(window.I18N.zh, { "set.linkedRole": "綁定後給予的身分組（linked）" });
 Object.assign(window.I18N.en, { "set.linkedRole": "Role granted after linking" });
+Object.assign(window.I18N.zh, {
+  "snd.title": "音效", "snd.master": "主音量", "snd.playing": "播放中",
+  "snd.ui": "介面音效", "snd.ui.d": "滑過、點擊、切換、開關選單等互動聲。",
+  "snd.notify": "通知音效", "snd.notify.d": "成功、錯誤、送出與收到訊息的提示音。",
+  "snd.ambient": "背景環境音", "snd.ambient.d": "輕柔流動的和弦與音點，點一下頁面後開始播放。",
+  "snd.ambOn": "背景環境音已開啟", "snd.ambOff": "背景環境音已關閉",
+  "set.soundd": "所有聲音都由瀏覽器即時合成，不需下載音效檔。",
+});
+Object.assign(window.I18N.en, {
+  "snd.title": "Sound", "snd.master": "Master volume", "snd.playing": "Playing",
+  "snd.ui": "Interface sounds", "snd.ui.d": "Hover, click, switch and menu feedback.",
+  "snd.notify": "Notifications", "snd.notify.d": "Success, error, send and message chimes.",
+  "snd.ambient": "Ambient music", "snd.ambient.d": "Soft evolving chords and chimes; starts after you click the page.",
+  "snd.ambOn": "Ambient music on", "snd.ambOff": "Ambient music off",
+  "set.soundd": "Every sound is synthesized live in your browser.",
+});

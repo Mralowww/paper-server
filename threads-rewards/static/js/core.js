@@ -28,60 +28,208 @@
   };
   const setLang = (l) => { lang = l; store.set("lang", l); applyI18n(); document.dispatchEvent(new CustomEvent("langchange")); };
 
-  /* ---------- 合成音效（Web Audio，不使用音效檔） ---------- */
-  let actx = null;
+  /* ---------- 音效引擎（Web Audio 即時合成，不使用音效檔） ----------
+     聲音 → 分類音軌（介面 / 通知 / 環境）→ 主音量 → 壓縮器 → 喇叭，另有一路共用殘響。 */
+  let actx = null; let bus = {}; let master; let reverb; let noiseBuf; let lastSfx = 0;
+  const SND_CATS = ["ui", "notify", "ambient"];
+  const CAT_DEF = { ui: [true, 0.7], notify: [true, 0.85], ambient: [false, 0.45] };
   const sound = {
     get enabled() { return store.get("sound", true); },
-    set enabled(v) { store.set("sound", v); },
-    get volume() { return store.get("volume", 0.4); },
-    set volume(v) { store.set("volume", v); },
+    set enabled(v) { store.set("sound", v); applyGains(); ambient.sync(); },
+    get volume() { return store.get("volume", 0.5); },
+    set volume(v) { store.set("volume", v); applyGains(); },
+    on: (c) => store.get("snd." + c, CAT_DEF[c][0]),
+    vol: (c) => store.get("sndv." + c, CAT_DEF[c][1]),
+    set(c, { on, vol } = {}) {
+      if (on != null) store.set("snd." + c, on);
+      if (vol != null) store.set("sndv." + c, vol);
+      applyGains(); if (c === "ambient") ambient.sync();
+      document.dispatchEvent(new CustomEvent("soundchange"));
+    },
+    get playing() { return ambient.playing; },
   };
-  function tone({ f = 440, f2 = null, d = 0.1, type = "sine", v = 1, at = 0, attack = 0.005 }) {
-    const ctx = actx; const now = ctx.currentTime + at;
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = type; o.frequency.setValueAtTime(f, now);
-    if (f2) o.frequency.exponentialRampToValueAtTime(f2, now + d);
-    const peak = 0.25 * v * sound.volume;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), now + attack);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + d);
-    o.connect(g).connect(ctx.destination); o.start(now); o.stop(now + d + 0.02);
+  const catGain = (c) => (sound.enabled && sound.on(c) ? sound.vol(c) : 0);
+  function applyGains() {
+    if (!actx) return; const now = actx.currentTime;
+    master.gain.setTargetAtTime(sound.volume, now, 0.05);
+    SND_CATS.forEach((c) => bus[c].gain.setTargetAtTime(catGain(c), now, c === "ambient" ? 0.8 : 0.03));
   }
-  function noise({ d = 0.15, v = 1, at = 0, from = 3000, to = 300 }) {
-    const ctx = actx; const now = ctx.currentTime + at;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * d, ctx.sampleRate);
-    const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const flt = ctx.createBiquadFilter(); flt.type = "bandpass"; flt.frequency.setValueAtTime(from, now); flt.frequency.exponentialRampToValueAtTime(to, now + d);
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.18 * v * sound.volume, now); g.gain.exponentialRampToValueAtTime(0.0001, now + d);
-    src.connect(flt).connect(g).connect(ctx.destination); src.start(now);
+  function impulse(sec = 2.4, decay = 3.2) {
+    const len = Math.floor(actx.sampleRate * sec); const ir = actx.createBuffer(2, len, actx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay); }
+    return ir;
   }
+  function ensureAudio() {
+    if (actx) return actx;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    actx = new AC();
+    const comp = actx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
+    master = actx.createGain(); master.connect(comp).connect(actx.destination);
+    reverb = actx.createConvolver(); reverb.buffer = impulse();
+    const wet = actx.createGain(); wet.gain.value = 0.9; reverb.connect(wet).connect(master);
+    SND_CATS.forEach((c) => { bus[c] = actx.createGain(); bus[c].gain.value = 0; bus[c].connect(master); });
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    applyGains();
+    return actx;
+  }
+  /** 一個音：可疊兩個微走音的振盪器、低通濾波、平移、殘響。 */
+  function voice({ f = 440, f2 = null, d = 0.12, type = "sine", v = 1, at = 0, attack = 0.004, cut = 7000, cut2 = null, q = 0.4, det = 0, rev = 0.12, pan = 0, cat = "ui" }) {
+    const now = actx.currentTime + at;
+    const env = actx.createGain(); const flt = actx.createBiquadFilter();
+    flt.type = "lowpass"; flt.Q.value = q; flt.frequency.setValueAtTime(cut, now);
+    if (cut2) flt.frequency.exponentialRampToValueAtTime(cut2, now + d);
+    const peak = 0.3 * v;
+    env.gain.setValueAtTime(0, now); env.gain.linearRampToValueAtTime(peak, now + attack);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + d);
+    const oscs = det ? [-det, det] : [0];
+    oscs.forEach((c) => {
+      const o = actx.createOscillator(); o.type = type; o.detune.value = c;
+      o.frequency.setValueAtTime(f, now); if (f2) o.frequency.exponentialRampToValueAtTime(f2, now + d * 0.9);
+      const g = actx.createGain(); g.gain.value = 1 / oscs.length;
+      o.connect(g).connect(flt); o.start(now); o.stop(now + d + 0.05);
+    });
+    let node = flt.connect(env);
+    if (pan && actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = pan; node = env.connect(p); }
+    route(node, cat, rev);
+  }
+  function route(node, cat, rev) {
+    node.connect(bus[cat]);
+    if (rev > 0) { const r = actx.createGain(); r.gain.value = rev; node.connect(r); r.connect(reverb); }
+  }
+  /** 鐘聲：基頻 + 非整數泛音，清脆但柔和。 */
+  function bell(f, { at = 0, d = 0.5, v = 0.5, rev = 0.3, cat = "ui", pan = 0 } = {}) {
+    voice({ f, d, v, at, attack: 0.003, rev, cat, pan });
+    voice({ f: f * 2.005, d: d * 0.45, v: v * 0.28, at, attack: 0.002, rev, cat, pan });
+    voice({ f: f * 3.01, d: d * 0.2, v: v * 0.1, at, attack: 0.002, rev, cat, pan });
+  }
+  function noise({ d = 0.15, v = 1, at = 0, from = 3000, to = 300, type = "bandpass", q = 0.8, rev = 0.1, cat = "ui" }) {
+    const now = actx.currentTime + at;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf;
+    const flt = actx.createBiquadFilter(); flt.type = type; flt.Q.value = q;
+    flt.frequency.setValueAtTime(from, now); flt.frequency.exponentialRampToValueAtTime(to, now + d);
+    const g = actx.createGain(); g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.22 * v, now + Math.min(0.03, d / 3)); g.gain.exponentialRampToValueAtTime(0.0001, now + d);
+    src.connect(flt).connect(g); route(g, cat, rev);
+    src.start(now, Math.random() * 0.5, d + 0.05);
+  }
+  // A 大調五聲音階（配合水淺蔥的清爽感）
+  const NOTE = (n) => 440 * Math.pow(2, n / 12);
+  const PENTA = [0, 2, 4, 7, 9];
+  const pent = (i) => NOTE(PENTA[((i % 5) + 5) % 5] + 12 * Math.floor(i / 5));
+  let hoverStep = 0;
   const SFX = {
-    click: () => tone({ f: 880, f2: 660, d: 0.05, type: "triangle", v: 0.6 }),
-    hover: () => tone({ f: 1400, d: 0.025, type: "sine", v: 0.15 }),
-    switch: () => { tone({ f: 520, f2: 780, d: 0.08, type: "triangle", v: 0.5 }); },
-    toggleOn: () => { tone({ f: 600, d: 0.05, type: "square", v: 0.25 }); tone({ f: 900, d: 0.07, type: "square", v: 0.25, at: 0.05 }); },
-    toggleOff: () => { tone({ f: 900, d: 0.05, type: "square", v: 0.25 }); tone({ f: 600, d: 0.07, type: "square", v: 0.25, at: 0.05 }); },
-    popup: () => tone({ f: 300, f2: 900, d: 0.14, type: "sine", v: 0.6 }),
-    close: () => tone({ f: 700, f2: 250, d: 0.12, type: "sine", v: 0.4 }),
-    success: () => [523, 659, 784, 1047].forEach((f, i) => tone({ f, d: 0.16, type: "triangle", v: 0.55, at: i * 0.075 })),
-    error: () => { tone({ f: 220, f2: 140, d: 0.25, type: "sawtooth", v: 0.35 }); tone({ f: 180, f2: 110, d: 0.28, type: "square", v: 0.2, at: 0.08 }); },
-    copy: () => { tone({ f: 1200, d: 0.04, type: "sine", v: 0.4 }); tone({ f: 1600, d: 0.06, type: "sine", v: 0.4, at: 0.05 }); },
-    send: () => { noise({ d: 0.22, v: 0.8, from: 800, to: 5000 }); tone({ f: 400, f2: 1200, d: 0.18, type: "sine", v: 0.4 }); },
-    receive: () => { tone({ f: 988, d: 0.1, type: "sine", v: 0.5 }); tone({ f: 1319, d: 0.16, type: "sine", v: 0.5, at: 0.09 }); },
-    menu: () => tone({ f: 660, f2: 990, d: 0.06, type: "triangle", v: 0.35 }),
-    delete: () => noise({ d: 0.2, v: 0.8, from: 2500, to: 200 }),
-    tick: () => tone({ f: 2000, d: 0.015, type: "square", v: 0.08 }),
-    launch: () => { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone({ f, d: 0.22, type: "triangle", v: 0.5, at: i * 0.06 })); noise({ d: 0.6, v: 0.5, from: 400, to: 6000, at: 0.2 }); },
+    // 介面
+    hover: () => { hoverStep = (hoverStep + 1 + (Math.random() * 2 | 0)) % 6; voice({ f: pent(10 + hoverStep), d: 0.05, v: 0.07, cut: 3500, rev: 0.05, pan: (Math.random() - 0.5) * 0.4 }); },
+    click: () => { voice({ f: 1150, f2: 720, d: 0.05, type: "sine", v: 0.45, cut: 4000, rev: 0.04 }); noise({ d: 0.018, v: 0.35, from: 5200, to: 3000, rev: 0 }); },
+    tick: () => voice({ f: 2600, d: 0.014, v: 0.12, cut: 6000, rev: 0 }),
+    focus: () => voice({ f: pent(12), f2: pent(13), d: 0.07, v: 0.12, type: "triangle", cut: 3000, rev: 0.08 }),
+    switch: () => { bell(pent(9), { d: 0.18, v: 0.3, rev: 0.12 }); bell(pent(11), { d: 0.25, v: 0.3, at: 0.05, rev: 0.15 }); },
+    toggleOn: () => { voice({ f: pent(7), d: 0.08, v: 0.35, type: "triangle", cut: 3200 }); voice({ f: pent(10), d: 0.14, v: 0.35, type: "triangle", cut: 3600, at: 0.06, rev: 0.12 }); },
+    toggleOff: () => { voice({ f: pent(10), d: 0.08, v: 0.3, type: "triangle", cut: 3000 }); voice({ f: pent(6), d: 0.14, v: 0.3, type: "triangle", cut: 2400, at: 0.06, rev: 0.1 }); },
+    menu: () => { voice({ f: pent(8), f2: pent(10), d: 0.09, v: 0.3, type: "triangle", cut: 3000, rev: 0.12 }); noise({ d: 0.08, v: 0.25, from: 1500, to: 4000, rev: 0.05 }); },
+    popup: () => { noise({ d: 0.2, v: 0.4, from: 500, to: 3500, rev: 0.15 }); bell(pent(10), { at: 0.06, d: 0.4, v: 0.28, rev: 0.25 }); },
+    close: () => { noise({ d: 0.16, v: 0.35, from: 3000, to: 500, rev: 0.08 }); voice({ f: pent(8), f2: pent(4), d: 0.14, v: 0.22, cut: 2000 }); },
+    copy: () => { bell(pent(13), { d: 0.2, v: 0.28 }); bell(pent(15), { d: 0.35, v: 0.28, at: 0.06 }); },
+    delete: () => { voice({ f: 190, f2: 60, d: 0.22, v: 0.7, cut: 900 }); noise({ d: 0.22, v: 0.5, from: 2400, to: 180, rev: 0.1 }); },
+    slide: (x = 0.5) => voice({ f: pent(5 + Math.round(x * 10)), d: 0.04, v: 0.1, type: "triangle", cut: 3000, rev: 0.03 }),
+    count: () => voice({ f: pent(14 + (Math.random() * 3 | 0)), d: 0.02, v: 0.05, cut: 5000, rev: 0 }),
+    countDone: () => bell(pent(12), { d: 0.5, v: 0.14, rev: 0.35 }),
+    reveal: () => bell(pent(7 + (Math.random() * 8 | 0)), { d: 0.45, v: 0.06, rev: 0.5, pan: (Math.random() - 0.5) * 0.8 }),
+    leave: () => noise({ d: 0.25, v: 0.3, from: 2800, to: 400, rev: 0.12 }),
+    // 通知
+    success: () => [5, 7, 9, 10].forEach((n, i) => bell(pent(n), { at: i * 0.07, d: 0.6, v: 0.32, rev: 0.35, cat: "notify" })),
+    error: () => { voice({ f: 233, d: 0.28, v: 0.45, type: "triangle", det: 12, cut: 900, cat: "notify", rev: 0.1 }); voice({ f: 196, d: 0.34, v: 0.45, type: "triangle", det: 12, cut: 800, at: 0.12, cat: "notify", rev: 0.12 }); },
+    send: () => { noise({ d: 0.26, v: 0.5, from: 700, to: 5000, rev: 0.15, cat: "notify" }); bell(pent(12), { at: 0.12, d: 0.45, v: 0.25, cat: "notify" }); },
+    receive: () => { bell(pent(12), { d: 0.5, v: 0.4, rev: 0.3, cat: "notify" }); bell(pent(15), { at: 0.13, d: 0.8, v: 0.4, rev: 0.35, cat: "notify" }); },
+    launch: () => { [0, 2, 4, 5, 7, 9, 10].forEach((n, i) => bell(pent(n + 3), { at: i * 0.055, d: 0.7, v: 0.3, rev: 0.4, cat: "notify" })); noise({ d: 0.8, v: 0.35, from: 400, to: 7000, at: 0.2, rev: 0.3, cat: "notify" }); },
   };
-  const sfx = (name) => {
-    if (!sound.enabled || document.documentElement.dataset.motion === "reduce" && name === "hover") return;
+  const THROTTLE = { hover: 55, tick: 25, count: 45, reveal: 110, slide: 30, focus: 80 };
+  const lastBy = {};
+  const sfx = (name, arg) => {
+    if (!sound.enabled || !SFX[name]) return;
+    const reduce = document.documentElement.dataset.motion === "reduce";
+    if (reduce && (name === "hover" || name === "reveal" || name === "count")) return;
+    const cat = /^(success|error|send|receive|launch)$/.test(name) ? "notify" : "ui";
+    if (!sound.on(cat)) return;
+    const now = performance.now();
+    if (THROTTLE[name] && now - (lastBy[name] || 0) < THROTTLE[name]) return;
+    lastBy[name] = now;
     try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === "suspended") actx.resume();
-      SFX[name] && SFX[name]();
+      if (!ensureAudio()) return;
+      if (actx.state === "suspended") { actx.resume(); if (name === "hover" || name === "reveal" || name === "count") return; }
+      if (name !== "hover" && name !== "count" && name !== "reveal") lastSfx = now;
+      SFX[name](arg);
     } catch { /* 瀏覽器不支援 */ }
   };
+
+  /* ---------- 背景環境音：緩慢流動的和弦墊音 + 隨機的清脆音點 ---------- */
+  const ambient = (() => {
+    // Amaj9 → F#m9 → Dmaj9 → E6/9（以半音相對 A4 表示）
+    const CHORDS = [[-24, -17, -13, -10, -5], [-27, -20, -15, -10, -8], [-31, -24, -20, -15, -10], [-29, -22, -17, -12, -10]];
+    let playing = false; let timers = []; let step = 0; let pad; let lfo;
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    function chord() {
+      if (!playing) return;
+      const now = actx.currentTime; const len = 9;
+      CHORDS[step++ % CHORDS.length].forEach((n, i) => {
+        ["sawtooth", "triangle"].forEach((type, k) => {
+          const o = actx.createOscillator(); o.type = type; o.frequency.value = NOTE(n); o.detune.value = (k ? 7 : -7) + (Math.random() - 0.5) * 4;
+          const g = actx.createGain(); const vol = (type === "sawtooth" ? 0.022 : 0.05) / (1 + i * 0.15);
+          g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(vol, now + 3); g.gain.setValueAtTime(vol, now + len - 1); g.gain.linearRampToValueAtTime(0, now + len + 3);
+          o.connect(g).connect(pad); o.start(now); o.stop(now + len + 3.2);
+        });
+      });
+      later(chord, (len - 0.5) * 1000);
+    }
+    function sparkle() {
+      if (!playing) return;
+      if (!document.hidden) bell(pent(8 + (Math.random() * 9 | 0)), { d: 1.6, v: 0.05 + Math.random() * 0.05, rev: 0.8, cat: "ambient", pan: (Math.random() - 0.5) * 1.2 });
+      later(sparkle, 1800 + Math.random() * 4200);
+    }
+    function start() {
+      if (playing || !ensureAudio()) return;
+      if (actx.state === "suspended") { actx.resume(); if (actx.state === "suspended") return; }
+      playing = true;
+      pad = actx.createBiquadFilter(); pad.type = "lowpass"; pad.frequency.value = 900; pad.Q.value = 0.7;
+      lfo = actx.createOscillator(); lfo.frequency.value = 0.06; const depth = actx.createGain(); depth.gain.value = 420;
+      lfo.connect(depth).connect(pad.frequency); lfo.start();
+      route(pad, "ambient", 0.6);
+      chord(); later(sparkle, 2500);
+      document.dispatchEvent(new CustomEvent("soundchange"));
+    }
+    function stop() {
+      if (!playing) return; playing = false;
+      timers.forEach(clearTimeout); timers = [];
+      const p = pad, l = lfo; setTimeout(() => { try { l.stop(); p.disconnect(); } catch {} }, 4000);
+      document.dispatchEvent(new CustomEvent("soundchange"));
+    }
+    return {
+      get playing() { return playing; },
+      sync() { if (sound.enabled && sound.on("ambient") && !document.hidden) start(); else stop(); },
+    };
+  })();
+  // 瀏覽器要求使用者先互動才能出聲：第一次點擊 / 按鍵時解鎖並啟動環境音
+  const unlock = () => { if (!sound.enabled) return; try { ensureAudio(); actx.state === "suspended" && actx.resume().then(() => ambient.sync()); ambient.sync(); } catch {} };
+  ["pointerdown", "keydown"].forEach((ev) => addEventListener(ev, unlock, { capture: true, passive: true }));
+  document.addEventListener("visibilitychange", () => { if (actx) ambient.sync(); });
+
+  /* ---------- 全站互動音效 ---------- */
+  const HOVER_SEL = "a[href], button:not(:disabled), .rank-row, .card.hover, .stat-tile, .tk-item, .rival, .res, [data-sfx-hover]";
+  let hovered = null;
+  if (matchMedia("(hover: hover)").matches) {
+    document.addEventListener("pointerover", (e) => {
+      const el = e.target.closest?.(HOVER_SEL); if (el === hovered) return; hovered = el;
+      if (el && actx && actx.state === "running") sfx("hover");
+    });
+  }
+  // 沒有自己音效的按鈕 / 連結，點擊時補上 click
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest?.("a[href], button, [role=button], summary, label.switch"); if (!el) return;
+    const t0 = performance.now(); setTimeout(() => { if (lastSfx < t0) sfx("click"); }, 0);
+  }, true);
+  document.addEventListener("focusin", (e) => { if (e.target.matches?.("input:not([type=checkbox]):not([type=range]), textarea")) sfx("focus"); });
+  document.addEventListener("input", (e) => { const r = e.target; if (r.type === "range") sfx("slide", (r.value - r.min) / ((r.max - r.min) || 1)); });
+  document.addEventListener("change", (e) => { const c = e.target; if (c.type === "checkbox" && c.id !== "sound" && c.id !== "motion" && !c.dataset.sndCat) sfx(c.checked ? "toggleOn" : "toggleOff"); });
 
   /* ---------- 頂部進度條 ---------- */
   let pending = 0; let barTimer;
@@ -162,8 +310,8 @@
     const step = (now) => {
       const p = Math.min(1, (now - t0) / dur); const e = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
       show(target * e);
-      if (p < 1) requestAnimationFrame(step);
-      else { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+      if (p < 1) { if (p < 0.7) sfx("count"); requestAnimationFrame(step); }
+      else { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); sfx("countDone"); }
     };
     requestAnimationFrame(step);
   }
@@ -174,7 +322,7 @@
   });
 
   /* ---------- 捲動浮現 ---------- */
-  const revealIO = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); revealIO.unobserve(e.target); } }), { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+  const revealIO = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); revealIO.unobserve(e.target); if (scrollY > 40) sfx("reveal"); } }), { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
   const observe = (root = document) => {
     $$(".reveal, .reveal-l, .reveal-s", root).forEach((el, i) => { if (!el.classList.contains("in")) { el.style.transitionDelay = (el.dataset.delay || (i % 6) * 60) + "ms"; revealIO.observe(el); } });
     countAll(root); enhanceSelects(root); applyI18n(root);
@@ -346,6 +494,7 @@
       <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
+        <button class="btn icon ghost amb-btn" data-ambient aria-label="ambient" title="${t("snd.ambient")}"><span class="eq"><i></i><i></i><i></i><i></i></span></button>
         <button class="btn icon ghost theme-btn" data-theme-toggle aria-label="theme">${THEME_ICON}</button>
         <button class="btn sm ghost lang-btn" data-lang>${window.ART ? ART.icon("globe", 15) : ""}<span>${lang === "zh" ? "中" : "EN"}</span></button>
         <button class="search-trigger" data-search>${window.ART ? ART.icon("search", 15) : ""}<span class="txt" data-i18n="nav.search"></span><span class="kbd">Ctrl K</span></button>
@@ -357,6 +506,15 @@
     $("[data-search]", nav).addEventListener("click", openPalette);
     $("[data-theme-toggle]", nav).addEventListener("click", () => setTheme(theme === "light" ? "dark" : "light"));
     $("[data-copy-ip]", nav).addEventListener("click", () => copy("sawsmp.me"));
+    const amb = $("[data-ambient]", nav);
+    const ambState = () => { amb.classList.toggle("on", sound.enabled && sound.on("ambient")); amb.classList.toggle("playing", ambient.playing); };
+    amb.addEventListener("click", () => {
+      const on = !(sound.enabled && sound.on("ambient"));
+      if (on && !sound.enabled) sound.enabled = true;
+      sound.set("ambient", { on });
+      ok(t(on ? "snd.ambOn" : "snd.ambOff"), "", 1200);
+    });
+    document.addEventListener("soundchange", ambState); ambState();
     $("[data-lang]", nav).addEventListener("click", (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       showCtx(r.left, r.bottom + 8, [{ icon: lang === "zh" ? "✓" : "", label: "中文", act: () => setLang("zh") }, { icon: lang === "en" ? "✓" : "", label: "English", act: () => setLang("en") }]);
@@ -402,7 +560,7 @@
   /* ---------- 頁面切換 ---------- */
   function go(href) {
     if (document.documentElement.dataset.motion === "reduce") { location.href = href; return; }
-    sfx("switch"); document.body.classList.add("leaving"); progress.start();
+    sfx("leave"); document.body.classList.add("leaving"); progress.start();
     setTimeout(() => (location.href = href), 220);
   }
   document.addEventListener("click", (e) => {
@@ -538,6 +696,12 @@
     const mult = { s: 1, m: 60, h: 3600, d: 86400, w: 604800, mo: 2592000, y: 31536000 };
     return m.reduce((a, part) => { const [, n, u] = part.match(/(\d+)\s*(mo|y|w|d|h|m|s)/); return a + n * mult[u]; }, 0);
   }
+  /** 遊玩時間：與遊戲計分板相同格式，例如 2d 25m（為 0 的單位省略）。 */
+  const playtime = (sec) => {
+    sec = Math.max(0, Math.floor(+sec || 0));
+    const out = [["d", 86400], ["h", 3600], ["m", 60]].map(([u, n]) => { const v = Math.floor(sec / n); sec -= v * n; return v ? v + u : ""; }).filter(Boolean).join(" ");
+    return out || "0m";
+  };
   const remaining = (iso) => iso ? dur(Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000))) : t("pt.permanent");
 
   /* ---------- 減少動畫 ---------- */
@@ -552,7 +716,7 @@
   document.addEventListener("langchange", () => { renderNav(); renderFooter(); });
 
   window.App = {
-    $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress,
+    $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
     fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, mePromise,
     setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,

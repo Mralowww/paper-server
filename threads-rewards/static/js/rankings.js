@@ -2,8 +2,7 @@
   const { $, esc, t, api, fmt, mcHead, observe, store } = App;
   const SORTS = ["kills", "kdr", "wins", "winrate", "streak", "playtime"];
   let sort = store.get("rk.sort", "kills"); let q = ""; let timer;
-  const hours = (s) => (s / 3600).toFixed(1) + "h";
-  const main = (p) => ({ kills: fmt(p.kills), kdr: p.kdr.toFixed(2), wins: fmt(p.wins), winrate: p.winrate + "%", streak: fmt(p.best_streak), playtime: hours(p.playtime) })[sort];
+  const main = (p) => ({ kills: fmt(p.kills), kdr: p.kdr.toFixed(2), wins: fmt(p.wins), winrate: p.winrate + "%", streak: fmt(p.best_streak), playtime: App.playtime(p.playtime) })[sort];
 
   const ICON = { kills: "sword", kdr: "chart", wins: "trophy", winrate: "activity", streak: "gem", playtime: "history" };
   function moveInd() {

@@ -17,15 +17,18 @@
   <div class="container" style="max-width:760px">
     <div class="section-head reveal"><div><span class="eyebrow-text">Settings</span><h2 data-i18n="set.title"></h2><p class="muted" data-i18n="set.sub"></p></div></div>
     <div class="card reveal">
-      <div class="setting-row">
+      <div class="card-title"><h3 data-i18n="snd.title"></h3></div>
+      <div class="setting-row snd-master" id="snd-master">
         <div class="txt"><b data-i18n="set.sound"></b><small data-i18n="set.soundd"></small></div>
         <label class="switch"><input type="checkbox" id="sound"><span></span></label>
       </div>
       <div class="setting-row">
-        <div class="txt"><b data-i18n="set.volume"></b><small class="mono" id="vol-label"></small></div>
+        <div class="txt"><b data-i18n="snd.master"></b><small class="mono" id="vol-label"></small></div>
         <input type="range" id="volume" min="0" max="100" step="1" style="max-width:220px">
-        <button class="btn sm" id="test" data-i18n="set.test"></button>
       </div>
+      <div id="snd-cats"></div>
+    </div>
+    <div class="card reveal section">
       <div class="setting-row">
         <div class="txt"><b data-i18n="set.theme"></b></div>
         <select class="enhance" id="theme"><option value="dark" data-i18n="set.dark"></option><option value="light" data-i18n="set.light"></option></select>

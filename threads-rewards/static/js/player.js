@@ -2,7 +2,6 @@
   const { $, $$, esc, t, api, fmt, date, ago, mcHead, ptTag, remaining, observe, store, sfx } = App;
   const name = new URLSearchParams(location.search).get("name") || "";
   let d = null; let tab = store.get("pp.tab", "stats");
-  const hm = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return App.lang === "zh" ? `${h} 小時 ${m} 分` : `${h}h ${m}m`; };
 
   function overview() {
     const p = d.player, s = d.stats;
@@ -12,7 +11,7 @@
         <div class="kv"><span>${t("pp.tier")}</span><b>${esc(s.tier.name)}</b></div>
         <div class="kv"><span>${t("pl.firstSeen")}</span><b>${p.first_seen ? date(p.first_seen, false) : "—"}</b></div>
         <div class="kv"><span>${t("pl.lastSeen")}</span><b>${p.online ? t("home.online") : p.last_seen ? ago(p.last_seen) : "—"}</b></div>
-        <div class="kv"><span>${t("pp.playtime")}</span><b>${hm(s.playtime)}</b></div>
+        <div class="kv"><span>${t("pp.playtime")}</span><b>${App.playtime(s.playtime)}</b></div>
         <div class="kv"><span>${t("pp.linked")}</span><b class="${p.linked ? "good" : ""}">${p.linked ? "✓" : "—"}</b></div>
       </div>
       ${s.tier.next ? `<div style="margin-top:18px"><div class="row" style="justify-content:space-between;font-size:13px"><span class="muted">${t("pp.nextTier")}：${esc(s.tier.next.name)}</span><span class="mono">${s.kills} / ${s.tier.next.kills}</span></div><div class="progress" style="height:6px"><i style="width:${Math.min(100, (s.kills / s.tier.next.kills) * 100)}%"></i></div></div>` : ""}
@@ -38,7 +37,7 @@
         <div class="kv"><span>${t("pp.wins")}</span><b>${fmt(s.wins)}</b></div>
         <div class="kv"><span>${t("pp.losses")}</span><b>${fmt(s.losses)}</b></div>
         <div class="kv"><span>${t("pp.crystals")}</span><b>${fmt((d.methods.find((m) => m.method === "crystal") || {}).count || 0)}</b></div>
-        <div class="kv"><span>${t("pp.playtime")}</span><b>${hm(s.playtime)}</b></div>
+        <div class="kv"><span>${t("pp.playtime")}</span><b>${App.playtime(s.playtime)}</b></div>
       </div></div>
     <div class="grid" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);margin-top:20px">
       <div class="card reveal"><div class="card-title"><h3>${t("pp.methods")}</h3></div>
