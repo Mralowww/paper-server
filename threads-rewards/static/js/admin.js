@@ -20,7 +20,7 @@
     { id: "status", icon: "activity", min: 3 },
     { id: "maintenance", icon: "alert", min: 3 },
   ];
-  let level = 0; let current = null; let cleanup = null; let openTickets = 0;
+  let level = 0; let current = null; let cleanup = null; let openTickets = 0; let heightWatch = null;
   const main = () => $("#main");
   const head = (id, extra = "") => `<div class="admin-title"><div><h2>${t("adm." + id)}</h2><p>${t("adm." + id + ".d")}</p></div><div class="row">${extra}</div></div>`;
   const lvlTagsBase = (l) => (l >= 3 ? `<span class="lvl-tag lvl-3">${t("lv.3")}</span>` : "") + (l === 2 ? `<span class="lvl-tag lvl-2">${t("lv.2")}</span>` : "") + (l === 1 ? `<span class="lvl-tag lvl-1">${t("lv.1")}</span>` : "");
@@ -108,12 +108,17 @@
     const sec = SECTIONS.find((s) => s.id === id && level >= s.min) || SECTIONS.find((s) => s.id && level >= s.min);
     if (cleanup) { cleanup(); cleanup = null; }
     current = sec.id; renderSide();
-    // 保持捲動位置：先鎖住高度再換內容，載入完才放開（不會被拉回頂端）
-    const release = App.holdHeight(main(), 4000);
-    main().innerHTML = `<section></section>`;
-    try { const r = await VIEWS[sec.id]($("section", main())); if (typeof r === "function") cleanup = r; } catch (e) { main().innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
-    observe(main());
-    requestAnimationFrame(() => setTimeout(release, 250));
+    // 保持捲動位置：換內容前鎖住高度；停留在同一區時高度只增不減（篩選結果變少也不會把頁面拉上去）
+    const m = main(); m.style.minHeight = m.offsetHeight + "px";
+    m.innerHTML = `<section></section>`;
+    try { const r = await VIEWS[sec.id]($("section", m)); if (typeof r === "function") cleanup = r; } catch (e) { m.innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
+    observe(m);
+    await new Promise((r) => setTimeout(r, 250));
+    m.style.minHeight = "";
+    const body = m.firstElementChild || m; let maxH = body.offsetHeight;
+    heightWatch && heightWatch.disconnect();
+    heightWatch = new ResizeObserver(() => { const h = body.offsetHeight; if (h > maxH) maxH = h; m.style.minHeight = maxH + "px"; });
+    heightWatch.observe(body);
   }
 
   /* ---------- 總覽 ---------- */
