@@ -1,7 +1,7 @@
 /* Mc.Tierlist.Asia — staff panel */
 document.addEventListener('DOMContentLoaded', async () => {
   const { $, $$, esc, t, tierBadge, avatarUrl, discordAvatar, toast, countUp, session, levelChips, loginUrl,
-    testsTable, resultCell, scoreCell, icon, statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml } = window.MCTL;
+    testsTable, resultCell, scoreCell, icon, statusPill, catLabel, catIcon } = window.MCTL;
   const { fmtDate, fmtRelative } = window.I18N;
   const root = $('#adminRoot');
   const TIERS = ['HT1', 'LT1', 'HT2', 'LT2', 'HT3', 'LT3', 'HT4', 'LT4', 'HT5', 'LT5'];
@@ -271,38 +271,129 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     async support(panel, arg) {
-      if (arg && /^\d+$/.test(arg)) return supportTicket(panel, arg);
-      const filter = ['open', 'in_progress', 'closed'].includes(arg) ? arg : '';
-      const [{ tickets, counts }, { blocks }] = await Promise.all([api(`/support${filter ? `?status=${filter}` : ''}`), api('/support/blocks')]);
-      const total = Object.values(counts).reduce((a, b) => a + b, 0);
-      const seg = [['', t('support.filterAll'), total], ...['open', 'in_progress', 'closed'].map((st) => [st, t(`support.status.${st}`), counts[st] || 0])];
+      const SP = window.MCTL_SUPPORT;
+      let filter = ['open', 'in_progress', 'closed'].includes(arg) ? arg : '';
+      let selected = arg && /^\d+$/.test(arg) ? Number(arg) : null;
+      let q = '';
+      let tickets = [];
+      let counts = {};
+      let view = null;
+      let templates = (await api('/support/templates')).templates;
       panel.innerHTML = `
         <div class="panel">
-          <div class="panel-head"><div><h2>${t('tab.support')}</h2><p>${t('support.subtitle')}</p></div></div>
-          <div class="seg" style="margin-bottom:14px">${seg.map(([st, label, n]) => `<button class="${st === filter ? 'active' : ''}" data-go="support${st ? `/${st}` : ''}">${label} (${n})</button>`).join('')}</div>
-          <div class="card" style="margin-bottom:26px">${tickets.length ? tickets.map((x) => `
-            <a class="ticket-row" href="#support/${x.id}" data-open="${x.id}">
-              ${catIcon(x.category)}<span class="mono muted">#${x.id}</span>
-              <span class="ticket-title"><b>${esc(x.title)}</b><span class="muted">${catLabel(x.category)} · ${esc(x.username || x.user_id)} · ${esc(fmtRelative(x.updated_at))} · ${t('support.messages', { n: x.message_count })}</span></span>
-              ${x.status !== 'closed' && !x.last_is_staff ? `<span class="pill high">${t('support.awaiting')}</span>` : ''}
-              ${statusPill(x.status)}
-            </a>`).join('') : `<div class="card-pad muted">${t('support.none')}</div>`}</div>
-          <div class="panel-head"><h2 style="font-size:19px">${t('support.blocks')}</h2></div>
-          <div class="card">${blocks.length ? blocks.map((b) => `
+          <div class="panel-head"><div><h2>${t('tab.support')}</h2><p>${t('sp.inboxSub')}</p></div>
+            <button class="btn btn-sm" id="showBlocks">${t('support.blocks')}</button></div>
+          <div class="inbox ${selected ? 'has-sel' : ''}">
+            <aside class="inbox-side">
+              <label class="sp-search">${SP.svg(SP.IC.search, 15)}<input placeholder="${t('sp.searchStaff')}"></label>
+              <div class="seg inbox-seg"></div>
+              <div class="inbox-list"></div>
+            </aside>
+            <section class="inbox-main"><div class="inbox-empty">${catIcon('other', 30)}<p>${t('sp.pickTicket')}</p></div></section>
+          </div>
+        </div>`;
+      const listEl = $('.inbox-list', panel);
+      const segEl = $('.inbox-seg', panel);
+      const main = $('.inbox-main', panel);
+      const inbox = $('.inbox', panel);
+
+      function drawList() {
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        segEl.innerHTML = [['', t('support.filterAll'), total], ...['open', 'in_progress', 'closed'].map((st) => [st, t(`support.status.${st}`), counts[st] || 0])]
+          .map(([st, label, n]) => `<button data-f="${st}" class="${st === filter ? 'active' : ''}">${label} <span class="muted">${n}</span></button>`).join('');
+        listEl.innerHTML = tickets.length ? tickets.map((x) => `
+          <button class="inbox-item ${x.status} ${x.unread ? 'unread' : ''} ${x.id === selected ? 'sel' : ''}" data-id="${x.id}">
+            <img src="${discordAvatar(x.user_id, x.user_avatar)}" alt="">
+            <span class="inbox-item-main">
+              <span class="inbox-item-top"><b>${esc(x.title)}</b><time>${esc(fmtRelative(x.updated_at))}</time></span>
+              <span class="inbox-item-prev">${SP.previewText(x, true)}</span>
+              <span class="inbox-item-meta">${catIcon(x.category, 12)}<span class="mono">#${x.id}</span><span>${esc(x.username || x.user_id)}</span>${x.target_name ? `<span>→ ${esc(x.target_name)}</span>` : ''}</span>
+            </span>
+            <i class="inbox-dot" title="${t(`support.status.${x.status}`)}"></i>
+          </button>`).join('') : `<div class="muted" style="padding:20px;text-align:center">${t('support.none')}</div>`;
+      }
+      async function loadList() {
+        const p = new URLSearchParams();
+        if (filter) p.set('status', filter);
+        if (q) p.set('q', q);
+        const d = await api(`/support?${p}`);
+        tickets = d.tickets; counts = d.counts;
+        drawList();
+      }
+      async function open(id) {
+        view?.destroy();
+        selected = id;
+        inbox.classList.add('has-sel');
+        history.replaceState(null, '', `#support/${id}`);
+        $$('.inbox-item', listEl).forEach((b) => b.classList.toggle('sel', Number(b.dataset.id) === id));
+        main.innerHTML = '<div class="skeleton" style="height:100%;min-height:420px;border-radius:18px"></div>';
+        try {
+          view = await SP.mountThread(main, {
+            id, staff: true, templates,
+            manageTemplates: perms.managePlayers ? editTemplates : null,
+            headExtra: (tk) => `<button class="btn btn-sm btn-ghost inbox-back" data-back>←</button>
+              <div class="select-wrap"><select data-status aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></div>
+              ${perms.managePlayers ? `<button class="btn btn-sm" data-block>${t('support.block')}</button><button class="btn btn-sm btn-danger" data-del>${t('common.delete')}</button>` : ''}`,
+            bindHead: (root, tk, reload) => {
+              $('[data-back]', root)?.addEventListener('click', () => { view?.destroy(); view = null; selected = null; inbox.classList.remove('has-sel'); history.replaceState(null, '', '#support'); drawList(); });
+              $('[data-status]', root)?.addEventListener('change', async (e) => {
+                try { await api(`/support/${tk.id}`, { method: 'PATCH', body: { status: e.target.value } }); await reload(); loadList(); } catch (err) { toast(err.message, 'err'); }
+              });
+              $('[data-block]', root)?.addEventListener('click', async () => {
+                if (!(await confirmDialog(t('support.blockT'), t('support.blockD', { name: esc(tk.username || tk.user_id) })))) return;
+                try { await api('/support/blocks', { method: 'POST', body: { discordId: tk.user_id, reason: `#${tk.id}` } }); toast(t('support.toastBlocked', { name: tk.username || tk.user_id })); } catch (err) { toast(err.message, 'err'); }
+              });
+              $('[data-del]', root)?.addEventListener('click', async () => {
+                if (!(await confirmDialog(t('support.deleteT'), t('support.deleteD', { id: tk.id })))) return;
+                try { await api(`/support/${tk.id}`, { method: 'DELETE' }); toast(t('support.toastDeleted')); view?.destroy(); view = null; selected = null; main.innerHTML = ''; inbox.classList.remove('has-sel'); loadList(); } catch (err) { toast(err.message, 'err'); }
+              });
+            },
+            onUpdate: () => loadList(),
+          });
+          const it = tickets.find((x) => x.id === id);
+          if (it?.unread) { it.unread = false; drawList(); }
+        } catch (err) { main.innerHTML = `<div class="inbox-empty"><p>${esc(err.message)}</p></div>`; }
+      }
+      function editTemplates() {
+        modal(`<h3>${t('sp.editTemplates')}</h3><p class="muted" style="margin-top:0">${t('sp.templatesHint')}</p>
+          <form id="tplForm"><textarea class="input" name="tpl" rows="10">${esc(templates.join('\n---\n'))}</textarea>
+          <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-gold">${t('common.save')}</button></div></form>`, (bg, close) => {
+          $('#tplForm', bg).addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const items = e.target.tpl.value.split(/\n-{3,}\n/).map((x) => x.trim()).filter(Boolean);
+            try {
+              templates = (await api('/support/templates', { method: 'PUT', body: { templates: items } })).templates;
+              close(); toast(t('site.saved'));
+              if (selected) open(selected);
+            } catch (err) { toast(err.message, 'err'); }
+          });
+        });
+      }
+      segEl.addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; loadList(); } });
+      let qTimer;
+      $('.sp-search input', panel).addEventListener('input', (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { q = e.target.value.trim(); loadList(); }, 300); });
+      listEl.addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) open(Number(b.dataset.id)); });
+      $('#showBlocks', panel).addEventListener('click', async () => {
+        const { blocks } = await api('/support/blocks');
+        modal(`<h3>${t('support.blocks')}</h3><div class="card">${blocks.length ? blocks.map((b) => `
             <div class="ticket-row"><span class="mono muted">${esc(b.discord_id)}</span><span class="ticket-title"><b>${esc(b.username || '—')}</b><span class="muted">${esc(b.reason || '')} · ${esc(fmtDate(b.created_at))}</span></span>
             ${perms.managePlayers ? `<button class="btn btn-sm" data-unblock="${esc(b.discord_id)}">${t('support.unblock')}</button>` : ''}</div>`).join('') : `<div class="card-pad muted">${t('support.noBlocks')}</div>`}</div>
-        </div>`;
-      panel.addEventListener('click', async (e) => {
-        const g = e.target.closest('[data-go]');
-        if (g) return go(g.dataset.go);
-        const o = e.target.closest('[data-open]');
-        if (o) { e.preventDefault(); return go(`support/${o.dataset.open}`); }
-        const u = e.target.closest('[data-unblock]');
-        if (u) {
-          try { await api(`/support/blocks/${u.dataset.unblock}`, { method: 'DELETE' }); go(`support${filter ? `/${filter}` : ''}`); }
-          catch (err) { toast(err.message, 'err'); }
-        }
+          <div class="modal-actions"><button class="btn" data-close>${t('card.close')}</button></div>`, (bg, close) => {
+          bg.addEventListener('click', async (e) => {
+            const u = e.target.closest('[data-unblock]');
+            if (!u) return;
+            try { await api(`/support/blocks/${u.dataset.unblock}`, { method: 'DELETE' }); close(); toast(t('support.unblock')); } catch (err) { toast(err.message, 'err'); }
+          });
+        });
       });
+
+      await loadList();
+      if (selected) open(selected);
+      // Keep the list fresh while this view is on screen.
+      const tick = setInterval(() => {
+        if (!document.body.contains(panel)) { clearInterval(tick); view?.destroy(); return; }
+        if (!document.hidden) loadList().catch(() => {});
+      }, 15000);
     },
 
     async storage(panel) {
@@ -823,40 +914,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
   };
 
-  async function supportTicket(panel, id) {
-    const res = await fetch(`/api/support/tickets/${id}`, { headers: { Accept: 'application/json' } });
-    if (!res.ok) return go('support');
-    const d = await res.json();
-    const tk = d.ticket;
-    panel.innerHTML = `
-      <div class="panel">
-        <a href="#support" class="link-more back-link" data-go="support">${t('support.back')}</a>
-        ${ticketHeadHtml(tk, `<div class="ticket-hero-side">
-          <div class="muted" style="font-size:13px">${esc(tk.username || tk.user_id)} · <span class="mono">${esc(tk.user_id)}</span></div>
-          <div class="actions">
-            <div class="select-wrap"><select id="stSel" aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></div>
-            ${perms.managePlayers ? `<button class="btn btn-sm" id="blockUser">${t('support.block')}</button><button class="btn btn-sm btn-danger" id="delTicket">${t('common.delete')}</button>` : ''}
-          </div></div>`)}
-        <div class="thread">${threadHtml(d, (m) => !!m.is_staff)}</div>
-        ${composerHtml()}
-      </div>`;
-    $('[data-go]', panel).addEventListener('click', (e) => { e.preventDefault(); go('support'); });
-    bindComposer(panel, tk.id, () => go(`support/${tk.id}`));
-    $('#stSel', panel).addEventListener('change', async (e) => {
-      try { await api(`/support/${tk.id}`, { method: 'PATCH', body: { status: e.target.value } }); go(`support/${tk.id}`); }
-      catch (err) { toast(err.message, 'err'); }
-    });
-    $('#blockUser', panel)?.addEventListener('click', async () => {
-      if (!(await confirmDialog(t('support.blockT'), t('support.blockD', { name: esc(tk.username || tk.user_id) })))) return;
-      try { await api('/support/blocks', { method: 'POST', body: { discordId: tk.user_id, reason: `#${tk.id}` } }); toast(t('support.toastBlocked', { name: tk.username || tk.user_id })); }
-      catch (err) { toast(err.message, 'err'); }
-    });
-    $('#delTicket', panel)?.addEventListener('click', async () => {
-      if (!(await confirmDialog(t('support.deleteT'), t('support.deleteD', { id: tk.id })))) return;
-      try { await api(`/support/${tk.id}`, { method: 'DELETE' }); toast(t('support.toastDeleted')); go('support'); }
-      catch (err) { toast(err.message, 'err'); }
-    });
-  }
+
 
   function showKey(key) {
     modal(`

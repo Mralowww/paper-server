@@ -1551,17 +1551,50 @@ def load_ticket(tid):
     return dict(t)
 
 
-def ticket_payload(t):
+def ticket_payload(t, since=0):
+    """Ticket plus its messages (only those after message id `since` when given)."""
     conn = db()
     msgs = [dict(r) for r in conn.execute("""SELECT sm.*, m.avatar AS author_avatar FROM support_messages sm
                                               LEFT JOIN members m ON m.discord_id = sm.author_id
-                                              WHERE sm.ticket_id = ? ORDER BY sm.id""", (t["id"],))]
+                                              WHERE sm.ticket_id = ? AND sm.id > ? ORDER BY sm.id""", (t["id"], since))]
     atts = {}
-    for a in conn.execute("SELECT id, message_id, orig_name, mime, size FROM support_attachments WHERE ticket_id = ?", (t["id"],)):
+    for a in conn.execute("SELECT id, message_id, orig_name, mime, size FROM support_attachments WHERE ticket_id = ? AND message_id > ?",
+                          (t["id"], since)):
         atts.setdefault(a["message_id"], []).append(dict(a))
     for m in msgs:
         m["attachments"] = atts.get(m["id"], [])
     return {"ticket": t, "messages": msgs}
+
+
+def mark_seen(t):
+    """Remembers that the owner (or staff) has read the ticket up to now."""
+    user = current_user()
+    col = "user_seen_at" if user["id"] == t["user_id"] else "staff_seen_at" if is_support_staff(user) else None
+    if col:
+        db().execute(f"UPDATE support_tickets SET {col} = ? WHERE id = ?", (D.now_ms(), t["id"]))
+        db().commit()
+
+
+def system_message(conn, ticket_id, user, status):
+    """A status-change line in the conversation (kind='status', body = new status)."""
+    conn.execute("INSERT INTO support_messages (ticket_id, author_id, author_name, is_staff, body, created_at, kind) "
+                 "VALUES (?, ?, ?, 1, ?, ?, 'status')", (ticket_id, user["id"], user["username"], status, D.now_ms()))
+
+
+LAST_MSG_SQL = """(SELECT json_object('body', substr(body, 1, 140), 'staff', is_staff, 'author', author_name, 'kind', kind, 'at', created_at)
+                   FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.kind = 'message' DESC, m.id DESC LIMIT 1) AS last_json,
+                  (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id AND m.kind = 'message') AS message_count"""
+
+
+def ticket_row(r, viewer):
+    d = dict(r)
+    last = json.loads(d.pop("last_json") or "null")
+    d["last"] = last
+    seen = d["user_seen_at"] if viewer == "user" else d["staff_seen_at"]
+    # Unread: the other side wrote last and we haven't opened the ticket since.
+    other_wrote = last and last["kind"] == "message" and bool(last["staff"]) == (viewer == "user")
+    d["unread"] = bool(other_wrote and (not seen or last["at"] > seen))
+    return d
 
 
 def text_field(name, max_len):
@@ -1581,9 +1614,10 @@ async def _notify(kind, *args):
 def my_tickets():
     user = current_user()
     conn = db()
-    rows = conn.execute("SELECT * FROM support_tickets WHERE user_id = ? ORDER BY updated_at DESC", (user["id"],)).fetchall()
+    rows = conn.execute(f"SELECT t.*, {LAST_MSG_SQL} FROM support_tickets t WHERE user_id = ? ORDER BY updated_at DESC",
+                        (user["id"],)).fetchall()
     blocked = conn.execute("SELECT reason FROM support_blocks WHERE discord_id = ?", (user["id"],)).fetchone()
-    return jsonify({"tickets": [dict(r) for r in rows], "blocked": bool(blocked),
+    return jsonify({"tickets": [ticket_row(r, "user") for r in rows], "blocked": bool(blocked),
                     "blockReason": blocked["reason"] if blocked else None,
                     "categories": list(C.SUPPORT_CATEGORIES), "maxFiles": C.UPLOAD_MAX_FILES})
 
@@ -1606,16 +1640,30 @@ def open_ticket():
         return bad("invalid_title", "標題需為 1–100 字")
     if not text or len(text) > 4000:
         return bad("invalid_body", "內容需為 1–4000 字")
+    target_name = target_uuid = None
+    if category == "report":
+        target_name = str(request.form.get("target") or "").strip()
+        if not NAME_RE.match(target_name):
+            return bad("invalid_target", "請輸入被檢舉玩家的 Minecraft ID")
+        from . import heads
+        try:
+            target_uuid = heads.resolve_uuid(target_name)
+        except Exception:
+            target_uuid = None  # Mojang unreachable: keep the name only
+        else:
+            if not target_uuid:
+                return bad("target_not_found", "找不到這個 Minecraft 帳號")
     uploads, err = read_uploads()
     if err:
         return bad(*err)
     ts = D.now_ms()
-    cur = conn.execute("INSERT INTO support_tickets (user_id, username, category, title, status, created_at, updated_at) "
-                       "VALUES (?, ?, ?, ?, 'open', ?, ?)", (user["id"], user["username"], category, title, ts, ts))
+    cur = conn.execute("INSERT INTO support_tickets (user_id, username, category, title, status, created_at, updated_at, "
+                       "target_name, target_uuid, user_seen_at) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)",
+                       (user["id"], user["username"], category, title, ts, ts, target_name, target_uuid, ts))
     tid = cur.lastrowid
     save_message(conn, tid, user, False, text, uploads)
     D.audit(conn, user, "support_open", f"#{tid} {title}", target=("support", tid, title),
-            meta={"category": category, "images": len(uploads), "length": len(text)})
+            meta={"category": category, "images": len(uploads), "length": len(text), "reported": target_name})
     conn.commit()
     bridge.submit(_notify, "notify_support_new", tid, user["id"], category, title, text[:300], site_url(f"/admin#support/{tid}"))
     return jsonify({"ok": True, "id": tid}), 201
@@ -1626,7 +1674,29 @@ def get_ticket(tid):
     t = load_ticket(tid)
     if not t:
         return error(404, "not_found")
-    return jsonify(ticket_payload(t))
+    since = clamp_int(request.args.get("since"), 0, 10**12, 0)
+    payload = ticket_payload(t, since)
+    if payload["messages"] or not since:
+        mark_seen(t)
+    return jsonify(payload)
+
+
+@route("/api/support/check-player")
+def support_check_player():
+    """Live check for the 'reported player' field."""
+    name = (request.args.get("name") or "").strip()
+    if not NAME_RE.match(name):
+        return jsonify({"ok": False})
+    allowed, headers = site_limiter.hit(f"check:{current_user()['id']}")
+    g.extra_headers = headers
+    if not allowed:
+        return error(429, "rate_limited")
+    from . import heads
+    try:
+        uuid = heads.resolve_uuid(name)
+    except Exception:
+        return jsonify({"ok": True, "unknown": True})
+    return jsonify({"ok": bool(uuid), "uuid": uuid})
 
 
 @route("/api/support/tickets/<int:tid>/messages", methods=["POST"])
@@ -1648,6 +1718,8 @@ def reply_ticket(tid):
     save_message(conn, tid, user, staff, text, uploads)
     if staff and t["status"] == "open":
         conn.execute("UPDATE support_tickets SET status = 'in_progress' WHERE id = ?", (tid,))
+        system_message(conn, tid, user, "in_progress")
+    conn.execute(f"UPDATE support_tickets SET {'staff_seen_at' if staff else 'user_seen_at'} = ? WHERE id = ?", (D.now_ms(), tid))
     conn.commit()
     if staff:
         bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "reply", site_url(f"/support#{tid}"))
@@ -1672,16 +1744,53 @@ def get_attachment(aid):
 def admin_tickets():
     status = request.args.get("status", "")
     conn = db()
-    sql = """SELECT t.*, (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id) AS message_count,
-                    (SELECT is_staff FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_is_staff
-             FROM support_tickets t"""
-    args = ()
+    q = (request.args.get("q") or "").strip()[:60]
+    sql = f"""SELECT t.*, {LAST_MSG_SQL},
+                    (SELECT is_staff FROM support_messages m WHERE m.ticket_id = t.id AND m.kind = 'message' ORDER BY m.id DESC LIMIT 1) AS last_is_staff,
+                    mb.avatar AS user_avatar
+             FROM support_tickets t LEFT JOIN members mb ON mb.discord_id = t.user_id"""
+    where, args = [], []
     if status in ("open", "in_progress", "closed"):
-        sql += " WHERE t.status = ?"
-        args = (status,)
+        where.append("t.status = ?")
+        args.append(status)
+    if q:
+        like = f"%{q}%"
+        where.append("(t.title LIKE ? OR t.username LIKE ? OR t.user_id = ? OR t.target_name LIKE ? OR CAST(t.id AS TEXT) = ?)")
+        args += [like, like, q, like, q.lstrip("#")]
+    if where:
+        sql += " WHERE " + " AND ".join(where)
     rows = conn.execute(sql + " ORDER BY CASE t.status WHEN 'closed' THEN 1 ELSE 0 END, t.updated_at DESC LIMIT 300", args).fetchall()
     counts = {r["status"]: r["n"] for r in conn.execute("SELECT status, COUNT(*) AS n FROM support_tickets GROUP BY status")}
-    return jsonify({"tickets": [dict(r) for r in rows], "counts": counts})
+    return jsonify({"tickets": [ticket_row(r, "staff") for r in rows], "counts": counts})
+
+
+DEFAULT_TEMPLATES = [
+    "你好，我們已經收到你的回報，正在處理中，請耐心等候。",
+    "可以提供更多細節或截圖嗎？這樣我們能更快幫你處理。",
+    "問題已經處理完成，如果還有其他狀況歡迎再開一張客服單。",
+    "經過審查，這次的申訴沒有通過。如有新的證據可以再提出。",
+]
+
+
+@route("/api/admin/support/templates", perm="viewStaff")
+def support_templates():
+    raw = D.get_setting(db(), "support_templates")
+    return jsonify({"templates": json.loads(raw) if raw else DEFAULT_TEMPLATES})
+
+
+@route("/api/admin/support/templates", methods=["PUT"], perm="managePlayers")
+def save_support_templates():
+    items = body().get("templates")
+    if not isinstance(items, list):
+        return bad("invalid_templates", "格式不正確")
+    items = [str(x).strip()[:1000] for x in items if str(x).strip()][:20]
+    conn = db()
+    before = json.loads(D.get_setting(conn, "support_templates") or "null") or DEFAULT_TEMPLATES
+    D.set_setting(conn, "support_templates", json.dumps(items, ensure_ascii=False))
+    D.audit(conn, current_user(), "support_templates", f"{len(items)} templates", target=("setting", "support_templates", "客服快速回覆"),
+            changes={"templates": [before, items]})
+    conn.commit()
+    return jsonify({"ok": True, "templates": items})
 
 
 @route("/api/admin/support/<int:tid>", methods=["PATCH"], perm="viewStaff")
@@ -1694,6 +1803,8 @@ def set_ticket_status(tid):
     if not t:
         return error(404, "not_found")
     conn.execute("UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?", (status, D.now_ms(), tid))
+    if status != t["status"]:
+        system_message(conn, tid, current_user(), status)
     D.audit(conn, current_user(), "support_status", f"#{tid} → {status}", target=("support", tid, t["title"]),
             changes={"status": [t["status"], status]}, meta={"owner": t["user_id"]})
     conn.commit()

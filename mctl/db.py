@@ -245,6 +245,12 @@ MIGRATIONS = [
     # 'read' = developer API key, 'server' = the official Minecraft server plugin.
     ("api_keys", "scope", "TEXT NOT NULL DEFAULT 'read'"),
     # Detailed audit trail: where it came from, what it touched, and what changed.
+    # Support: reported player, per-side "seen" markers and system (status change) messages.
+    ("support_tickets", "target_name", "TEXT"),
+    ("support_tickets", "target_uuid", "TEXT"),
+    ("support_tickets", "user_seen_at", "INTEGER"),
+    ("support_tickets", "staff_seen_at", "INTEGER"),
+    ("support_messages", "kind", "TEXT NOT NULL DEFAULT 'message'"),
     ("audit_log", "source", "TEXT"),
     ("audit_log", "ip", "TEXT"),
     ("audit_log", "user_agent", "TEXT"),
