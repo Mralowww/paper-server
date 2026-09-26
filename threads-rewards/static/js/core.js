@@ -480,7 +480,7 @@
   }
 
   /* ---------- 導覽列 / 頁尾 ---------- */
-  const LOGO = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" style="fill:var(--accent)"/><path d="M6 21 L10 12 L14 21 L18 12 L22 21 L26 12" style="stroke:var(--accent-ink)" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/></svg>`;
+  const LOGO = `<img src="/static/img/icon-128.png" alt="鋸齒 SMP" width="30" height="30" decoding="async">`;
   const THEME_ICON = `<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>`;
   let me = null; let ambStateFn = null;
   document.addEventListener("soundchange", () => ambStateFn && ambStateFn());
