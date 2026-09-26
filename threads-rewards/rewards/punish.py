@@ -127,6 +127,7 @@ def active_of(uuid: str, ptype: str) -> dict | None:
 
 
 log = logging.getLogger("rewards.punish")
+heartbeat_hooks: list = []  # matchmaking 會註冊：清除離線玩家的配對
 _last_heartbeat = {"at": 0.0}
 
 
@@ -511,6 +512,7 @@ class PluginPunish(BaseModel):
     duration: int | None = None
     staff_name: str
     ip: str | None = None
+    silent: bool = False
 
 
 class PluginRevoke(BaseModel):
@@ -545,6 +547,8 @@ async def plugin_quit(body: dict):
 @router.post("/api/plugin/heartbeat", dependencies=[Depends(plugin_auth)])
 async def plugin_heartbeat(body: dict):
     online = body.get("online") or []
+    for hook in heartbeat_hooks:
+        hook([dashed(pl["uuid"]) for pl in online if pl.get("uuid")])
     now = time.time()
     elapsed = int(min(120, now - _last_heartbeat["at"])) if _last_heartbeat["at"] else 0
     _last_heartbeat["at"] = now
@@ -578,8 +582,22 @@ async def plugin_ack(body: dict):
 async def plugin_punish(body: PluginPunish):
     player = db.one("SELECT * FROM players WHERE uuid = ?", (dashed(body.uuid),)) if body.uuid else None
     player = player or await resolve_player(body.name)
-    p = create_punishment(player, body.type, body.reason, body.duration, None, body.staff_name[:32], source="game", ip=body.ip)
-    return {"ok": True, "id": p["id"], "message": kick_message(p) if p["type"] in ("ban", "ipban", "kick") else None}
+    staff = db.one("SELECT * FROM users WHERE mc_name = ? COLLATE NOCASE", (body.staff_name,))
+    p = create_punishment(player, body.type, body.reason, body.duration, staff, body.staff_name[:32], source="game",
+                          ip=body.ip, silent=body.silent)
+    return {"ok": True, "id": p["id"], "uuid": p["uuid"], "name": p["name"], "expires_at": p["expires_at"], "ip": p["ip"],
+            "message": kick_message(p) if p["type"] in ("ban", "ipban", "kick") else None}
+
+
+@router.get("/api/plugin/history/{name}", dependencies=[Depends(plugin_auth)])
+async def plugin_history(name: str):
+    expire_old()
+    player = await resolve_player(name)
+    rows = db.query("SELECT * FROM punishments WHERE uuid = ? ORDER BY id DESC LIMIT 20", (player["uuid"],))
+    linked = db.one("SELECT id, username FROM users WHERE mc_uuid = ?", (player["uuid"],))
+    return {"player": {"uuid": player["uuid"], "name": player["name"], "online": bool(player.get("online")),
+                       "last_ip": player.get("last_ip"), "first_seen": player.get("first_seen"), "last_seen": player.get("last_seen")},
+            "discord": linked, "punishments": rows}
 
 
 @router.post("/api/plugin/revoke", dependencies=[Depends(plugin_auth)])

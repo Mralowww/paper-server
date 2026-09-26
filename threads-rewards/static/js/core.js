@@ -343,7 +343,7 @@
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
       <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
         <button class="btn icon ghost theme-btn" data-theme-toggle aria-label="theme">${THEME_ICON}</button>
@@ -476,7 +476,7 @@
   let paletteOpen = false;
   function openPalette() {
     if (paletteOpen) return; paletteOpen = true; sfx("popup");
-    const pages = [["/", "nav.home", "🏠"], ["/rankings", "nav.rankings", "🏆"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/bans", "nav.bans", "⚖️"], ["/support", "nav.support", "💬"], ["/account", "nav.account", "👤"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
+    const pages = [["/", "nav.home", "🏠"], ["/rankings", "nav.rankings", "🏆"], ["/match", "nav.match", "⚔️"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/bans", "nav.bans", "⚖️"], ["/support", "nav.support", "💬"], ["/account", "nav.account", "👤"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
     if (me && me.level >= 1) pages.splice(5, 0, ["/admin", "nav.admin", "🛡️"]);
     const o = openOverlay(`<div class="modal palette"><input class="input" data-i18n-ph="nav.search" autocomplete="off"><div class="palette-results"></div></div>`, { onClose: () => (paletteOpen = false) });
     const input = $("input", o.el); const res = $(".palette-results", o.el);

@@ -56,7 +56,7 @@
     d.matches.forEach((m, i) => {
       const day = new Date(m.created_at).toLocaleDateString(App.lang === "zh" ? "zh-TW" : "en-US", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
       if (day !== last) { out += `<div class="day-sep">${day}</div>`; last = day; }
-      out += `<div class="match ${m.won ? "" : "lost"}" style="animation-delay:${Math.min(i, 12) * 40}ms">${ART.worldArt(m.world || "")}<span class="res">${t(m.won ? "pp.win" : "pp.loss")}</span>
+      out += `<div class="match ${m.draw ? "draw" : m.won ? "" : "lost"}" style="animation-delay:${Math.min(i, 12) * 40}ms">${ART.worldArt(m.world || "")}<span class="res">${t(m.draw ? "pp.draw" : m.won ? "pp.win" : "pp.loss")}</span>
         <div class="who"><b>${esc(d.player.name)} <span>vs</span> <a href="/player?name=${encodeURIComponent(m.opponent)}">${esc(m.opponent)}</a></b><small>${esc(m.world || "—")}</small><small class="mono">${new Date(m.created_at).toLocaleTimeString(App.lang === "zh" ? "zh-TW" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</small></div>
         <img class="opp" src="${mcHead(m.opponent_uuid, 52)}" alt=""><span class="score"><span class="w">${m.my_score}</span><span class="d">—</span><span class="l">${m.their_score}</span></span></div>`;
     });

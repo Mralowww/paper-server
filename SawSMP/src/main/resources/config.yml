@@ -1,0 +1,41 @@
+# 鋸齒 SMP 核心插件設定
+api:
+  # 網站網址（不要以 / 結尾）
+  url: "http://tw4.shdctw.com:25463"
+  # 網站後台 → API Keys → Minecraft 插件金鑰
+  key: ""
+  # 連線逾時（秒）
+  timeout-seconds: 5
+
+# 多久向網站回報一次線上玩家並取得待執行動作（秒）
+heartbeat-seconds: 5
+
+login:
+  # 玩家進服前向網站確認是否被封鎖
+  check: true
+  # 網站連不上時是否仍允許進入（true = 允許）
+  fail-open: true
+
+stats:
+  # 回報 PVP 擊殺 / 死亡到網站排行榜
+  enabled: true
+  # 受到玩家攻擊後幾秒內死亡，仍算該玩家擊殺（例如被打下懸崖）
+  combat-tag-seconds: 10
+
+match:
+  # 對戰傳送的世界
+  world: "world"
+  # 隨機位置與世界中心 (0, 0) 的距離範圍
+  min-radius: 800
+  max-radius: 4000
+  # 兩名玩家之間的距離（格）
+  spacing: 14
+  # 開戰倒數（秒）
+  countdown: 3
+  # 對戰結束後把玩家傳回原本位置
+  return-to-origin: true
+  # 尋找安全位置的最多嘗試次數
+  max-attempts: 40
+
+messages:
+  prefix: "<#97c8c7><bold>鋸齒 SMP</bold></#97c8c7> <dark_gray>»</dark_gray> "

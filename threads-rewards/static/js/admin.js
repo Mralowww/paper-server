@@ -301,6 +301,7 @@
     { title: "set.punish", items: [["reason_presets", "set.reasons", "textarea"], ["warn_threshold", "set.warnN", "num"], ["warn_ban_hours", "set.warnH", "num"]] },
     { title: "set.support", items: [["canned_replies", "set.canned", "textarea"], ["violation_types", "set.violations", "textarea"]] },
     { title: "set.ranks", hint: "set.ranks.d", items: [["rank_tiers", "set.tiers", "textarea"]] },
+    { title: "set.match", items: [["match_enabled", "set.matchOn"], ["match_time_limit", "set.matchLimit", "num"]] },
   ]);
 
   /* ---------- Threads 獎勵 ---------- */

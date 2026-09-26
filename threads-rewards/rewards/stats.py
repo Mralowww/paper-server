@@ -132,7 +132,7 @@ async def leaderboard(sort: str = "kills", limit: int = 100, q: str = ""):
     rows = leaderboard_rows(sort, limit, q)
     totals = db.one("""SELECT COUNT(*) AS players, COALESCE(SUM(kills),0) AS kills, COALESCE(SUM(playtime),0) AS playtime
                        FROM player_stats""")
-    totals["matches"] = db.one("SELECT COUNT(*) AS c FROM matches")["c"]
+    totals["matches"] = db.one("SELECT COUNT(*) AS c FROM matches WHERE status = 'finished'")["c"]
     totals["online"] = db.one("SELECT COUNT(*) AS c FROM players WHERE online = 1")["c"]
     return {"sort": sort if sort in SORTS else "kills", "players": rows, "totals": totals}
 
@@ -150,18 +150,18 @@ def profile(name: str, match_limit: int = 50) -> dict:
     if stats["kills"]:
         rank = db.one("SELECT COUNT(*) + 1 AS r FROM player_stats WHERE kills > ?", (stats["kills"],))["r"]
     methods = db.query("SELECT method, count FROM kill_methods WHERE uuid = ? ORDER BY count DESC", (uuid,))
-    matches = db.query("""SELECT * FROM matches WHERE winner_uuid = ? OR loser_uuid = ? ORDER BY id DESC LIMIT ?""",
+    matches = db.query("""SELECT * FROM matches WHERE status = 'finished' AND (winner_uuid = ? OR loser_uuid = ?) ORDER BY id DESC LIMIT ?""",
                        (uuid, uuid, match_limit))
     for m in matches:
-        me_won = m["winner_uuid"] == uuid
+        me_won = m["winner_uuid"] == uuid and not m["draw"]
         m.update(won=me_won, opponent=m["loser_name"] if me_won else m["winner_name"],
                  opponent_uuid=m["loser_uuid"] if me_won else m["winner_uuid"],
                  my_score=m["winner_score"] if me_won else m["loser_score"],
                  their_score=m["loser_score"] if me_won else m["winner_score"])
     rivals = db.query(
         """SELECT opp_uuid AS uuid, MAX(opp_name) AS name, SUM(win) AS wins, SUM(1 - win) AS losses, MAX(created_at) AS last
-           FROM (SELECT loser_uuid AS opp_uuid, loser_name AS opp_name, 1 AS win, created_at FROM matches WHERE winner_uuid = ?
-                 UNION ALL SELECT winner_uuid, winner_name, 0, created_at FROM matches WHERE loser_uuid = ?)
+           FROM (SELECT loser_uuid AS opp_uuid, loser_name AS opp_name, 1 AS win, created_at FROM matches WHERE winner_uuid = ? AND status = 'finished' AND draw = 0
+                 UNION ALL SELECT winner_uuid, winner_name, 0, created_at FROM matches WHERE loser_uuid = ? AND status = 'finished' AND draw = 0)
            GROUP BY opp_uuid ORDER BY COUNT(*) DESC, last DESC LIMIT 5""", (uuid, uuid))
     linked = db.one("SELECT id FROM users WHERE mc_uuid = ?", (uuid,))
     puns = db.query("""SELECT * FROM punishments WHERE uuid = ? AND silent = 0 AND type != 'kick' ORDER BY id DESC LIMIT 30""", (uuid,))

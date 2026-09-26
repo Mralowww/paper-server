@@ -386,3 +386,30 @@ Object.assign(window.I18N.en, {
 
 Object.assign(window.I18N.zh, { "lk.inGuild": "在 Discord 伺服器中", "lk.notInGuild": "不在伺服器中", "lk.dcCreated": "Discord 帳號建立", "lk.joined": "加入伺服器", "lk.webLevel": "網站權限", "lk.lastLogin": "最後登入網站", "lk.roles": "身分組", "lk.live": "即時資料", "lk.unranked": "未排名", "lk.activity": "動態", "lk.stats": "伺服器戰績", "lk.names": "名稱紀錄", "lk.related": "相關紀錄" });
 Object.assign(window.I18N.en, { "lk.inGuild": "In Discord server", "lk.notInGuild": "Not in server", "lk.dcCreated": "Discord account created", "lk.joined": "Joined server", "lk.webLevel": "Website rank", "lk.lastLogin": "Last website login", "lk.roles": "roles", "lk.live": "live", "lk.unranked": "Unranked", "lk.activity": "Activity", "lk.stats": "Server stats", "lk.names": "Name history", "lk.related": "Related" });
+
+Object.assign(window.I18N.zh, {
+  "nav.match": "配對", "pp.draw": "平手",
+  "mm.title": "PVP 配對", "mm.sub": "在遊戲中上線後按下開始配對，湊到對手就會一起傳送到地表的隨機位置開打。",
+  "mm.live": "進行中的對戰", "mm.recent": "最近結果", "mm.rules": "規則", "mm.queue": "配對中", "mm.liveN": "對戰中", "mm.noLive": "目前沒有進行中的對戰。",
+  "mm.ruleList": "需要綁定 Minecraft 帳號並在伺服器上線|配對成功後雙方會被傳送到地表的安全隨機位置|其中一方死亡即分出勝負|中途退出遊戲判負|超過時間限制算平手|結果會記錄到排行榜與對戰紀錄",
+  "mm.loginTitle": "登入後開始配對", "mm.loginD": "使用 Discord 登入並綁定 Minecraft 帳號。", "mm.disabled": "配對系統目前關閉中",
+  "mm.needLink": "先綁定 Minecraft 帳號", "mm.needLinkD": "配對需要知道你在遊戲中的角色。", "mm.needOnline": "請先進入伺服器", "mm.needOnlineD": "你必須在遊戲中上線才能配對。",
+  "mm.autoRefresh": "上線後此頁會自動更新。", "mm.start": "開始配對", "mm.ready": "準備好了嗎？", "mm.readyD": "對戰時間上限 {m} 分鐘，死亡或退出遊戲即判負。",
+  "mm.searching": "正在尋找對手…", "mm.inQueue": "目前 {n} 人在配對中", "mm.cancel": "取消配對",
+  "mm.teleporting": "傳送中", "mm.teleportingD": "正在把你們傳送到戰場，請留在遊戲中。", "mm.fighting": "對戰中", "mm.fightingD": "擊敗對手！時間上限 {m} 分鐘。",
+  "mm.found": "配對成功！", "mm.foundD": "即將把你傳送到戰場。", "mm.lastResult": "上一場",
+  "set.match": "PVP 配對", "set.matchOn": "啟用配對（1 = 開、0 = 關）", "set.matchLimit": "對戰時間上限（分鐘）",
+});
+Object.assign(window.I18N.en, {
+  "nav.match": "Match", "pp.draw": "Draw",
+  "mm.title": "PvP matchmaking", "mm.sub": "Be online in-game and hit start — once paired, you're both teleported to a random surface spot to fight.",
+  "mm.live": "Live matches", "mm.recent": "Recent results", "mm.rules": "Rules", "mm.queue": "Queued", "mm.liveN": "Fighting", "mm.noLive": "No live matches.",
+  "mm.ruleList": "Link your Minecraft account and be online|Both players are teleported to a safe random surface spot|First death decides the winner|Leaving the game counts as a loss|Hitting the time limit is a draw|Results go to the rankings and match history",
+  "mm.loginTitle": "Log in to play", "mm.loginD": "Log in with Discord and link your Minecraft account.", "mm.disabled": "Matchmaking is disabled",
+  "mm.needLink": "Link your Minecraft account", "mm.needLinkD": "We need to know which player you are.", "mm.needOnline": "Join the server first", "mm.needOnlineD": "You must be online in-game to queue.",
+  "mm.autoRefresh": "This page updates when you come online.", "mm.start": "Find match", "mm.ready": "Ready?", "mm.readyD": "{m}-minute time limit. Dying or leaving counts as a loss.",
+  "mm.searching": "Searching for an opponent…", "mm.inQueue": "{n} player(s) in queue", "mm.cancel": "Cancel",
+  "mm.teleporting": "Teleporting", "mm.teleportingD": "Sending you to the arena — stay in-game.", "mm.fighting": "Fighting", "mm.fightingD": "Defeat your opponent! {m}-minute limit.",
+  "mm.found": "Match found!", "mm.foundD": "Teleporting you to the arena.", "mm.lastResult": "Last match",
+  "set.match": "PvP matchmaking", "set.matchOn": "Enabled (1 = on, 0 = off)", "set.matchLimit": "Time limit (minutes)",
+});

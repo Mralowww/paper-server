@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, admin_ext, bot, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, admin_ext, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,7 +22,7 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
          "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html",
          "/support": "support.html", "/ticket": "ticket.html", "/account": "account.html",
-         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html"}
+         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html"}
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ app.include_router(punish.router)
 app.include_router(account.router)
 app.include_router(stats.router)
 app.include_router(admin_ext.router)
+app.include_router(matchmaking.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 

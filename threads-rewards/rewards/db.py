@@ -33,6 +33,8 @@ DEFAULT_SETTINGS = {
     "reason_presets": "使用外掛\n辱罵他人\n洗頻\n利用 Bug\n惡意破壞\n使用小號規避處罰",
     "violation_types": "外掛 / 作弊\n辱罵 / 騷擾\n惡意破壞\n洗頻 / 廣告\n利用漏洞\n其他",
     "canned_replies": "你好，我們已經收到你的回報，正在處理中，請耐心等候。\n可以提供更多細節或截圖嗎？\n已處理完畢，感謝你的回報！\n此問題已轉交相關人員處理。",
+    "match_enabled": "1",
+    "match_time_limit": "60",
     "rank_tiers": "0:戰鬥新手\n50:熟練戰士\n150:精英鬥士\n400:戰場大師\n1000:傳奇",
 }
 
@@ -229,6 +231,12 @@ CREATE TABLE IF NOT EXISTS player_names (
     first_seen TEXT NOT NULL,
     PRIMARY KEY (uuid, name)
 );
+CREATE TABLE IF NOT EXISTS match_queue (
+    uuid TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    joined_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settled_periods (period_start TEXT PRIMARY KEY, settled_at TEXT NOT NULL);
 """
 
@@ -242,7 +250,9 @@ def _migrate(c: sqlite3.Connection) -> None:
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_mc ON users(mc_uuid) WHERE mc_uuid IS NOT NULL")
     extra = {"users": [("ticket_banned", "INTEGER NOT NULL DEFAULT 0")],
              "punishments": [("silent", "INTEGER NOT NULL DEFAULT 0"), ("discord_sync", "INTEGER NOT NULL DEFAULT 0")],
-             "tickets": [("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("fields", "TEXT NOT NULL DEFAULT '{}'")]}
+             "tickets": [("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("fields", "TEXT NOT NULL DEFAULT '{}'")],
+             "matches": [("status", "TEXT NOT NULL DEFAULT 'finished'"), ("reason", "TEXT"), ("draw", "INTEGER NOT NULL DEFAULT 0"),
+                         ("started_at", "TEXT"), ("ended_at", "TEXT")]}
     for table, columns in extra.items():
         have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
         for name, ddl in columns:

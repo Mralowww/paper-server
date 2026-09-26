@@ -1,0 +1,100 @@
+name: SawSMP
+version: '${version}'
+main: dev.sawsmp.core.SawSMPPlugin
+api-version: '1.21'
+folia-supported: true
+author: opopjjjidj
+website: https://sawsmp.me
+description: 鋸齒 SMP 核心：網站串接、懲處、帳號綁定、權限同步、戰績回報與 PVP 配對
+
+commands:
+  ban:
+    description: 封禁玩家（可加時長）
+    usage: /ban <玩家> [時長] [-s] [原因]
+    permission: sawsmp.punish.ban
+  tempban:
+    description: 限時封禁玩家
+    usage: /tempban <玩家> <時長> [-s] [原因]
+    permission: sawsmp.punish.tempban
+  ipban:
+    description: IP 封禁玩家
+    usage: /ipban <玩家> [時長] [-s] [原因]
+    permission: sawsmp.punish.ipban
+    aliases: [ban-ip]
+  mute:
+    description: 禁言玩家（可加時長）
+    usage: /mute <玩家> [時長] [-s] [原因]
+    permission: sawsmp.punish.mute
+  tempmute:
+    description: 限時禁言玩家
+    usage: /tempmute <玩家> <時長> [-s] [原因]
+    permission: sawsmp.punish.tempmute
+  warn:
+    description: 警告玩家
+    usage: /warn <玩家> [-s] <原因>
+    permission: sawsmp.punish.warn
+  kick:
+    description: 踢出玩家
+    usage: /kick <玩家> [-s] [原因]
+    permission: sawsmp.punish.kick
+  unban:
+    description: 解除封禁
+    usage: /unban <玩家> [原因]
+    permission: sawsmp.punish.unban
+    aliases: [pardon]
+  unipban:
+    description: 解除 IP 封禁
+    usage: /unipban <玩家> [原因]
+    permission: sawsmp.punish.ipban
+    aliases: [pardon-ip]
+  unmute:
+    description: 解除禁言
+    usage: /unmute <玩家> [原因]
+    permission: sawsmp.punish.unmute
+  history:
+    description: 查看玩家處罰紀錄
+    usage: /history <玩家>
+    permission: sawsmp.history
+  check:
+    description: 查看玩家目前狀態
+    usage: /check <玩家>
+    permission: sawsmp.check
+  link:
+    description: 綁定網站帳號
+    usage: /link <驗證碼>
+  sawsmp:
+    description: 鋸齒 SMP 插件管理
+    usage: /sawsmp <reload|status>
+    permission: sawsmp.admin
+    aliases: [saw]
+
+permissions:
+  sawsmp.punish.*:
+    description: 所有處罰指令
+    default: op
+    children:
+      sawsmp.punish.ban: true
+      sawsmp.punish.tempban: true
+      sawsmp.punish.ipban: true
+      sawsmp.punish.mute: true
+      sawsmp.punish.tempmute: true
+      sawsmp.punish.warn: true
+      sawsmp.punish.kick: true
+      sawsmp.punish.unban: true
+      sawsmp.punish.unmute: true
+  sawsmp.history:
+    default: op
+  sawsmp.check:
+    default: op
+  sawsmp.silent:
+    description: 可使用 -s 靜默處罰
+    default: op
+  sawsmp.notify:
+    description: 收到處罰與靜默處罰通知
+    default: op
+  sawsmp.admin:
+    description: 管理插件、在 /check 看到 IP
+    default: op
+  sawsmp.bypass.mute:
+    description: 不受禁言影響（僅供除錯）
+    default: false
