@@ -505,7 +505,7 @@
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
       <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${link("/redeem", "nav.redeem")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
         <button class="btn icon ghost amb-btn" data-ambient aria-label="ambient" title="${t("snd.ambient")}"><span class="eq"><i></i><i></i><i></i><i></i></span></button>
