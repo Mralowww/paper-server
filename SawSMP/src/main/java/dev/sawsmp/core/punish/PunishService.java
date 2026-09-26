@@ -103,6 +103,37 @@ public final class PunishService implements Listener {
                 "t", m.expires() == null ? "永久" : "剩餘 " + Durations.format(m.expires().getEpochSecond() - Instant.now().getEpochSecond()));
     }
 
+    /** 舊版聊天事件：部分聊天插件（格式化、跨服聊天）只聽這個事件，也要一併擋下。 */
+    @SuppressWarnings("deprecation")
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onLegacyChat(org.bukkit.event.player.AsyncPlayerChatEvent e) {
+        if (muteOf(e.getPlayer().getUniqueId()) == null || e.getPlayer().hasPermission("sawsmp.bypass.mute")) return;
+        e.setCancelled(true);
+    }
+
+    /** 以網站回傳的完整清單覆蓋線上玩家的禁言狀態（每次心跳），確保不漏也不殘留。 */
+    public void syncMutes(JsonObject list) {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            UUID id = p.getUniqueId();
+            JsonObject m = list.has(id.toString()) && list.get(id.toString()).isJsonObject() ? list.getAsJsonObject(id.toString()) : null;
+            setMute(id, m);
+        }
+    }
+
+    /** 清掉遊戲內其他來源（原版、AdvancedBan）的同一筆封禁 / 禁言。 */
+    public void pardonElsewhere(String type, String name, String ip) {
+        Sched.global(() -> {
+            var console = Bukkit.getConsoleSender();
+            if ("ban".equals(type) && name != null) Bukkit.dispatchCommand(console, "minecraft:pardon " + name);
+            if ("ipban".equals(type) && ip != null) Bukkit.dispatchCommand(console, "minecraft:pardon-ip " + ip);
+            if (Bukkit.getPluginManager().isPluginEnabled("AdvancedBan")) {
+                String cmd = switch (type) { case "mute" -> "advancedban:unmute"; default -> "advancedban:unban"; };
+                String who = "ipban".equals(type) && ip != null ? ip : name;
+                if (who != null) Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd + " " + who);
+            }
+        });
+    }
+
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent e) {
         if (muteOf(e.getPlayer().getUniqueId()) == null || e.getPlayer().hasPermission("sawsmp.bypass.mute")) return;
@@ -137,6 +168,7 @@ public final class PunishService implements Listener {
                 Sched.entity(target, () -> Msg.send(target, "<red>你已被禁言：</red><white>{r}</white> <gray>（{t}）</gray>",
                         "r", ApiClient.str(p, "reason"), "t", Durations.remaining(ApiClient.str(p, "expires_at"))));
             }
+            case "pardon" -> pardonElsewhere(ApiClient.str(p, "type"), ApiClient.str(p, "name"), ApiClient.str(p, "ip"));
             case "unmute" -> {
                 if (target == null) return;
                 mutes.remove(target.getUniqueId());

@@ -62,7 +62,10 @@ public final class PunishCommand implements TabExecutor {
             String reason = String.join(" ", rest);
             plugin.api().post("/api/plugin/revoke", ApiClient.obj("name", target, "type", revokeType, "staff_name", staff, "reason", reason)).thenAccept(r -> {
                 if (!r.ok()) { Msg.send(sender, "<red>解除失敗：{e}</red>", "e", r.error()); return; }
-                Msg.send(sender, "<green>已解除 {p} 的{t}（#{id}）。</green>", "p", target, "t", typeName(revokeType), "id", ApiClient.str(r.body(), "id"));
+                // 不論網站上有沒有這筆，都清掉遊戲內其他插件（原版 / AdvancedBan）的紀錄
+                plugin.punish().pardonElsewhere(revokeType, target, "ipban".equals(revokeType) ? target : null);
+                if (ApiClient.str(r.body(), "id") == null) Msg.send(sender, "<yellow>網站上沒有 {p} 生效中的{t}，已清除遊戲內的紀錄。</yellow>", "p", target, "t", typeName(revokeType));
+                else Msg.send(sender, "<green>已解除 {p} 的{t}（#{id}）。</green>", "p", target, "t", typeName(revokeType), "id", ApiClient.str(r.body(), "id"));
                 if ("mute".equals(revokeType)) {
                     Player online = Bukkit.getPlayerExact(target);
                     if (online != null) { plugin.punish().setMute(online.getUniqueId(), null); Sched.entity(online, () -> Msg.send(online, "<green>你的禁言已解除。</green>")); }

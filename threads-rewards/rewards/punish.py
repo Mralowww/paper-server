@@ -254,6 +254,9 @@ def revoke(p: dict, staff: dict | None, staff_name: str, reason: str, notify_plu
     db.audit(staff, f"revoke.{p['type']}", f"#{p['id']} {p['name']} — {reason}")
     if notify_plugin and p["type"] == "mute":
         queue("unmute", {"uuid": p["uuid"], "name": p["name"], "punishment_id": p["id"]})
+    if p["type"] in ("ban", "ipban", "mute"):
+        # 讓遊戲內也清掉原版 / AdvancedBan 等其他插件的同一筆封禁或禁言，避免網站解了、遊戲還擋著
+        queue("pardon", {"uuid": p["uuid"], "name": p["name"], "ip": p.get("ip"), "type": p["type"], "punishment_id": p["id"]})
     if p.get("discord_sync"):
         _bg(_discord_sync(p, undo=True))
     if not p.get("silent"):
@@ -576,7 +579,14 @@ async def plugin_heartbeat(body: dict):
     actions = db.query("SELECT id, action, payload, created_at FROM plugin_actions WHERE done_at IS NULL ORDER BY id LIMIT 100")
     for a in actions:
         a["payload"] = json.loads(a["payload"])
-    return {"actions": actions}
+    # 線上玩家目前生效中的禁言（完整清單，插件據此覆蓋自己的狀態，確保不會漏掉或殘留）
+    ids = [dashed(pl["uuid"]) for pl in online if pl.get("uuid")]
+    mutes = {}
+    if ids:
+        marks = ",".join("?" * len(ids))
+        for m in db.query(f"SELECT id, uuid, reason, expires_at FROM punishments WHERE type = 'mute' AND active = 1 AND uuid IN ({marks})", tuple(ids)):
+            mutes[m["uuid"]] = {"id": m["id"], "reason": m["reason"], "expires_at": m["expires_at"]}
+    return {"actions": actions, "mutes": mutes}
 
 
 @router.post("/api/plugin/actions/ack", dependencies=[Depends(plugin_auth)])
@@ -611,10 +621,15 @@ async def plugin_history(name: str):
 
 @router.post("/api/plugin/revoke", dependencies=[Depends(plugin_auth)])
 async def plugin_revoke(body: PluginRevoke):
-    player = await resolve_player(body.name)
-    p = active_of(player["uuid"], body.type)
+    try:
+        player = await resolve_player(body.name)
+    except HTTPException:
+        player = None
+    p = player and active_of(player["uuid"], body.type)
+    if not p and body.type == "ipban":
+        p = db.one("SELECT * FROM punishments WHERE type = 'ipban' AND active = 1 AND (name = ? COLLATE NOCASE OR ip = ?) ORDER BY id DESC LIMIT 1", (body.name, body.name))
     if not p:
-        raise HTTPException(404, "沒有生效中的此類懲處")
+        return {"ok": True, "id": None, "none": True}
     revoke(p, None, body.staff_name[:32], body.reason, notify_plugin=False)
     return {"ok": True, "id": p["id"]}
 

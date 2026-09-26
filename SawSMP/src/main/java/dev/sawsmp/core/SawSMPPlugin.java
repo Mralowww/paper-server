@@ -100,6 +100,7 @@ public final class SawSMPPlugin extends JavaPlugin {
                 }
                 if (warnedOffline) getLogger().info("已恢復與網站的連線");
                 warnedOffline = false;
+                if (r.body().has("mutes") && r.body().get("mutes").isJsonObject()) punish.syncMutes(r.body().getAsJsonObject("mutes"));
                 JsonArray done = new JsonArray();
                 for (JsonElement el : r.body().getAsJsonArray("actions")) {
                     JsonObject a = el.getAsJsonObject();
@@ -116,7 +117,7 @@ public final class SawSMPPlugin extends JavaPlugin {
 
     private void handle(String action, JsonObject payload) {
         switch (action) {
-            case "kick", "mute", "unmute", "warn" -> punish.handleAction(action, payload);
+            case "kick", "mute", "unmute", "warn", "pardon" -> punish.handleAction(action, payload);
             case "permissions_reload" -> perms.refreshAll();
             case "match_start" -> Sched.global(() -> matches.start(payload));
             default -> getLogger().fine("未知的動作：" + action);
