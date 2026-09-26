@@ -193,15 +193,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="pf-bars">${types.map(([k, n]) => `<div class="pf-bar"><span>${CAUSE[k]} ${t(`pf.cause.${k}`)}</span><i style="--w:${(n / maxType) * 100}%"></i><b>${n}</b></div>`).join('')}</div>
         </div>
         <div class="pf-card"><h3>${t('pf.rivals')}</h3>
-          ${s.rivals.length ? `<div class="pf-rivals">${s.rivals.map((r) => `<a href="/player/${encodeURIComponent(r.name)}"><img src="${avatarUrl(r.opp, 32)}" alt="" onerror="${fallbackImg}"><span>${esc(r.name)}</span><b><span class="win">${r.kills}</span> – <span class="loss">${r.deaths}</span></b></a>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}
+          ${s.rivals.length ? `<div class="pf-rivals">${s.rivals.map(rivalHtml).join('')}</div>${moreBtn('rivals', s.rivalCount)}` : `<p class="muted">${t('pf.none')}</p>`}
         </div>
       </div>
+      <div class="pf-card"><h3>${t('pf.recent')}</h3>
+        ${s.recent.length ? `<div class="pf-log">${s.recent.map(logRow).join('')}</div>${moreBtn('log')}` : `<p class="muted">${t('pf.none')}</p>`}
+      </div>
       <div class="pf-card"><h3>${svg(IC.globe)}${t('pf.byWorld')}</h3>
-        ${s.worlds.length ? `<div class="pf-worlds">${s.worlds.map((w) => `<div class="pf-world">${worldThumb(w.world)}
-          <div class="pf-world-name"><b>${esc(worldInfo(w.world).name)}</b><span class="mono muted">${esc(w.world)}</span></div>
-          <div><small>${t('pf.kills')}</small><b>${w.kills}</b></div><div><small>${t('pf.deaths')}</small><b>${w.deaths}</b></div>
-          <div><small>KDR</small><b>${ratio(w.kills, w.deaths)}</b></div><div><small>${t('pf.matches')}</small><b>${w.matches}</b></div>
-          <div><small>${t('pf.winRate')}</small><b>${pct(w.wins, w.matches)}</b></div></div>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}
+        ${s.worlds.length ? `<div class="pf-worlds">${s.worlds.map(worldRow).join('')}</div>${moreBtn('worlds', s.worldCount)}` : `<p class="muted">${t('pf.none')}</p>`}
       </div>
       ${cp ? `<div class="pf-card"><div class="pf-card-head"><h3>${t('pf.coreplus')}</h3><span class="muted" style="font-size:12px">${t('pf.syncedAt', { time: esc(fmtRelative(cp.syncedAt)) })}</span></div>
         <div class="pf-tiles five">
@@ -214,6 +213,147 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${tierInfo}
       <p class="muted pf-note" style="text-align:center">${t('pf.statsNote', { since: esc(fmtDate(s.firstSeen)) })}</p>`;
     $$('[data-n]', box).forEach((el) => countUp(el, Number(el.dataset.n)));
+    $$('[data-full]', box).forEach((b) => b.addEventListener('click', () => openFull(b.dataset.full)));
+  }
+
+  const moreBtn = (tab, n) => `<button class="pf-more-link" data-full="${tab}">${t('pf.viewAll')}${n ? ` <span class="muted">(${n})</span>` : ''} →</button>`;
+  const rivalHtml = (r) => `<a href="/player/${encodeURIComponent(r.name)}"><img src="${avatarUrl(r.opp, 32)}" alt="" onerror="${fallbackImg}"><span>${esc(r.name)}</span>
+    ${r.last_at ? `<small class="muted">${esc(fmtRelative(r.last_at))}</small>` : ''}<b><span class="win">${r.kills}</span> – <span class="loss">${r.deaths}</span></b></a>`;
+  const worldRow = (w) => `<div class="pf-world">${worldThumb(w.world)}
+    <div class="pf-world-name"><b>${esc(worldInfo(w.world).name)}</b><span class="mono muted">${w.last_at ? esc(fmtRelative(w.last_at)) : esc(w.world)}</span></div>
+    <div><small>${t('pf.kills')}</small><b>${w.kills}</b></div><div><small>${t('pf.deaths')}</small><b>${w.deaths}</b></div>
+    <div><small>KDR</small><b>${ratio(w.kills, w.deaths)}</b></div><div><small>${t('pf.matches')}</small><b>${w.matches}</b></div>
+    <div><small>${t('pf.winRate')}</small><b>${pct(w.wins, w.matches)}</b></div></div>`;
+  const logRow = (k, i = 0) => `<div class="pf-logrow ${k.role}" style="--i:${i}">
+    <span class="pf-log-badge">${t(k.role === 'kill' ? 'pf.kill' : 'pf.death')}</span>
+    <span class="pf-log-main">${k.opponent ? `<span>${t(k.role === 'kill' ? 'pf.killed' : 'pf.killedBy')} <a href="/player/${encodeURIComponent(k.opponent.name)}">${esc(k.opponent.name)}</a></span>` : `<span class="muted">${t('pf.selfDeath')}</span>`}
+      <small class="muted">${CAUSE[k.cause] || '•'} ${t(`pf.cause.${k.cause}`)}${k.killerHealth != null ? ` · ❤ ${k.killerHealth}` : ''}${k.victimPops ? ` · ${t('pf.pops', { n: k.victimPops })}` : ''}</small></span>
+    <span class="pf-log-world">${worldThumb(k.world, 'xs')}<span>${esc(worldInfo(k.world).name)}</span></span>
+    <span class="pf-log-time mono muted" title="${esc(fmtDate(k.at))}">${esc(fmtRelative(k.at))}</span>
+  </div>`;
+
+  // ---------------------------------------------------------------- full stats dialog
+  function openFull(tab = 'log') {
+    const bg = document.createElement('div');
+    bg.className = 'pfx-bg';
+    bg.innerHTML = `
+      <div class="pfx" role="dialog" aria-modal="true" aria-label="${t('pf.fullTitle')}">
+        <header class="pfx-head">
+          <img src="${avatarUrl(g.uuid, 64)}" alt="" onerror="${fallbackImg}">
+          <div><div class="kicker">${t('pf.fullKicker')}</div><h2>${t('pf.fullTitle')} · ${esc(g.name)}</h2></div>
+          <button class="pfx-x" aria-label="${t('card.close')}">✕</button>
+        </header>
+        <nav class="pfx-tabs"><i class="pfx-ink"></i>
+          ${[['log', 'pf.tabLog'], ['worlds', 'pf.byWorld'], ['rivals', 'pf.rivalsAll']].map(([id, key]) => `<button data-t="${id}">${t(key)}</button>`).join('')}
+        </nav>
+        <div class="pfx-body"></div>
+      </div>`;
+    document.body.append(bg);
+    document.body.classList.add('pfx-open');
+    const body = $('.pfx-body', bg);
+    const close = () => {
+      bg.classList.add('closing');
+      document.body.classList.remove('pfx-open');
+      removeEventListener('keydown', onKey);
+      setTimeout(() => bg.remove(), 320);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    addEventListener('keydown', onKey);
+    bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
+    $('.pfx-x', bg).addEventListener('click', close);
+
+    const ink = $('.pfx-ink', bg);
+    async function select(id) {
+      $$('.pfx-tabs button', bg).forEach((b) => {
+        b.classList.toggle('active', b.dataset.t === id);
+        if (b.dataset.t === id) { ink.style.width = `${b.offsetWidth}px`; ink.style.transform = `translateX(${b.offsetLeft}px)`; }
+      });
+      body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap');
+      body.scrollTop = 0;
+      try {
+        if (id === 'log') await fullLog(body);
+        else if (id === 'worlds') await fullWorlds(body);
+        else await fullRivals(body);
+      } catch (err) { body.innerHTML = `<p class="muted pfx-empty">${esc(err.message)}</p>`; }
+    }
+    $$('.pfx-tabs button', bg).forEach((b) => b.addEventListener('click', () => select(b.dataset.t)));
+    requestAnimationFrame(() => select(tab));
+  }
+
+  async function fullLog(body) {
+    const worldOpts = Object.keys(worldMap);
+    const f = { type: 'all', cause: '', world: '', opp: '', from: '', to: '' };
+    body.innerHTML = `
+      <div class="pfx-filters">
+        <div class="seg" data-f="type">${['all', 'kills', 'deaths'].map((x) => `<button data-v="${x}" class="${x === 'all' ? 'active' : ''}">${t(`pf.f.${x}`)}</button>`).join('')}</div>
+        <div class="seg" data-f="cause">${['', 'crystal', 'anchor', 'melee', 'other'].map((x) => `<button data-v="${x}" class="${x === '' ? 'active' : ''}">${x ? `${CAUSE[x]} ${t(`pf.cause.${x}`)}` : t('pf.f.anyCause')}</button>`).join('')}</div>
+        <div class="pfx-row">
+          <select class="input" data-f="world"><option value="">${t('pf.f.anyWorld')}</option>${worldOpts.map((w) => `<option value="${esc(w)}">${esc(worldInfo(w).name)}</option>`).join('')}</select>
+          <input class="input" data-f="opp" maxlength="16" placeholder="${t('pf.f.opp')}">
+          <label class="pfx-date"><span>${t('au.from')}</span><input class="input mono" type="date" data-f="from"></label>
+          <label class="pfx-date"><span>${t('au.to')}</span><input class="input mono" type="date" data-f="to"></label>
+        </div>
+      </div>
+      <div class="pfx-summary"></div>
+      <div class="pfx-list"></div>
+      <div class="pfx-foot"><button class="btn btn-sm pfx-more" hidden>${t('au.loadMore')}</button></div>`;
+    const list = $('.pfx-list', body);
+    const more = $('.pfx-more', body);
+    const summary = $('.pfx-summary', body);
+    let before = null;
+    let token = 0;
+    async function load(reset) {
+      const my = ++token;
+      if (reset) { before = null; list.innerHTML = '<div class="skeleton" style="height:180px;border-radius:12px"></div>'; }
+      const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v));
+      if (before) q.set('before', before);
+      const d = await request(`/api/profile/${encodeURIComponent(g.uuid)}/log?${q}`);
+      if (my !== token) return;
+      if (reset) {
+        list.innerHTML = '';
+        summary.innerHTML = `<span><b>${d.summary.total.toLocaleString()}</b> ${t('pf.f.records')}</span><span class="win"><b>${d.summary.kills}</b> ${t('pf.kills')}</span><span class="loss"><b>${d.summary.deaths}</b> ${t('pf.deaths')}</span><span><b>${ratio(d.summary.kills, d.summary.deaths)}</b> KDR</span>`;
+      }
+      if (reset && !d.items.length) list.innerHTML = `<p class="muted pfx-empty">${t('au.empty')}</p>`;
+      list.insertAdjacentHTML('beforeend', d.items.map((k, i) => logRow(k, i)).join(''));
+      before = d.items.at(-1)?.id;
+      more.hidden = !d.hasMore;
+    }
+    let timer;
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('.seg[data-f] button');
+      if (!b) return;
+      const seg = b.parentElement;
+      $$('button', seg).forEach((x) => x.classList.toggle('active', x === b));
+      f[seg.dataset.f] = b.dataset.v;
+      load(true);
+    });
+    $$('select[data-f], input[data-f]', body).forEach((el) => el.addEventListener(el.tagName === 'INPUT' && el.type !== 'date' ? 'input' : 'change', () => {
+      f[el.dataset.f] = el.value.trim();
+      clearTimeout(timer);
+      timer = setTimeout(() => load(true), el.type === 'date' || el.tagName === 'SELECT' ? 0 : 350);
+    }));
+    more.addEventListener('click', () => load(false));
+    await load(true);
+  }
+
+  async function fullWorlds(body) {
+    body.innerHTML = '<div class="skeleton" style="height:240px;border-radius:12px"></div>';
+    const d = await request(`/api/profile/${encodeURIComponent(g.uuid)}/worlds`);
+    worldMap = { ...worldMap, ...d.names };
+    body.innerHTML = d.worlds.length ? `<div class="pf-worlds pfx-stagger">${d.worlds.map((w, i) => worldRow(w).replace('class="pf-world"', `class="pf-world" style="--i:${i}"`)).join('')}</div>`
+      : `<p class="muted pfx-empty">${t('pf.none')}</p>`;
+  }
+
+  async function fullRivals(body) {
+    body.innerHTML = `<input class="input pfx-search" maxlength="16" placeholder="${t('pf.f.opp')}"><div class="pf-rivals pfx-stagger pfx-rivals"></div>`;
+    const box = $('.pfx-rivals', body);
+    let timer;
+    const load = async (q = '') => {
+      const d = await request(`/api/profile/${encodeURIComponent(g.uuid)}/rivals${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+      box.innerHTML = d.rivals.length ? d.rivals.map((r, i) => rivalHtml(r).replace('<a ', `<a style="--i:${Math.min(i, 30)}" `)).join('') : `<p class="muted pfx-empty">${t('au.empty')}</p>`;
+    };
+    $('.pfx-search', body).addEventListener('input', (e) => { clearTimeout(timer); timer = setTimeout(() => load(e.target.value.trim()), 300); });
+    await load();
   }
 
   // ---------------------------------------------------------------- match history

@@ -1433,3 +1433,79 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--gold)
 .me-solo { max-width: 720px; }
 @media (max-width: 760px) { .set-grid { grid-template-columns: 1fr; } .set-nav { position: static; display: flex; flex-wrap: wrap; } }
 #keys .keys-box { margin-top: 0; }
+
+/* ---------- stats previews + full stats dialog ---------- */
+.pf-more-link { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 12px; padding: 10px; border-radius: 11px; border: 1px dashed rgba(242, 193, 78, 0.35); background: rgba(242, 193, 78, 0.04); color: var(--gold-2); font: 600 13.5px var(--font); cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.2s; }
+.pf-more-link:hover { background: rgba(242, 193, 78, 0.1); border-style: solid; transform: translateY(-1px); }
+.pf-rivals small { font-size: 11px; white-space: nowrap; }
+.world-thumb.xs { width: 34px; height: 22px; border-radius: 5px; }
+.pf-log { display: grid; gap: 6px; }
+.pf-logrow { display: grid; grid-template-columns: 58px minmax(0, 1fr) minmax(0, 150px) 86px; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 11px; background: var(--bg-2); border: 1px solid var(--border); border-left: 3px solid var(--dim); font-size: 14px; }
+.pf-logrow.kill { border-left-color: var(--success); }
+.pf-logrow.death { border-left-color: #ff5a5f; }
+.pf-log-badge { font: 700 10.5px var(--font-mono); letter-spacing: 0.08em; }
+.pf-logrow.kill .pf-log-badge { color: var(--success); }
+.pf-logrow.death .pf-log-badge { color: #ff8a8e; }
+.pf-log-main { display: grid; gap: 1px; min-width: 0; }
+.pf-log-main a { color: var(--text); font-weight: 700; text-decoration: none; }
+.pf-log-main a:hover { color: var(--gold); }
+.pf-log-main small { font-size: 12px; }
+.pf-log-world { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; color: var(--muted); }
+.pf-log-world span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-log-time { font-size: 11.5px; text-align: right; }
+
+body.pfx-open { overflow: hidden; }
+.pfx-bg { position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; padding: 24px 16px; background: rgba(4, 5, 9, 0.62); backdrop-filter: blur(8px); animation: pfx-fade 0.28s ease both; }
+.pfx { width: min(880px, 100%); max-height: min(780px, calc(100vh - 48px)); display: flex; flex-direction: column; border-radius: 22px; border: 1px solid var(--border-strong); background: linear-gradient(180deg, rgba(242, 193, 78, 0.05), transparent 140px), var(--bg-2); box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(242, 193, 78, 0.08); overflow: hidden; animation: pfx-pop 0.5s cubic-bezier(.16, 1.2, .3, 1) both; }
+.pfx-bg.closing { animation: pfx-fade 0.28s ease reverse both; }
+.pfx-bg.closing .pfx { animation: pfx-out 0.28s ease both; }
+@keyframes pfx-fade { from { opacity: 0; } }
+@keyframes pfx-pop { from { opacity: 0; transform: translateY(26px) scale(0.94); } }
+@keyframes pfx-out { to { opacity: 0; transform: translateY(14px) scale(0.97); } }
+.pfx-head { display: flex; align-items: center; gap: 14px; padding: 20px 22px 14px; }
+.pfx-head img { width: 44px; height: 44px; border-radius: 10px; image-rendering: pixelated; box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.3); }
+.pfx-head h2 { margin: 2px 0 0; font-family: var(--font-display); font-size: 21px; }
+.pfx-head > div { flex: 1; min-width: 0; }
+.pfx-x { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-size: 14px; cursor: pointer; transition: all 0.2s; }
+.pfx-x:hover { color: var(--text); transform: rotate(90deg); }
+.pfx-tabs { position: relative; display: flex; gap: 4px; padding: 0 22px; border-bottom: 1px solid var(--border); }
+.pfx-tabs button { position: relative; z-index: 1; padding: 11px 14px; border: 0; background: none; color: var(--muted); font: 600 14px var(--font); cursor: pointer; transition: color 0.2s; }
+.pfx-tabs button.active { color: var(--text); }
+.pfx-ink { position: absolute; left: 0; bottom: -1px; height: 2px; width: 0; border-radius: 2px; background: var(--gold-grad); box-shadow: 0 0 10px var(--gold); transition: transform 0.35s var(--ease), width 0.35s var(--ease); }
+.pfx-body { flex: 1; overflow-y: auto; padding: 18px 22px 22px; overscroll-behavior: contain; }
+.pfx-body.swap { animation: pfx-swap 0.35s var(--ease) both; }
+@keyframes pfx-swap { from { opacity: 0; transform: translateX(14px); } }
+.pfx-filters { display: grid; gap: 10px; margin-bottom: 12px; }
+.pfx-filters .seg { justify-self: start; }
+.pfx-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.pfx-row > .nsel, .pfx-row > select { flex: 1 1 170px; min-width: 150px; }
+.pfx-row > input[data-f=opp] { flex: 1 1 170px; }
+.pfx-date { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.pfx-date .input { width: 148px; padding-top: 8px; padding-bottom: 8px; }
+.pfx-summary { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 13px; color: var(--muted); }
+.pfx-summary b { font-family: var(--font-display); font-size: 17px; color: var(--text); margin-right: 3px; }
+.pfx-summary .win b { color: var(--success); }
+.pfx-summary .loss b { color: #ff8a8e; }
+.pfx-list { display: grid; gap: 6px; }
+.pfx-list .pf-logrow, .pfx-stagger > * { animation: pfx-row 0.4s var(--ease) both; animation-delay: calc(min(var(--i, 0), 20) * 25ms); }
+@keyframes pfx-row { from { opacity: 0; transform: translateY(8px); } }
+.pfx-foot { display: flex; justify-content: center; margin-top: 14px; }
+.pfx-empty { text-align: center; padding: 30px 0; }
+.pfx-search { margin-bottom: 12px; }
+@media (max-width: 700px) {
+  .pfx-bg { padding: 12px 10px; }
+  .pfx { max-height: calc(100vh - 24px); border-radius: 18px; }
+  .pfx-head { padding: 16px 16px 10px; }
+  .pfx-tabs { padding: 0 10px; overflow-x: auto; }
+  .pfx-tabs button { white-space: nowrap; padding: 10px; font-size: 13px; }
+  .pfx-body { padding: 14px; }
+  .pfx-date { flex: 1 1 140px; }
+  .pfx-date .input { width: 100%; }
+  .pf-logrow { grid-template-columns: 46px minmax(0, 1fr) auto; }
+  .pf-log-world { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pfx, .pfx-bg, .pfx-body.swap, .pfx-list .pf-logrow, .pfx-stagger > * { animation: none; } }
+.pfx-head, .pfx-tabs { flex: none; }
+.pfx { height: min(780px, calc(100vh - 48px)); }
+.pf-log-main > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) { .pfx { height: calc(100vh - 24px); } }

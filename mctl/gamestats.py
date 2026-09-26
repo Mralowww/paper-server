@@ -234,23 +234,89 @@ def stats(conn, uuid):
     if p["online"] and p["session_start"]:
         p["playtime_ms"] += max(0, D.now_ms() - p["session_start"])
     cp = conn.execute("SELECT * FROM gs_coreplus WHERE uuid = ?", (uuid,)).fetchone()
-    per_world = [dict(r) for r in conn.execute("SELECT world, kills, deaths, matches, wins FROM gs_world_stats WHERE uuid = ? "
-                                               "ORDER BY kills + deaths DESC", (uuid,)).fetchall()]
-    rivals = [dict(r) for r in conn.execute("""
-        SELECT opp, MAX(name) AS name, SUM(k) AS kills, SUM(d) AS deaths FROM (
-          SELECT victim_uuid AS opp, victim_name AS name, 1 AS k, 0 AS d FROM gs_kills WHERE killer_uuid = ?
-          UNION ALL SELECT killer_uuid, killer_name, 0, 1 FROM gs_kills WHERE victim_uuid = ? AND killer_uuid IS NOT NULL)
-        GROUP BY opp ORDER BY kills + deaths DESC LIMIT 8""", (uuid, uuid)).fetchall()]
+    all_worlds = world_stats(conn, uuid)
+    all_rivals = rivals(conn, uuid)
     return {
         "kills": p["kills"], "deaths": p["deaths"], "pvpDeaths": p["pvp_deaths"],
         "killTypes": {"crystal": p["crystal_kills"], "anchor": p["anchor_kills"], "melee": p["melee_kills"], "other": p["other_kills"]},
         "totemPops": p["totem_pops"], "curStreak": p["cur_streak"], "bestStreak": p["best_streak"],
         "matches": p["matches"], "wins": p["match_wins"], "losses": p["match_losses"], "draws": p["match_draws"],
         "playtimeMs": p["playtime_ms"], "firstSeen": p["first_seen"], "lastSeen": p["last_seen"],
-        "worlds": per_world, "rivals": rivals,
+        "worlds": all_worlds[:PREVIEW], "worldCount": len(all_worlds),
+        "rivals": all_rivals[:PREVIEW], "rivalCount": len(all_rivals),
+        "recent": kill_log(conn, uuid, limit=PREVIEW)[0],
         "coreplus": cp and {"stats": json.loads(cp["stats"]), "achievements": len(json.loads(cp["achievements"])),
                             "loginStreak": cp["login_streak"], "syncedAt": cp["synced_at"]},
     }
+
+
+PREVIEW = 6
+
+
+def world_stats(conn, uuid):
+    """Every world this player fought in, most recent first."""
+    return [dict(r) for r in conn.execute("""
+        SELECT w.world, w.kills, w.deaths, w.matches, w.wins,
+               (SELECT MAX(created_at) FROM gs_kills k WHERE k.world = w.world AND (k.killer_uuid = w.uuid OR k.victim_uuid = w.uuid)) AS last_at
+        FROM gs_world_stats w WHERE w.uuid = ? ORDER BY last_at DESC, w.kills + w.deaths DESC""", (uuid,)).fetchall()]
+
+
+def rivals(conn, uuid, q=""):
+    """Everyone this player killed or was killed by, most fought first."""
+    like = f"%{q}%"
+    return [dict(r) for r in conn.execute("""
+        SELECT opp, MAX(name) AS name, SUM(k) AS kills, SUM(d) AS deaths, MAX(at) AS last_at FROM (
+          SELECT victim_uuid AS opp, victim_name AS name, 1 AS k, 0 AS d, created_at AS at FROM gs_kills WHERE killer_uuid = ?
+          UNION ALL SELECT killer_uuid, killer_name, 0, 1, created_at FROM gs_kills WHERE victim_uuid = ? AND killer_uuid IS NOT NULL)
+        GROUP BY opp HAVING ? = '' OR MAX(name) LIKE ? ORDER BY kills + deaths DESC, last_at DESC LIMIT 500""",
+        (uuid, uuid, q, like)).fetchall()]
+
+
+def kill_log(conn, uuid, kind="all", cause="", world="", opp="", start=None, end=None, before=None, limit=30):
+    """Kills and deaths of one player, newest first. Returns (items, has_more, summary)."""
+    where, args = [], []
+    if kind == "kills":
+        where.append("killer_uuid = ?")
+        args.append(uuid)
+    elif kind == "deaths":
+        where.append("victim_uuid = ?")
+        args.append(uuid)
+    else:
+        where.append("(killer_uuid = ? OR victim_uuid = ?)")
+        args += [uuid, uuid]
+    if cause in CAUSES:
+        where.append("cause IN ('projectile', 'explosion', 'other')" if cause == "other" else "cause = ?")
+        if cause != "other":
+            args.append(cause)
+    if world:
+        where.append("world = ?")
+        args.append(world)
+    if opp:
+        where.append("((killer_uuid = ? AND victim_name LIKE ?) OR (victim_uuid = ? AND killer_name LIKE ?))")
+        args += [uuid, f"%{opp}%", uuid, f"%{opp}%"]
+    if start:
+        where.append("created_at >= ?")
+        args.append(start)
+    if end:
+        where.append("created_at < ?")
+        args.append(end)
+    base = " AND ".join(where)
+    summary = conn.execute(f"SELECT COUNT(*) AS total, SUM(killer_uuid = ?) AS kills, SUM(victim_uuid = ?) AS deaths "
+                           f"FROM gs_kills WHERE {base}", (uuid, uuid, *args)).fetchone()
+    if before:
+        base += " AND id < ?"
+        args.append(before)
+    rows = conn.execute(f"SELECT * FROM gs_kills WHERE {base} ORDER BY id DESC LIMIT ?", (*args, limit + 1)).fetchall()
+    items = []
+    for r in rows[:limit]:
+        won = r["killer_uuid"] == uuid
+        items.append({
+            "id": r["id"], "role": "kill" if won else "death", "world": r["world"], "cause": r["cause"],
+            "opponent": {"uuid": r["victim_uuid"], "name": r["victim_name"]} if won
+            else ({"uuid": r["killer_uuid"], "name": r["killer_name"]} if r["killer_uuid"] else None),
+            "killerHealth": r["killer_health"], "victimPops": r["victim_pops"], "matchId": r["match_id"], "at": r["created_at"],
+        })
+    return items, len(rows) > limit, {"total": summary["total"], "kills": summary["kills"] or 0, "deaths": summary["deaths"] or 0}
 
 
 def matches(conn, uuid, before=None, limit=30):

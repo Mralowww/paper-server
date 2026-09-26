@@ -9,7 +9,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, abort, g, jsonify, redirect, request, send_from_directory, session
@@ -1147,6 +1147,47 @@ def profile_matches(ident):
     items, more = GS.matches(conn, found[0], clamp_int(request.args.get("before"), 0, 10**12, 0) or None,
                              clamp_int(request.args.get("limit"), 1, 50, 30))
     return jsonify({"matches": items, "hasMore": more, "worlds": GS.worlds(conn)})
+
+
+@route("/api/profile/<ident>/log")
+def profile_log(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    a = request.args
+    day = lambda v: int(datetime.fromisoformat(f"{v}T00:00:00+08:00").timestamp() * 1000) \
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v or "") else None
+    end = day(a.get("to"))
+    items, more, summary = GS.kill_log(
+        db(), found[0], kind=a.get("type", "all"), cause=a.get("cause", ""), world=(a.get("world") or "")[:64],
+        opp=(a.get("opp") or "")[:16], start=day(a.get("from")), end=end and end + 86400 * 1000,
+        before=clamp_int(a.get("before"), 0, 10**12, 0) or None, limit=clamp_int(a.get("limit"), 1, 50, 30))
+    return jsonify({"items": items, "hasMore": more, "summary": summary})
+
+
+@route("/api/profile/<ident>/worlds")
+def profile_worlds(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    return jsonify({"worlds": GS.world_stats(db(), found[0]), "names": GS.worlds(db())})
+
+
+@route("/api/profile/<ident>/rivals")
+def profile_rivals(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    return jsonify({"rivals": GS.rivals(db(), found[0], (request.args.get("q") or "")[:16])})
 
 
 @route("/api/profile/match/<int:mid>")
