@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['overview', 'tab.overview', true, '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>'],
     ['players', 'tab.players', true, '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>'],
     ['bans', 'tab.bans', true, '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'],
+    ['perms', 'tab.perms', perms.manageSettings, '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/>'],
     ['support', 'tab.support', true, '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'],
     ['tickets', 'tab.tickets', true, '<path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/>'],
     ['links', 'tab.links', true, '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'],
@@ -205,69 +206,147 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     async bans(panel, arg) {
-      const { bans } = await api('/bans');
-      const showAll = arg === 'all';
-      const list = showAll ? bans : bans.filter((b) => b.status === 'active');
-      const canEdit = perms.managePlayers;
+      let [type, status] = String(arg || '').split('.');
+      if (!['ban', 'ipban', 'mute', 'warn', 'kick'].includes(type)) type = '';
+      if (!['active', 'ended'].includes(status)) status = status === 'all' ? '' : 'active';
+      let q = '';
+      const TYPES = ['ban', 'ipban', 'mute', 'warn', 'kick'];
       panel.innerHTML = `
         <div class="panel">
           <div class="panel-head">
-            <div><h2>${t('tab.bans')}${readOnly}</h2><p>${t('bans.subtitle')}</p></div>
-            ${canEdit ? `<button class="btn btn-gold" id="addBan">${t('bans.add')}</button>` : ''}
+            <div><h2>${t('tab.bans')}</h2><p>${t('pn.subtitle')}</p></div>
+            <div class="actions">${perms.manageSettings ? `<button class="btn btn-sm" id="pnSettings">${t('pn.settings')}</button>` : ''}<button class="btn btn-gold" id="pnAdd">${t('pn.add')}</button></div>
           </div>
-          <div class="seg" style="margin-bottom:14px">
-            <button class="${showAll ? '' : 'active'}" data-go="bans">${t('bans.filterActive')} (${bans.filter((b) => b.status === 'active').length})</button>
-            <button class="${showAll ? 'active' : ''}" data-go="bans/all">${t('bans.filterAll')} (${bans.length})</button>
+          <div class="pn-counts"></div>
+          <div class="pn-toolbar">
+            <label class="sp-search">${window.MCTL_SUPPORT.svg(window.MCTL_SUPPORT.IC.search, 15)}<input placeholder="${t('pn.search')}"></label>
+            <div class="seg" data-k="type">${['', ...TYPES].map((x) => `<button data-v="${x}">${x ? t(`pn.type.${x}`) : t('support.filterAll')}</button>`).join('')}</div>
+            <div class="seg" data-k="status">${[['active', 'pn.active'], ['ended', 'pn.ended'], ['', 'support.filterAll']].map(([x, k]) => `<button data-v="${x}">${t(k)}</button>`).join('')}</div>
           </div>
-          <div class="card">${list.length ? `<div class="table-wrap"><table class="data">
-            <thead><tr><th>${t('col.player')}</th><th>${t('bans.reason')}</th><th>${t('col.expires')}</th><th>${t('col.bannedBy')}</th><th>${t('col.status')}</th><th></th></tr></thead>
-            <tbody>${list.map((b, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
-              <td><div class="cell-player"><img src="${avatarUrl(b.mc_name, 32)}" alt="">${esc(b.mc_name)}</div>${b.discord_id ? `<div class="mono muted" style="font-size:11px">${esc(b.discord_id)}</div>` : ''}</td>
-              <td style="max-width:280px">${esc(b.reason)}</td>
-              <td class="muted" style="font-size:13px">${b.expires_at ? esc(fmtDate(b.expires_at)) : t('bans.perm')}</td>
-              <td class="muted" style="font-size:13px">${esc(b.created_by_name || '—')}<div>${esc(fmtDate(b.created_at))}</div></td>
-              <td><span class="pill ${b.status === 'active' ? 'off' : ''}">${t(`bans.status.${b.status}`)}</span></td>
-              <td>${canEdit && b.status === 'active' ? `<div class="actions"><button class="btn btn-sm" data-revoke="${b.id}" data-name="${esc(b.mc_name)}">${t('bans.revoke')}</button></div>` : ''}</td>
-            </tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('bans.empty')}</div>`}</div>
+          <div class="card pn-table"></div>
         </div>`;
-      $$('[data-go]', panel).forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
-      if (!canEdit) return;
-      $('#addBan').addEventListener('click', () => modal(`
-        <h3>${t('bans.addTitle')}</h3>
-        <form id="banForm">
-          <div class="field"><label>${t('players.mcName')}</label><input class="input" name="name" maxlength="16" placeholder="Steve" required></div>
-          <div class="field"><label>${t('bans.discordOpt')}</label><input class="input mono" name="discordId" inputmode="numeric"></div>
-          <div class="field"><label>${t('bans.reason')}</label><input class="input" name="reason" maxlength="300" placeholder="${t('bans.reasonPh')}" required></div>
-          <div class="row2">
-            <div class="field"><label>${t('bans.duration')}</label><select class="input" name="duration">
-              ${['perm', '1d', '7d', '30d', 'custom'].map((d) => `<option value="${d}">${t(`bans.${d}`)}</option>`).join('')}</select></div>
-            <div class="field" id="daysField" hidden><label>${t('bans.days')}</label><input class="input mono" name="days" type="number" min="1" max="3650" value="14"></div>
-          </div>
-          <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-danger">${t('bans.addTitle')}</button></div>
-        </form>`, (bg, close) => {
-        const form = $('#banForm', bg);
-        form.duration.addEventListener('change', () => { $('#daysField', bg).hidden = form.duration.value !== 'custom'; });
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          try {
-            await api('/bans', { method: 'POST', body: {
-              name: form.name.value.trim(), discordId: form.discordId.value.trim(), reason: form.reason.value.trim(),
-              duration: form.duration.value, days: Number(form.days.value) } });
-            close();
-            toast(t('bans.created', { name: form.name.value.trim() }));
-            go('bans');
-          } catch (err) { toast(err.message, 'err'); }
-        });
-      }));
+      let settings = {};
+      const tableEl = $('.pn-table', panel);
+      async function load() {
+        const p = new URLSearchParams();
+        if (type) p.set('type', type);
+        if (status) p.set('status', status);
+        if (q) p.set('q', q);
+        const d = await api(`/punishments?${p}`);
+        settings = d.settings;
+        history.replaceState(null, '', `#bans/${type}.${status || 'all'}`);
+        $$('.seg[data-k=type] button', panel).forEach((b) => b.classList.toggle('active', b.dataset.v === type));
+        $$('.seg[data-k=status] button', panel).forEach((b) => b.classList.toggle('active', b.dataset.v === status));
+        $('.pn-counts', panel).innerHTML = ['ban', 'ipban', 'mute'].map((k) => `<button class="pn-count ${k}" data-type="${k}"><span class="pn-ico">${PN_ICON[k]}</span><b>${d.activeCounts[k] || 0}</b><span>${t('pn.activeOf', { type: t(`pn.type.${k}`) })}</span></button>`).join('');
+        const list = d.punishments;
+        tableEl.innerHTML = list.length ? `<div class="table-wrap"><table class="data">
+          <thead><tr><th>#</th><th>${t('col.player')}</th><th>${t('pn.col.type')}</th><th>${t('bans.reason')}</th><th>${t('pn.col.until')}</th><th>${t('pn.col.by')}</th><th>${t('col.status')}</th><th></th></tr></thead>
+          <tbody>${list.map((x, i) => `<tr class="row-link" data-pid="${x.id}" style="animation-delay:${Math.min(i, 20) * 0.02}s">
+            <td class="mono muted">#${x.id}</td>
+            <td><div class="cell-player"><img src="${avatarUrl(x.uuid || x.mc_name, 32)}" alt="">${esc(x.mc_name)}</div>${x.discord_id ? `<div class="mono muted" style="font-size:11px">${esc(x.discord_id)}</div>` : ''}</td>
+            <td>${pnPill(x.type)}</td>
+            <td style="max-width:260px">${esc(x.reason)}</td>
+            <td class="muted" style="font-size:12.5px">${pnUntil(x)}</td>
+            <td style="font-size:12.5px">${esc(x.created_by_name || 'console')}<div><span class="au-src-badge ${x.source === 'game' ? 'server' : 'web'}">${t(x.source === 'game' ? 'pn.src.game' : 'au.src.web')}</span>${x.silent ? ` <span class="pill">${t('pn.silent')}</span>` : ''}${x.discord_sync ? ' <span class="pill" title="Discord">DC</span>' : ''}</div></td>
+            <td><span class="pill ${x.status === 'active' ? 'off' : ''}">${t(`pn.st.${x.status}`)}</span></td>
+            <td>${x.status === 'active' && canRevoke(x) ? `<button class="btn btn-sm" data-revoke="${x.id}">${t('pn.revoke')}</button>` : ''}</td>
+          </tr>`).join('')}</tbody></table></div>` : `<div class="card-pad muted">${t('bans.empty')}</div>`;
+        return list;
+      }
+      let rows = await load();
       panel.addEventListener('click', async (e) => {
-        const r = e.target.closest('[data-revoke]');
-        if (!r || !(await confirmDialog(t('bans.revokeT'), t('bans.revokeD', { name: esc(r.dataset.name) })))) return;
+        const seg = e.target.closest('.seg[data-k] button');
+        if (seg) { if (seg.parentElement.dataset.k === 'type') type = seg.dataset.v; else status = seg.dataset.v; rows = await load(); return; }
+        const c = e.target.closest('[data-type]');
+        if (c) { type = c.dataset.type; status = 'active'; rows = await load(); return; }
+        const rv = e.target.closest('[data-revoke]');
+        if (rv) { revokeDialog(rows.find((x) => x.id === Number(rv.dataset.revoke)), async () => { rows = await load(); }); return; }
+        const row = e.target.closest('[data-pid]');
+        if (row) punishmentDetail(rows.find((x) => x.id === Number(row.dataset.pid)), async () => { rows = await load(); });
+      });
+      let qt;
+      $('.sp-search input', panel).addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(async () => { q = e.target.value.trim(); rows = await load(); }, 300); });
+      $('#pnAdd', panel).addEventListener('click', () => punishDialog({ settings, onDone: async () => { rows = await load(); } }));
+      $('#pnSettings', panel)?.addEventListener('click', () => punishSettingsDialog(settings, async () => { rows = await load(); }));
+    },
+
+    async perms(panel) {
+      const d = await api('/perms');
+      let rules = structuredClone(d.rules);
+      let roles = [];
+      try { roles = (await api('/discord-roles')).roles; } catch { /* bot offline */ }
+      const roleName = (id) => roles.find((r) => r.id === id)?.name || id;
+      const roleColor = (id) => roles.find((r) => r.id === id)?.color || '#99aab5';
+      let current = 'level:helper';
+      let dirty = false;
+      const subjectLabel = (s) => (s.startsWith('role:') ? `@${roleName(s.slice(5))}` : t(`pm.s.${s.replace(':', '_')}`));
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-head"><div><h2>${t('tab.perms')}</h2><p>${t('pm.subtitle')}</p></div>
+            <button class="btn btn-gold" id="pmSave" disabled>${t('common.save')}</button></div>
+          <div class="pm">
+            <aside class="pm-side card">
+              <div class="pm-group">${t('pm.g.site')}</div><div class="pm-subjects" data-g="fixed"></div>
+              <div class="pm-group">${t('pm.g.roles')}</div><div class="pm-subjects" data-g="roles"></div>
+              <div class="pm-add-role">
+                ${roles.length ? `<select class="input" id="pmRole"><option value="">${t('pm.addRole')}</option>${roles.filter((r) => !r.managed).map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>`
+                  : `<input class="input mono" id="pmRoleId" placeholder="${t('pm.roleIdPh')}"><button class="btn btn-sm" id="pmRoleAdd">${t('common.create')}</button>`}
+              </div>
+            </aside>
+            <section class="pm-main card card-pad"></section>
+          </div>
+        </div>`;
+      const side = $('.pm-side', panel);
+      const main = $('.pm-main', panel);
+      const drawSide = () => {
+        $('[data-g=fixed]', side).innerHTML = d.subjects.map((s) => `<button data-s="${s}" class="${s === current ? 'sel' : ''}"><span>${esc(subjectLabel(s))}</span><em>${(rules[s] || []).length}</em></button>`).join('');
+        const roleSubs = Object.keys(rules).filter((s) => s.startsWith('role:'));
+        $('[data-g=roles]', side).innerHTML = roleSubs.length ? roleSubs.map((s) => `<button data-s="${s}" class="${s === current ? 'sel' : ''}"><i style="background:${esc(roleColor(s.slice(5)))}"></i><span>${esc(subjectLabel(s))}</span><em>${rules[s].length}</em></button>`).join('')
+          : `<p class="muted" style="font-size:12.5px;padding:0 12px">${t('pm.noRoles')}</p>`;
+      };
+      const drawMain = () => {
+        const nodes = rules[current] || [];
+        main.innerHTML = `
+          <div class="pm-head"><h3>${esc(subjectLabel(current))}</h3>${current.startsWith('role:') ? `<button class="btn btn-sm btn-danger" id="pmDelRole">${t('pm.removeRole')}</button>` : ''}</div>
+          <p class="muted" style="margin:0 0 14px;font-size:13px">${t(current.startsWith('level:') ? 'pm.inheritNote' : 'pm.nodeNote')}</p>
+          <form class="pm-input" id="pmAdd"><input class="input mono" list="pmKnown" placeholder="${t('pm.nodePh')}" autocomplete="off"><datalist id="pmKnown">${d.knownNodes.map((n) => `<option value="${n}">`).join('')}</datalist><button class="btn btn-gold btn-sm">${t('common.create')}</button></form>
+          <div class="pm-nodes">${nodes.length ? nodes.map((n, i) => `<span class="pm-node ${n.startsWith('-') ? 'deny' : ''}" style="--i:${i}"><button type="button" data-toggle="${i}" title="${t('pm.toggle')}">${n.startsWith('-') ? '✕' : '✓'}</button><code>${esc(n.replace(/^-/, ''))}</code><button type="button" data-rm="${i}" aria-label="${t('common.delete')}">×</button></span>`).join('') : `<p class="muted">${t('pm.empty')}</p>`}</div>
+          <div class="pm-known"><span class="muted">${t('pm.quick')}</span>${d.knownNodes.filter((n) => !nodes.includes(n)).map((n) => `<button type="button" data-quick="${n}">+ ${n}</button>`).join('')}</div>`;
+        $('#pmAdd', main).addEventListener('submit', (e) => {
+          e.preventDefault();
+          const v = e.target.querySelector('input').value.trim();
+          if (!/^-?[A-Za-z0-9_.*-]{1,120}$/.test(v)) return toast(t('pm.badNode'), 'err');
+          addNode(v);
+        });
+        $('#pmDelRole', main)?.addEventListener('click', () => { delete rules[current]; current = 'level:helper'; mark(); });
+      };
+      const mark = () => { dirty = true; $('#pmSave', panel).disabled = false; drawSide(); drawMain(); };
+      const addNode = (n) => { rules[current] = [...(rules[current] || []).filter((x) => x.replace(/^-/, '') !== n.replace(/^-/, '')), n]; mark(); };
+      side.addEventListener('click', (e) => { const b = e.target.closest('[data-s]'); if (b) { current = b.dataset.s; drawSide(); drawMain(); } });
+      main.addEventListener('click', (e) => {
+        const nodes = rules[current] || [];
+        const tg = e.target.closest('[data-toggle]');
+        if (tg) { const i = Number(tg.dataset.toggle); nodes[i] = nodes[i].startsWith('-') ? nodes[i].slice(1) : `-${nodes[i]}`; rules[current] = nodes; return mark(); }
+        const rm = e.target.closest('[data-rm]');
+        if (rm) { nodes.splice(Number(rm.dataset.rm), 1); rules[current] = nodes; return mark(); }
+        const qk = e.target.closest('[data-quick]');
+        if (qk) addNode(qk.dataset.quick);
+      });
+      $('#pmRole', side)?.addEventListener('change', (e) => { if (e.target.value) { current = `role:${e.target.value}`; rules[current] = rules[current] || []; e.target.value = ''; mark(); } });
+      $('#pmRoleAdd', side)?.addEventListener('click', () => {
+        const id = $('#pmRoleId', side).value.trim();
+        if (!/^\d{15,21}$/.test(id)) return toast(t('error.invalid_discord_id'), 'err');
+        current = `role:${id}`; rules[current] = rules[current] || []; mark();
+      });
+      $('#pmSave', panel).addEventListener('click', async () => {
         try {
-          await api(`/bans/${r.dataset.revoke}/revoke`, { method: 'POST' });
-          toast(t('bans.revoked', { name: r.dataset.name }));
-          go(showAll ? 'bans/all' : 'bans');
+          const r = await api('/perms', { method: 'PUT', body: { rules } });
+          rules = r.rules; dirty = false; $('#pmSave', panel).disabled = true;
+          toast(t('pm.saved'));
         } catch (err) { toast(err.message, 'err'); }
       });
+      addEventListener('beforeunload', (e) => { if (dirty && document.body.contains(panel)) e.preventDefault(); });
+      drawSide(); drawMain();
     },
 
     async support(panel, arg) {
@@ -307,7 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span class="inbox-item-main">
               <span class="inbox-item-top"><b>${esc(x.title)}</b><time>${esc(fmtRelative(x.updated_at))}</time></span>
               <span class="inbox-item-prev">${SP.previewText(x, true)}</span>
-              <span class="inbox-item-meta">${catIcon(x.category, 12)}<span class="mono">#${x.id}</span><span>${esc(x.username || x.user_id)}</span>${x.target_name ? `<span>→ ${esc(x.target_name)}</span>` : ''}</span>
+              <span class="inbox-item-meta">${catIcon(x.category, 12)}<span class="mono">#${x.id}</span><span>${esc(x.username || x.user_id)}</span>${x.target_name ? `<span>→ ${esc(x.target_name)}</span>` : ''}${x.priority && x.priority !== 'normal' ? `<span class="sp-prio ${esc(x.priority)}">${t(`sp.prio.${x.priority}`)}</span>` : ''}${x.assigned_name ? `<span class="inbox-claim ${x.assigned_to === me.id ? 'mine' : ''}">＠${esc(x.assigned_name)}</span>` : ''}</span>
             </span>
             <i class="inbox-dot" title="${t(`support.status.${x.status}`)}"></i>
           </button>`).join('') : `<div class="muted" style="padding:20px;text-align:center">${t('support.none')}</div>`;
@@ -332,10 +411,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             id, staff: true, templates,
             manageTemplates: perms.managePlayers ? editTemplates : null,
             headExtra: (tk) => `<button class="btn btn-sm btn-ghost inbox-back" data-back>←</button>
+              <button class="btn btn-sm ${tk.assigned_to === me.id ? 'btn-gold' : ''}" data-claim>${tk.assigned_to === me.id ? t('sp.unclaim') : t('sp.claim')}</button>
+              <div class="select-wrap"><select data-prio aria-label="${t('sp.priority')}">${['low', 'normal', 'high', 'urgent'].map((x) => `<option value="${x}" ${x === (tk.priority || 'normal') ? 'selected' : ''}>${t('sp.priority')}：${t(`sp.prio.${x}`)}</option>`).join('')}</select></div>
+              ${tk.punishment && perms.managePlayers && tk.status !== 'closed' ? `<button class="btn btn-sm btn-gold" data-appeal="accept">${t('sp.appealAccept')}</button><button class="btn btn-sm" data-appeal="reject">${t('sp.appealReject')}</button>` : ''}
+              ${tk.target_name && window.MCTL_PUNISH ? `<button class="btn btn-sm btn-danger" data-punish>${t('sp.punishTarget')}</button>` : ''}
               <div class="select-wrap"><select data-status aria-label="${t('support.setStatus')}">${['open', 'in_progress', 'closed'].map((st) => `<option value="${st}" ${st === tk.status ? 'selected' : ''}>${t(`support.status.${st}`)}</option>`).join('')}</select></div>
               ${perms.managePlayers ? `<button class="btn btn-sm" data-block>${t('support.block')}</button><button class="btn btn-sm btn-danger" data-del>${t('common.delete')}</button>` : ''}`,
             bindHead: (root, tk, reload) => {
               $('[data-back]', root)?.addEventListener('click', () => { view?.destroy(); view = null; selected = null; inbox.classList.remove('has-sel'); history.replaceState(null, '', '#support'); drawList(); });
+              $('[data-claim]', root)?.addEventListener('click', async () => {
+                try { await api(`/support/${tk.id}/manage`, { method: 'POST', body: { claim: tk.assigned_to !== me.id } }); await reload(); loadList(); } catch (err) { toast(err.message, 'err'); }
+              });
+              $('[data-prio]', root)?.addEventListener('change', async (e) => {
+                try { await api(`/support/${tk.id}/manage`, { method: 'POST', body: { priority: e.target.value } }); await reload(); loadList(); } catch (err) { toast(err.message, 'err'); }
+              });
+              $$('[data-appeal]', root).forEach((b) => b.addEventListener('click', () => {
+                const accept = b.dataset.appeal === 'accept';
+                modal(`<h3>${t(accept ? 'sp.appealAcceptT' : 'sp.appealRejectT')}</h3><p class="muted" style="margin-top:0">${t(accept ? 'sp.appealAcceptD' : 'sp.appealRejectD', { id: tk.punishment.id })}</p>
+                  <form id="apForm"><textarea class="input" name="note" rows="3" maxlength="500" placeholder="${t('sp.appealNotePh')}"></textarea>
+                  <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn ${accept ? 'btn-gold' : 'btn-danger'}">${t(accept ? 'sp.appealAccept' : 'sp.appealReject')}</button></div></form>`, (bg, close) => {
+                  $('#apForm', bg).addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    try {
+                      await api(`/support/${tk.id}/appeal`, { method: 'POST', body: { decision: b.dataset.appeal, note: e.target.note.value } });
+                      close(); toast(t(accept ? 'sp.appealAccepted' : 'sp.appealRejected')); await reload(); loadList();
+                    } catch (err) { toast(err.message, 'err'); }
+                  });
+                });
+              }));
+              $('[data-punish]', root)?.addEventListener('click', () => window.MCTL_PUNISH.punishDialog({ name: tk.target_name, ticketId: tk.id, onDone: () => reload() }));
               $('[data-status]', root)?.addEventListener('change', async (e) => {
                 try { await api(`/support/${tk.id}`, { method: 'PATCH', body: { status: e.target.value } }); await reload(); loadList(); } catch (err) { toast(err.message, 'err'); }
               });
@@ -917,6 +1021,157 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
 
+
+  // ---------- punishments ----------
+  const PN_ICON = {
+    ban: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg>',
+    ipban: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M4 4l16 12"/></svg>',
+    mute: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="m9 8 6 6M15 8l-6 6"/></svg>',
+    warn: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+    kick: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
+  };
+  const pnPill = (k) => `<span class="pn-pill ${k}">${PN_ICON[k]}${t(`pn.type.${k}`)}</span>`;
+  const pnUntil = (x) => {
+    if (x.type === 'warn' || x.type === 'kick') return '—';
+    if (!x.expires_at) return `<b>${t('bans.perm')}</b>`;
+    return `${esc(fmtDate(x.expires_at))}<div>${x.status === 'active' ? esc(fmtRelative(x.expires_at)) : ''}</div>`;
+  };
+  const canRevoke = (x) => (x.type === 'ipban' ? perms.manageSettings : perms.managePlayers);
+  const PN_NEED = { warn: 'viewStaff', kick: 'viewStaff', mute: 'viewStaff', ban: 'managePlayers', ipban: 'manageSettings' };
+
+  function revokeDialog(x, onDone) {
+    modal(`<h3>${t('pn.revokeT', { type: t(`pn.type.${x.type}`) })}</h3>
+      <p class="muted" style="margin-top:0">#${x.id} · ${esc(x.mc_name)} · ${esc(x.reason)}</p>
+      <form id="rvForm"><div class="field"><label>${t('pn.revokeReason')}</label><input class="input" name="reason" maxlength="300" placeholder="${t('pn.revokeReasonPh')}"></div>
+      <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-gold">${t('pn.revoke')}</button></div></form>`, (bg, close) => {
+      $('#rvForm', bg).addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try { await api(`/punishments/${x.id}/revoke`, { method: 'POST', body: { reason: e.target.reason.value.trim() } }); close(); toast(t('pn.revoked')); onDone?.(); }
+        catch (err) { toast(err.message, 'err'); }
+      });
+    });
+  }
+
+  function punishmentDetail(x, onDone) {
+    const ds = x.discord_state ? JSON.parse(x.discord_state) : null;
+    modal(`<div class="pn-detail">
+        <div class="pn-detail-head"><img src="${avatarUrl(x.uuid || x.mc_name, 64)}" alt=""><div><div class="kicker">#${x.id}</div><h3>${esc(x.mc_name)}</h3>${pnPill(x.type)} <span class="pill ${x.status === 'active' ? 'off' : ''}">${t(`pn.st.${x.status}`)}</span></div></div>
+        <div class="ld-kv">
+          <div class="k">${t('bans.reason')}</div><div class="v">${esc(x.reason)}</div>
+          <div class="k">${t('pn.col.until')}</div><div class="v">${pnUntil(x)}</div>
+          <div class="k">${t('pn.col.by')}</div><div class="v">${esc(x.created_by_name || 'console')} · ${t(x.source === 'game' ? 'pn.src.game' : 'au.src.web')} · ${esc(fmtDate(x.created_at))}</div>
+          ${x.uuid ? `<div class="k">UUID</div><div class="v mono">${esc(x.uuid)}</div>` : ''}
+          ${x.discord_id ? `<div class="k">Discord</div><div class="v mono">${esc(x.discord_id)}</div>` : ''}
+          ${x.ip ? `<div class="k">IP</div><div class="v mono">${esc(x.ip)}</div>` : ''}
+          <div class="k">${t('pn.discordSync')}</div><div class="v">${x.discord_sync ? (ds ? esc(Object.keys(ds).join(', ') || '—') : t('pn.pending')) : t('pn.no')}</div>
+          ${x.ticket_id ? `<div class="k">${t('tab.support')}</div><div class="v"><a href="#support/${x.ticket_id}" data-close>#${x.ticket_id}</a></div>` : ''}
+          ${x.revoked_at ? `<div class="k">${t('pn.revokedBy')}</div><div class="v">${esc(x.revoked_by_name || '—')} · ${esc(fmtDate(x.revoked_at))}${x.revoke_reason ? `<div class="muted">${esc(x.revoke_reason)}</div>` : ''}</div>` : ''}
+        </div></div>
+      <div class="modal-actions"><button class="btn" data-close>${t('card.close')}</button>${x.status === 'active' && canRevoke(x) ? `<button class="btn btn-gold" id="dRevoke">${t('pn.revoke')}</button>` : ''}</div>`, (bg, close) => {
+      $('#dRevoke', bg)?.addEventListener('click', () => { close(); revokeDialog(x, onDone); });
+    });
+  }
+
+  /** New punishment dialog; opts: { name, ticketId, settings, onDone } */
+  function punishDialog(opts = {}) {
+    const QUICK = ['pn.q.hack', 'pn.q.abuse', 'pn.q.spam', 'pn.q.bug', 'pn.q.grief', 'pn.q.alt'];
+    const PRESETS = ['30m', '1h', '1d', '7d', '30d'];
+    modal(`<h3>${t('pn.add')}</h3>
+      <form id="pnForm" class="pn-form">
+        <div class="pn-types">${['warn', 'kick', 'mute', 'ban', 'ipban'].map((k, i) => `<label class="pn-type ${k}"><input type="radio" name="type" value="${k}" ${k === 'mute' ? 'checked' : ''} ${perms[PN_NEED[k]] ? '' : 'disabled'}><span>${PN_ICON[k]}<b>${t(`pn.type.${k}`)}</b></span></label>`).join('')}</div>
+        <div class="field"><label>${t('players.mcName')}</label>
+          <div class="sp-player-input"><img src="/heads/avatar/MHF_Steve/64.png" alt=""><input class="input mono" name="name" maxlength="16" value="${esc(opts.name || '')}" required autocomplete="off"><span class="sp-check"></span></div>
+          <div class="pn-lookup muted"></div></div>
+        <div class="field pn-dur"><label>${t('bans.duration')}</label>
+          <div class="pn-presets"><button type="button" data-d="" class="active">${t('bans.perm')}</button>${PRESETS.map((x) => `<button type="button" data-d="${x}">${x}</button>`).join('')}<input class="input mono" name="duration" placeholder="${t('pn.durPh')}"></div></div>
+        <div class="field"><label>${t('bans.reason')}</label><input class="input" name="reason" maxlength="300" required placeholder="${t('bans.reasonPh')}">
+          <div class="pn-quick">${QUICK.map((k) => `<button type="button" data-r="${esc(t(k))}">${t(k)}</button>`).join('')}</div></div>
+        <div class="pn-opts">
+          <label class="check"><input type="checkbox" name="silent">${t('pn.silentOpt')}</label>
+          <label class="check"><input type="checkbox" name="discord" ${opts.settings?.discordDefault ? 'checked' : ''}>${t('pn.discordOpt')}</label>
+        </div>
+        <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-danger">${t('pn.confirm')}</button></div>
+      </form>`, (bg, close) => {
+      const form = $('#pnForm', bg);
+      const img = $('.sp-player-input img', form);
+      const check = $('.sp-check', form);
+      const info = $('.pn-lookup', form);
+      const setType = () => {
+        const k = form.type.value;
+        $('.pn-dur', form).hidden = !['mute', 'ban', 'ipban'].includes(k);
+      };
+      form.addEventListener('change', (e) => { if (e.target.name === 'type') setType(); });
+      setType();
+      form.addEventListener('click', (e) => {
+        const d = e.target.closest('[data-d]');
+        if (d) { $$('[data-d]', form).forEach((b) => b.classList.toggle('active', b === d)); form.duration.value = d.dataset.d; }
+        const r = e.target.closest('[data-r]');
+        if (r) { form.reason.value = r.dataset.r; form.reason.focus(); }
+      });
+      form.duration.addEventListener('input', () => $$('[data-d]', form).forEach((b) => b.classList.toggle('active', b.dataset.d === form.duration.value)));
+      let tm;
+      const lookup = () => {
+        const v = form.name.value.trim();
+        clearTimeout(tm);
+        check.className = 'sp-check';
+        info.innerHTML = '';
+        if (!/^[A-Za-z0-9_]{2,16}$/.test(v)) return;
+        check.className = 'sp-check wait';
+        tm = setTimeout(async () => {
+          try {
+            const r = await api(`/punishments/lookup?name=${encodeURIComponent(v)}`);
+            if (form.name.value.trim() !== v) return;
+            check.className = `sp-check ${r.found && r.target.uuid ? 'good' : r.found ? '' : 'bad'}`;
+            if (!r.found) return;
+            img.src = avatarUrl(r.target.uuid || v, 64);
+            const act = r.history.filter((h) => h.status === 'active');
+            info.innerHTML = `${r.target.discord_id ? `Discord <span class="mono">${esc(r.target.discord_id)}</span> · ` : `${t('pn.noDiscord')} · `}${t('pn.historyN', { n: r.history.length })}${act.length ? ` · <span class="loss">${act.map((h) => t(`pn.type.${h.type}`)).join('、')} ${t('pn.st.active')}</span>` : ''}${r.hasIp ? '' : ` · ${t('pn.noIp')}`}`;
+            form.discord.disabled = !r.target.discord_id;
+          } catch { check.className = 'sp-check'; }
+        }, 400);
+      };
+      form.name.addEventListener('input', lookup);
+      if (opts.name) lookup();
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const type = form.type.value;
+        try {
+          await api('/punishments', { method: 'POST', body: {
+            type, name: form.name.value.trim(), reason: form.reason.value.trim(),
+            duration: ['mute', 'ban', 'ipban'].includes(type) ? form.duration.value.trim() : '',
+            silent: form.silent.checked, discord: form.discord.checked && !form.discord.disabled, ticketId: opts.ticketId || null } });
+          close();
+          toast(t('pn.done', { name: form.name.value.trim(), type: t(`pn.type.${type}`) }));
+          opts.onDone?.();
+        } catch (err) { toast(err.message, 'err'); }
+      });
+    });
+  }
+
+  async function punishSettingsDialog(settings, onDone) {
+    let roles = [];
+    try { roles = (await api('/discord-roles')).roles.filter((r) => !r.managed); } catch { /* offline */ }
+    const roleSel = (name, val) => (roles.length ? `<select class="input" name="${name}"><option value="">${t('pn.noRole')}</option>${roles.map((r) => `<option value="${r.id}" ${r.id === val ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>`
+      : `<input class="input mono" name="${name}" value="${esc(val || '')}" placeholder="${t('pm.roleIdPh')}">`);
+    modal(`<h3>${t('pn.settings')}</h3>
+      <form id="psForm">
+        <label class="check" style="margin-bottom:10px"><input type="checkbox" name="broadcast" ${settings.broadcast ? 'checked' : ''}>${t('pn.set.broadcast')}</label>
+        <label class="check" style="margin-bottom:14px"><input type="checkbox" name="discordDefault" ${settings.discordDefault ? 'checked' : ''}>${t('pn.set.discordDefault')}</label>
+        <div class="field"><label>${t('pn.set.muteRole')}</label>${roleSel('muteRole', settings.muteRole)}<small class="muted">${t('pn.set.muteRoleHint')}</small></div>
+        <div class="field"><label>${t('pn.set.banRole')}</label>${roleSel('banRole', settings.banRole)}<small class="muted">${t('pn.set.banRoleHint')}</small></div>
+        <div class="modal-actions"><button type="button" class="btn" data-close>${t('common.cancel')}</button><button class="btn btn-gold">${t('common.save')}</button></div>
+      </form>`, (bg, close) => {
+      $('#psForm', bg).addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        try {
+          await api('/punish-settings', { method: 'PUT', body: { broadcast: f.broadcast.checked, discordDefault: f.discordDefault.checked, muteRole: f.muteRole.value.trim(), banRole: f.banRole.value.trim() } });
+          close(); toast(t('site.saved')); onDone?.();
+        } catch (err) { toast(err.message, 'err'); }
+      });
+    });
+  }
+  window.MCTL_PUNISH = { punishDialog };
 
   // ---------- account link detail dialog ----------
   async function linkDetail(did, onChange) {

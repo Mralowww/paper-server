@@ -69,7 +69,7 @@ UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 UPLOAD_MAX_FILES = 3
 # Refuse new uploads once the data folder reaches this size (hosting plan has 1 GB).
 STORAGE_LIMIT_BYTES = _int("STORAGE_LIMIT_MB", 900) * 1024 * 1024
-SUPPORT_CATEGORIES = ("bug", "appeal", "report", "other")
+SUPPORT_CATEGORIES = ("bug", "appeal", "report", "suggest", "other")
 SUPPORT_MAX_OPEN = 3
 ALLOW_DEV_LOGIN = os.environ.get("ALLOW_DEV_LOGIN") == "true" and not PRODUCTION
 

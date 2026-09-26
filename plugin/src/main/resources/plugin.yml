@@ -2,15 +2,109 @@ name: TierlistLink
 version: '${project.version}'
 main: asia.tierlist.link.TierlistLink
 api-version: '1.21'
-description: Mc.Tierlist.Asia — 帳號綁定、封禁同步與伺服器戰績
+description: Mc.Tierlist.Asia — 帳號綁定、處罰系統、權限同步與伺服器戰績
 author: Mc.Tierlist.Asia
 website: https://tierlist.asia
 commands:
+  ban:
+    description: 永久封禁玩家
+    usage: "/ban <玩家> [原因] [-s] [-d|-nd]"
+    permission: tierlist.ban
+    permission-message: §c你沒有權限使用這個指令。
+  tempban:
+    description: 暫時封禁玩家
+    usage: "/tempban <玩家> <時間> [原因] [-s] [-d|-nd]"
+    permission: tierlist.tempban
+    permission-message: §c你沒有權限使用這個指令。
+  unban:
+    description: 解除封禁
+    usage: "/unban <玩家> [原因]"
+    permission: tierlist.unban
+    permission-message: §c你沒有權限使用這個指令。
+  ipban:
+    description: 封禁玩家的 IP
+    usage: "/ipban <玩家|IP> [原因] [-t 時間] [-s]"
+    permission: tierlist.ipban
+    permission-message: §c你沒有權限使用這個指令。
+  mute:
+    description: 永久禁言玩家
+    usage: "/mute <玩家> [原因] [-s] [-d|-nd]"
+    permission: tierlist.mute
+    permission-message: §c你沒有權限使用這個指令。
+  tempmute:
+    description: 暫時禁言玩家
+    usage: "/tempmute <玩家> <時間> [原因] [-s] [-d|-nd]"
+    permission: tierlist.tempmute
+    permission-message: §c你沒有權限使用這個指令。
+  unmute:
+    description: 解除禁言
+    usage: "/unmute <玩家> [原因]"
+    permission: tierlist.unmute
+    permission-message: §c你沒有權限使用這個指令。
+  warn:
+    description: 警告玩家
+    usage: "/warn <玩家> <原因> [-s]"
+    permission: tierlist.warn
+    permission-message: §c你沒有權限使用這個指令。
+  kick:
+    description: 踢出玩家
+    usage: "/kick <玩家> [原因] [-s]"
+    permission: tierlist.kick
+    permission-message: §c你沒有權限使用這個指令。
+  history:
+    description: 查看處罰紀錄
+    usage: "/history <玩家>"
+    permission: tierlist.history
+    permission-message: §c你沒有權限使用這個指令。
+  check:
+    description: 查看目前處罰狀態
+    usage: "/check <玩家>"
+    permission: tierlist.check
+    permission-message: §c你沒有權限使用這個指令。
   tierlist:
     description: TierlistLink 管理指令
     usage: /tierlist <reload|status|sync>
     permission: tierlist.admin
 permissions:
+  tierlist.ban:
+    description: 永久封禁玩家
+    default: op
+  tierlist.tempban:
+    description: 暫時封禁玩家
+    default: op
+  tierlist.unban:
+    description: 解除封禁
+    default: op
+  tierlist.ipban:
+    description: 封禁玩家的 IP
+    default: op
+  tierlist.mute:
+    description: 永久禁言玩家
+    default: op
+  tierlist.tempmute:
+    description: 暫時禁言玩家
+    default: op
+  tierlist.unmute:
+    description: 解除禁言
+    default: op
+  tierlist.warn:
+    description: 警告玩家
+    default: op
+  tierlist.kick:
+    description: 踢出玩家
+    default: op
+  tierlist.history:
+    description: 查看處罰紀錄
+    default: op
+  tierlist.check:
+    description: 查看目前處罰狀態
+    default: op
+  tierlist.notify:
+    description: 看到靜默處罰與處罰通知
+    default: op
+  tierlist.silent:
+    description: 可以使用 -s 靜默處罰
+    default: op
   tierlist.admin:
     description: 使用 /tierlist 管理指令
     default: op

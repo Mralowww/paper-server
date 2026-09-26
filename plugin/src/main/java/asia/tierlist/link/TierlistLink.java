@@ -34,6 +34,7 @@ public final class TierlistLink extends JavaPlugin implements Listener {
     private Api api;
     private EventQueue events;
     private CorePlusSync corePlus;
+    private Punishments punish;
     private boolean statsEnabled;
     private HttpClient http;
     private String apiUrl;
@@ -53,6 +54,16 @@ public final class TierlistLink extends JavaPlugin implements Listener {
             getLogger().warning("config.yml 的 server-key 還沒填！請到網站後台建立「官方伺服器插件」金鑰。");
         }
         events = new EventQueue(api, getLogger());
+        punish = new Punishments(this, api);
+        punish.setBlockedCommands(getConfig().getStringList("punish.muted-blocked-commands"));
+        getServer().getPluginManager().registerEvents(punish, this);
+        for (String c : Punishments.COMMANDS) {
+            org.bukkit.command.PluginCommand pc = getCommand(c);
+            if (pc != null) pc.setTabCompleter(punish);
+        }
+        long syncTicks = Math.max(20L, getConfig().getLong("punish.sync-seconds", 5) * 20L);
+        getServer().getScheduler().runTaskTimerAsynchronously(this, punish::poll, 40L, syncTicks);
+        getServer().getScheduler().runTaskTimer(this, punish::refreshPermissions, 1200L, 1200L);
         if (statsEnabled) {
             getServer().getPluginManager().registerEvents(new CombatTracker(events), this);
             getServer().getScheduler().runTaskTimerAsynchronously(this, events::flush, 100L, 100L);
@@ -121,6 +132,10 @@ public final class TierlistLink extends JavaPlugin implements Listener {
         statsEnabled = getConfig().getBoolean("stats.enabled", true);
         api = new Api(apiUrl, serverKey, timeout, getPluginMeta().getVersion());
         if (events != null) events.setApi(api);
+        if (punish != null) {
+            punish.setApi(api);
+            punish.setBlockedCommands(getConfig().getStringList("punish.muted-blocked-commands"));
+        }
         java.io.File cpFolder = new java.io.File(getDataFolder().getParentFile(), getConfig().getString("coreplus.folder", "CorePlus"));
         corePlus = getConfig().getBoolean("coreplus.enabled", true) ? new CorePlusSync(cpFolder, getLogger()) : null;
     }
@@ -130,10 +145,11 @@ public final class TierlistLink extends JavaPlugin implements Listener {
     }
 
     /** Calls POST /api/server/join; throws on network or auth problems. */
-    private JsonObject checkJoin(UUID uuid, String name) throws Exception {
+    private JsonObject checkJoin(UUID uuid, String name, String ip) throws Exception {
         JsonObject body = new JsonObject();
         body.addProperty("uuid", uuid.toString());
         body.addProperty("name", name);
+        body.addProperty("ip", ip);
         HttpRequest req = HttpRequest.newBuilder(URI.create(apiUrl + "/api/server/join"))
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
@@ -159,7 +175,7 @@ public final class TierlistLink extends JavaPlugin implements Listener {
         UUID uuid = event.getUniqueId();
         JsonObject res;
         try {
-            res = checkJoin(uuid, event.getName());
+            res = checkJoin(uuid, event.getName(), event.getAddress().getHostAddress());
         } catch (Exception e) {
             getLogger().warning("無法檢查 " + event.getName() + "：" + e.getMessage());
             if (!failOpen) {
@@ -167,6 +183,7 @@ public final class TierlistLink extends JavaPlugin implements Listener {
             }
             return;
         }
+        punish.rememberLogin(uuid, res);
         if (res.get("allow").getAsBoolean()) {
             if (showLinked && res.has("discord")) {
                 String discord = str(res.getAsJsonObject("discord"), "name");
@@ -207,6 +224,9 @@ public final class TierlistLink extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (Punishments.COMMANDS.contains(command.getName().toLowerCase())) {
+            return punish.handle(sender, command.getName().toLowerCase(), args);
+        }
         String sub = args.length > 0 ? args[0].toLowerCase() : "";
         if (sub.equals("reload")) {
             loadSettings();

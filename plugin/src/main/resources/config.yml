@@ -39,6 +39,13 @@ coreplus:
   # 幾分鐘同步一次
   sync-minutes: 10
 
+# 處罰系統：/ban /tempban /ipban /mute /tempmute /warn /kick /unban /unmute /history /check
+punish:
+  # 幾秒向網站同步一次（網站上的處罰、權限變更多久會套用到遊戲內）
+  sync-seconds: 5
+  # 被禁言時不能使用的指令（私訊類）
+  muted-blocked-commands: [msg, tell, w, whisper, pm, r, reply, me, say, mail, m, t, message]
+
 messages:
   unavailable: "&c目前無法連線到 Mc.Tierlist.Asia，請稍後再試。"
   linked: "&6[Tierlist] &f已綁定 Discord：&e{discord}"

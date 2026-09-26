@@ -22,6 +22,8 @@ from . import panel as P
 from . import site as S
 from . import links as L
 from . import gamestats as GS
+from . import perms as PM
+from . import punish as PU
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$", re.I)
@@ -945,11 +947,6 @@ def server_key_ok():
     return row
 
 
-def taipei_time(ms):
-    return time.strftime("%Y/%m/%d %H:%M", time.gmtime(ms / 1000 + 8 * 3600))
-
-
-BAN_KICK = "§c§l你已被封禁\n\n§7原因：§f{reason}\n§7期限：§f{until}\n\n§8申訴請至 {host}/support"
 LINK_KICK = ("§6§lMc.Tierlist.Asia\n\n§f進入伺服器前，請先綁定你的 Discord 帳號\n\n§7你的驗證碼\n§e§l{code}\n\n"
              "§7到 §f{host}/me §7輸入驗證碼\n§7或在 Discord 使用 §f/verify {code}\n\n§8驗證碼 10 分鐘內有效")
 LINK_CHAT = "§6[Tierlist] §f你尚未綁定 Discord，驗證碼 §e§l{code}§r§f：到 §e{host}/me §f或在 Discord 使用 §e/verify {code}"
@@ -966,23 +963,27 @@ def server_join():
     if not re.fullmatch(r"[0-9a-f]{32}", uuid) or not re.fullmatch(r"[A-Za-z0-9_]{1,16}", name):
         return bad("invalid_player", "uuid / name missing")
     host = urllib.parse.urlsplit(C.BASE_URL).netloc
+    ip = str(data.get("ip") or "")[:45]
     conn = db()
     L.sync_name(conn, uuid, name)
+    PU.record_ip(conn, uuid, ip)
     link = L.link_by_uuid(conn, uuid)
-    ban = D.find_active_ban(conn, name=name, uuid=uuid, discord_id=link and link["discord_id"])
+    ban = D.find_active_ban(conn, name=name, uuid=uuid, discord_id=link and link["discord_id"], ip=ip or None)
     if ban:
         conn.commit()
-        until = taipei_time(ban["expires_at"]) + "（台灣時間）" if ban["expires_at"] else "永久"
-        return jsonify({"allow": False, "reason": "banned",
-                        "kickMessage": BAN_KICK.format(reason=ban["reason"], until=until, host=host)})
+        return jsonify({"allow": False, "reason": "banned", "kickMessage": PU.screen(PU.row(ban), host)})
+    extra = {"nodes": PM.nodes_for(conn, uuid), "permsVersion": PM.version(conn)}
+    mute = PU.find_active(conn, "mute", uuid=uuid)
+    if mute:
+        extra["mute"] = mute_payload(mute)
     if link:
         conn.commit()
         m = D.member(conn, link["discord_id"])
-        return jsonify({"allow": True, "linked": True,
+        return jsonify({"allow": True, "linked": True, **extra,
                         "discord": {"id": link["discord_id"], "name": m and m["username"]}})
     code, expires = L.issue_code(conn, uuid, name)
     conn.commit()
-    return jsonify({"allow": False, "reason": "unlinked", "linked": False, "code": code, "expiresAt": expires,
+    return jsonify({"allow": False, "reason": "unlinked", "linked": False, "code": code, "expiresAt": expires, **extra,
                     "kickMessage": LINK_KICK.format(code=code, host=host),
                     "chatMessage": LINK_CHAT.format(code=code, host=host)})
 
@@ -1012,6 +1013,153 @@ def save_worlds(conn, data):
                                  "display": str(info.get("display") or world)[:40]}
     if clean:
         D.set_setting(conn, "gs_worlds", json.dumps(clean, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------- punishments (game server)
+def mute_payload(p):
+    return {"id": p["id"], "uuid": L.norm_uuid(p["uuid"]) if p["uuid"] else None, "name": p["mc_name"],
+            "expiresAt": p["expires_at"], "message": PU.chat_line(p)}
+
+
+def change_payload(p, host):
+    """What the plugin needs to act on one created/revoked punishment."""
+    out = {"id": p["id"], "type": p["type"], "status": p["status"], "uuid": L.norm_uuid(p["uuid"]) if p["uuid"] else None,
+           "name": p["mc_name"], "ip": p["ip"], "expiresAt": p["expires_at"], "createdAt": p["created_at"],
+           "silent": bool(p["silent"]), "source": p["source"], "reason": p["reason"]}
+    if p["status"] == "active" or p["type"] in ("kick", "warn"):
+        out["screen"] = PU.screen(p, host)
+        out["chat"] = PU.chat_line(p) if p["type"] == "mute" else None
+        out["broadcast"] = PU.broadcast_line(p, p["created_by_name"] or "console")
+        if p["type"] == "warn":
+            out["warn"] = f"§6§l警告 §f{p['reason']} §7（#{p['id']}，由 {p['created_by_name'] or 'console'}）"
+    return out
+
+
+def game_actor(conn, data):
+    """Audit actor for an in-game command: the linked Discord member when there is one."""
+    a = data.get("actor") if isinstance(data.get("actor"), dict) else {}
+    uuid, name = L.norm_uuid(str(a.get("uuid") or "")), str(a.get("name") or "console")[:32]
+    link = L.link_by_uuid(conn, uuid) if re.fullmatch(r"[0-9a-f]{32}", uuid) else None
+    if link:
+        m = D.member(conn, link["discord_id"])
+        return {"id": link["discord_id"], "username": (m and m["username"]) or name, "mc": name}
+    return {"id": None, "username": name if name != "console" else "console", "mc": name}
+
+
+GAME_ACTIONS = {"ban": ("ban", False), "tempban": ("ban", True), "ipban": ("ipban", None), "mute": ("mute", False),
+                "tempmute": ("mute", True), "warn": ("warn", False), "kick": ("kick", False)}
+
+
+@app.post("/api/server/punish")
+def server_punish():
+    """In-game /ban, /tempban, /ipban, /mute, /tempmute, /warn, /kick, /unban, /unmute."""
+    err = server_request()
+    if err:
+        return err
+    data = body()
+    action = str(data.get("action") or "")
+    conn = db()
+    actor = game_actor(conn, data)
+    host = urllib.parse.urlsplit(C.BASE_URL).netloc
+    ident = str(data.get("target") or "").strip()
+    ip_target = ident if action == "ipban" and PU.IP_RE.match(ident) and "." in ident else None
+    target = {"uuid": None, "name": ident, "discord_id": None} if ip_target else PU.resolve_target(conn, ident)
+    if not target:
+        return jsonify({"ok": False, "message": f"§c找不到玩家 {ident}"})
+    try:
+        if action in ("unban", "unmute"):
+            kind = "ban" if action == "unban" else "mute"
+            # Same identities the join check uses, so nothing is left that would still kick them.
+            done = []
+            while len(done) < 20:
+                p = PU.find_active(conn, kind, uuid=target["uuid"], name=target["name"], discord_id=target["discord_id"])
+                if not p:
+                    break
+                done.append(PU.revoke(conn, p["id"], actor, data.get("reason") or "", source="game"))
+            if not done:
+                return jsonify({"ok": False, "message": f"§c{target['name']} 目前沒有生效中的{'封禁' if kind == 'ban' else '禁言'}"})
+            conn.commit()
+            for p in done:
+                if p["discord_sync"]:
+                    PU.discord_undo(p["id"])
+            p = done[0]
+            ids = "、".join(f"#{x['id']}" for x in done)
+            return jsonify({"ok": True, "punishment": change_payload(p, host),
+                            "message": f"§a已解除 §e{target['name']} §a的{PU.LABEL[p['type']]}（{ids}）"})
+        if action not in GAME_ACTIONS:
+            return bad("invalid_action", "unknown action")
+        kind, timed = GAME_ACTIONS[action]
+        duration = None
+        if timed or (action == "ipban" and data.get("duration")):
+            duration = PU.parse_duration(data.get("duration"))
+            if timed and not duration:
+                raise PU.PunishError("invalid_duration", "時間格式不正確，例如 30m、12h、7d、1mo")
+        sync = data.get("discord")
+        sync = PU.settings(conn)["discordDefault"] if sync is None else bool(sync)
+        p = PU.create(conn, kind=kind, target=target, reason=data.get("reason"), duration_ms=duration, actor=actor,
+                      source="game", silent=bool(data.get("silent")), discord_sync=sync and kind != "kick", ip=ip_target)
+        conn.commit()
+    except PU.PunishError as exc:
+        return jsonify({"ok": False, "message": f"§c{exc}"})
+    except ValueError:
+        return jsonify({"ok": False, "message": "§c時間格式不正確，例如 30m、12h、7d、1mo"})
+    if p["discord_sync"]:
+        PU.discord_apply(p["id"])
+    return jsonify({"ok": True, "punishment": change_payload(p, host),
+                    "message": f"§a已{PU.LABEL[p['type']]} §e{p['mc_name']}§a（#{p['id']}）"})
+
+
+@app.post("/api/server/history")
+def server_history():
+    """/history and /check in game."""
+    err = server_request()
+    if err:
+        return err
+    conn = db()
+    target = PU.resolve_target(conn, str(body().get("target") or ""))
+    if not target:
+        return jsonify({"ok": False, "message": "§c找不到這位玩家"})
+    items = PU.history(conn, uuid=target["uuid"], name=target["name"], discord_id=target["discord_id"], limit=15)
+    lines = []
+    for p in items:
+        st = {"active": "§c生效中", "expired": "§7已到期", "revoked": "§a已解除", "done": "§7"}[p["status"]]
+        dur = PU.fmt_duration(p["expires_at"] - p["created_at"]) if p["expires_at"] else ("永久" if p["type"] in PU.LASTING else "")
+        lines.append(f"§8#{p['id']} §e{PU.LABEL[p['type']]} {st} §7{PU.taipei(p['created_at'])} {dur} §f{p['reason']} §8by {p['created_by_name'] or 'console'}")
+    active = [p for p in items if p["status"] == "active"]
+    return jsonify({"ok": True, "name": target["name"], "uuid": target["uuid"], "lines": lines,
+                    "summary": f"§6{target['name']} §7共 {len(items)} 筆處罰，生效中 {len(active)} 筆"
+                               + (f"：§c{'、'.join(PU.LABEL[p['type']] for p in active)}" if active else "")})
+
+
+@app.get("/api/server/sync")
+def server_sync():
+    """Punishment changes since `cursor` plus the permission version, polled every few seconds."""
+    err = server_request()
+    if err:
+        return err
+    conn = db()
+    host = urllib.parse.urlsplit(C.BASE_URL).netloc
+    cursor = clamp_int(request.args.get("cursor"), 0, 10**14, 0)
+    if not cursor:  # first call: all active mutes, start from now
+        return jsonify({"cursor": D.now_ms(), "mutes": [mute_payload(p) for p in PU.active_mutes(conn)],
+                        "changes": [], "permsVersion": PM.version(conn), "settings": PU.settings(conn)})
+    changes = PU.changes_since(conn, cursor)
+    new_cursor = max([cursor] + [p["updated_at"] for p in changes])
+    return jsonify({"cursor": new_cursor, "changes": [change_payload(p, host) for p in changes],
+                    "permsVersion": PM.version(conn), "settings": PU.settings(conn)})
+
+
+@app.post("/api/server/perms")
+def server_perms():
+    """Permission nodes for the given online players."""
+    err = server_request()
+    if err:
+        return err
+    conn = db()
+    rules = PM.load(conn)
+    uuids = [L.norm_uuid(str(u)) for u in (body().get("uuids") or [])[:500]]
+    return jsonify({"version": PM.version(conn),
+                    "players": {u: PM.nodes_for(conn, u, rules) for u in uuids if re.fullmatch(r"[0-9a-f]{32}", u)}})
 
 
 @app.post("/api/server/events")
@@ -1461,76 +1609,149 @@ def too_large(_exc):
     return error(413, "payload_too_large")
 
 
-# ================================================================ bans
-DURATIONS = {"1d": 1, "7d": 7, "30d": 30}
+# ================================================================ punishments (staff panel)
+PUNISH_PERM = {"warn": "viewStaff", "kick": "viewStaff", "mute": "viewStaff", "ban": "managePlayers", "ipban": "manageSettings"}
 
 
 def ban_row(b):
+    return PU.row(b)
+
+
+@route("/api/admin/punishments", perm="viewStaff")
+def list_punishments():
+    a = request.args
+    where, args = [], []
+    if a.get("type") in PU.TYPES:
+        where.append("type = ?")
+        args.append(a["type"])
+    q = (a.get("q") or "").strip()[:40]
+    if q:
+        like = f"%{q}%"
+        where.append("(mc_name LIKE ? OR reason LIKE ? OR created_by_name LIKE ? OR discord_id = ? OR CAST(id AS TEXT) = ?)")
+        args += [like, like, like, q, q.lstrip("#")]
+    st = a.get("status")
     now = D.now_ms()
-    status = ("revoked" if b["revoked_at"] else
-              "expired" if b["expires_at"] and b["expires_at"] <= now else "active")
-    return {**b, "status": status}
+    if st == "active":
+        where.append(f"{D.LIVE_SQL} AND type IN ('ban', 'ipban', 'mute')")
+        args.append(now)
+    elif st == "ended":
+        where.append("(revoked_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= ?) OR type IN ('warn', 'kick'))")
+        args.append(now)
+    sql = "SELECT * FROM bans" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT 500"
+    rows = [PU.row(r) for r in db().execute(sql, args).fetchall()]
+    counts = {r["type"]: r["n"] for r in db().execute(f"SELECT type, COUNT(*) AS n FROM bans WHERE {D.LIVE_SQL} GROUP BY type", (now,))}
+    user = current_user()
+    for r in rows:
+        if not permissions(user)["viewAudit"]:
+            r["ip"] = None
+    return jsonify({"punishments": rows, "activeCounts": counts, "settings": PU.settings(db())})
 
 
-@route("/api/admin/bans", perm="viewStaff")
-def list_bans():
-    rows = db().execute("SELECT * FROM bans ORDER BY id DESC LIMIT 500").fetchall()
-    return jsonify({"bans": [ban_row(dict(r)) for r in rows]})
-
-
-@route("/api/admin/bans", methods=["POST"], perm="managePlayers")
-def create_ban():
+@route("/api/admin/punishments", methods=["POST"], perm="viewStaff")
+def create_punishment():
     data = body()
-    name = str(data.get("name") or "").strip()
-    reason = str(data.get("reason") or "").strip()
-    discord_id = str(data.get("discordId") or "").strip() or None
-    if not NAME_RE.match(name):
-        return bad("invalid_name", "玩家名稱需為 2–16 個英數字或底線")
-    if not reason or len(reason) > 300:
-        return bad("invalid_reason", "請輸入 1–300 字的封禁原因")
-    if discord_id and not DISCORD_ID_RE.match(discord_id):
-        return bad("invalid_discord_id", "Discord ID 格式不正確")
-    duration = str(data.get("duration") or "perm")
-    if duration == "perm":
-        expires = None
-    elif duration in DURATIONS:
-        expires = D.now_ms() + DURATIONS[duration] * 86400 * 1000
-    else:
-        days = clamp_int(data.get("days"), 1, 3650, 0)
-        if not days:
-            return bad("invalid_duration", "請輸入 1–3650 天")
-        expires = D.now_ms() + days * 86400 * 1000
-    conn = db()
-    player = conn.execute("SELECT * FROM players WHERE name = ?", (name,)).fetchone()
-    uuid = player["uuid"] if player else None
-    discord_id = discord_id or (player["discord_id"] if player else None)
-    if player:
-        name = player["name"]
+    kind = str(data.get("type") or "")
+    if kind not in PU.TYPES:
+        return bad("invalid_type", "處罰類型不正確")
     user = current_user()
-    cur = conn.execute("""INSERT INTO bans (mc_name, uuid, discord_id, reason, created_by, created_by_name, created_at, expires_at)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                       (name, uuid, discord_id, reason, user["id"], user["username"], D.now_ms(), expires))
-    D.audit(conn, user, "ban_create", f"{name} ({'permanent' if not expires else duration}) — {reason}",
-            target=("ban", cur.lastrowid, name),
-            meta={"ban": {"mcName": name, "uuid": uuid, "discordId": discord_id, "reason": reason, "duration": duration,
-                          "expiresAt": expires, "playerId": player["id"] if player else None}})
-    conn.commit()
-    return jsonify({"ok": True}), 201
-
-
-@route("/api/admin/bans/<int:bid>/revoke", methods=["POST"], perm="managePlayers")
-def revoke_ban(bid):
+    if not permissions(user)[PUNISH_PERM[kind]]:
+        return error(403, "forbidden", "你的身分不能執行這種處罰")
     conn = db()
-    b = conn.execute("SELECT * FROM bans WHERE id = ?", (bid,)).fetchone()
-    if not b:
+    target = PU.resolve_target(conn, str(data.get("name") or ""))
+    if not target:
+        return bad("invalid_name", "找不到這位玩家")
+    if data.get("discordId") and DISCORD_ID_RE.match(str(data["discordId"])):
+        target["discord_id"] = str(data["discordId"])
+    try:
+        duration = PU.parse_duration(data.get("duration"))
+        p = PU.create(conn, kind=kind, target=target, reason=data.get("reason"), duration_ms=duration, actor=user, source="web",
+                      silent=bool(data.get("silent")), discord_sync=bool(data.get("discord")), ticket_id=data.get("ticketId"))
+    except PU.PunishError as exc:
+        return bad(exc.code, str(exc))
+    except ValueError:
+        return bad("invalid_duration", "時間格式不正確，例如 30m、12h、7d、1mo")
+    if p["ticket_id"]:
+        conn.execute("INSERT INTO support_messages (ticket_id, author_id, author_name, is_staff, body, created_at, kind) "
+                     "VALUES (?, ?, ?, 1, ?, ?, 'note')", (p["ticket_id"], user["id"], user["username"],
+                                                           f"已{PU.LABEL[kind]} {p['mc_name']}（處罰 #{p['id']}）：{p['reason']}", D.now_ms()))
+    conn.commit()
+    if p["discord_sync"]:
+        PU.discord_apply(p["id"])
+    return jsonify({"ok": True, "punishment": p}), 201
+
+
+@route("/api/admin/punishments/<int:pid>/revoke", methods=["POST"], perm="viewStaff")
+def revoke_punishment(pid):
+    conn = db()
+    p = conn.execute("SELECT * FROM bans WHERE id = ?", (pid,)).fetchone()
+    if not p:
         return error(404, "not_found")
-    user = current_user()
-    conn.execute("UPDATE bans SET revoked_at = ?, revoked_by_name = ? WHERE id = ? AND revoked_at IS NULL",
-                 (D.now_ms(), user["username"], bid))
-    D.audit(conn, user, "ban_revoke", b["mc_name"], target=("ban", bid, b["mc_name"]),
-            changes={"status": ["active", "revoked"]}, meta={"ban": dict(b)})
+    need = "manageSettings" if p["type"] == "ipban" else "managePlayers"
+    if not permissions(current_user())[need]:
+        return error(403, "forbidden", "你的身分不能解除這筆處罰")
+    try:
+        p = PU.revoke(conn, pid, current_user(), body().get("reason") or "")
+    except PU.PunishError as exc:
+        return bad(exc.code, str(exc))
     conn.commit()
-    return jsonify({"ok": True})
+    if p["discord_sync"]:
+        PU.discord_undo(pid)
+    return jsonify({"ok": True, "punishment": p})
+
+
+@route("/api/admin/punishments/lookup", perm="viewStaff")
+def punishment_lookup():
+    """Player preview for the punish form: resolved account and their history."""
+    conn = db()
+    target = PU.resolve_target(conn, request.args.get("name") or "")
+    if not target:
+        return jsonify({"found": False})
+    items = PU.history(conn, uuid=target["uuid"], name=target["name"], discord_id=target["discord_id"], limit=20)
+    return jsonify({"found": True, "target": {**target, "uuid": target["uuid"] and L.dashed(target["uuid"])},
+                    "history": items, "hasIp": bool(target["uuid"] and PU.last_ip(conn, target["uuid"]))})
+
+
+@route("/api/admin/punish-settings", methods=["PUT"], perm="manageSettings")
+def put_punish_settings():
+    data = body()
+    conn = db()
+    before = PU.settings(conn)
+    new = {"discordDefault": bool(data.get("discordDefault")), "broadcast": bool(data.get("broadcast", True)),
+           "muteRole": str(data.get("muteRole") or "") if re.fullmatch(r"\d{15,21}|", str(data.get("muteRole") or "")) else "",
+           "banRole": str(data.get("banRole") or "") if re.fullmatch(r"\d{15,21}|", str(data.get("banRole") or "")) else ""}
+    D.set_setting(conn, "punish_settings", json.dumps(new))
+    D.audit(conn, current_user(), "punish_settings", None, target=("setting", "punish_settings", "處罰設定"), changes=D.diff(before, new))
+    conn.commit()
+    return jsonify({"ok": True, "settings": new})
+
+
+@route("/api/admin/perms", perm="manageSettings")
+def get_perms():
+    conn = db()
+    return jsonify({"rules": PM.load(conn), "version": PM.version(conn), "subjects": PM.FIXED_SUBJECTS, "knownNodes": PM.KNOWN_NODES})
+
+
+@route("/api/admin/perms", methods=["PUT"], perm="manageSettings")
+def put_perms():
+    try:
+        rules = PM.clean(body().get("rules"))
+    except ValueError as exc:
+        return bad(str(exc), "權限格式不正確（節點只能包含英數字、. _ - *，開頭可加 - 表示拒絕）")
+    conn = db()
+    before = PM.load(conn)
+    version = PM.save(conn, rules)
+    D.audit(conn, current_user(), "perms_update", f"{sum(len(v) for v in rules.values())} nodes / {len(rules)} subjects",
+            target=("setting", "perm_rules", "遊戲權限"), changes=D.diff(before, rules))
+    conn.commit()
+    return jsonify({"ok": True, "version": version, "rules": rules})
+
+
+@route("/api/admin/discord-roles", perm="viewStaff")
+def discord_roles():
+    roles, err = bot_call("guild_roles")
+    if err:
+        return err
+    return jsonify({"roles": roles})
 
 
 def public_ban(b):
@@ -1624,11 +1845,26 @@ def load_ticket(tid):
 
 
 def ticket_payload(t, since=0):
-    """Ticket plus its messages (only those after message id `since` when given)."""
+    """Ticket plus its messages (only those after message id `since` when given). Internal notes only for staff."""
     conn = db()
-    msgs = [dict(r) for r in conn.execute("""SELECT sm.*, m.avatar AS author_avatar FROM support_messages sm
+    staff = is_support_staff(current_user())
+    msgs = [dict(r) for r in conn.execute(f"""SELECT sm.*, m.avatar AS author_avatar FROM support_messages sm
                                               LEFT JOIN members m ON m.discord_id = sm.author_id
-                                              WHERE sm.ticket_id = ? AND sm.id > ? ORDER BY sm.id""", (t["id"], since))]
+                                              WHERE sm.ticket_id = ? AND sm.id > ? {'' if staff else "AND sm.kind != 'note'"}
+                                              ORDER BY sm.id""", (t["id"], since))]
+    t = dict(t)
+    try:
+        t["fields"] = json.loads(t.get("fields") or "null")
+    except ValueError:
+        t["fields"] = None
+    if t.get("punishment_id"):
+        p = conn.execute("SELECT * FROM bans WHERE id = ?", (t["punishment_id"],)).fetchone()
+        t["punishment"] = PU.row(p) if p else None
+        if t["punishment"] and not staff:
+            t["punishment"]["ip"] = None
+    if staff and t.get("target_uuid"):
+        t["targetHistory"] = [{k: p[k] for k in ("id", "type", "status", "reason", "created_at")}
+                              for p in PU.history(conn, uuid=t["target_uuid"], limit=10)]
     atts = {}
     for a in conn.execute("SELECT id, message_id, orig_name, mime, size FROM support_attachments WHERE ticket_id = ? AND message_id > ?",
                           (t["id"], since)):
@@ -1654,7 +1890,7 @@ def system_message(conn, ticket_id, user, status):
 
 
 LAST_MSG_SQL = """(SELECT json_object('body', substr(body, 1, 140), 'staff', is_staff, 'author', author_name, 'kind', kind, 'at', created_at)
-                   FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.kind = 'message' DESC, m.id DESC LIMIT 1) AS last_json,
+                   FROM support_messages m WHERE m.ticket_id = t.id AND m.kind != 'note' ORDER BY m.kind = 'message' DESC, m.id DESC LIMIT 1) AS last_json,
                   (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id AND m.kind = 'message') AS message_count"""
 
 
@@ -1725,13 +1961,26 @@ def open_ticket():
         else:
             if not target_uuid:
                 return bad("target_not_found", "找不到這個 Minecraft 帳號")
+    fields, err = ticket_fields(category)
+    if err:
+        return bad(*err)
+    punishment_id = None
+    if category == "appeal":
+        pid = clamp_int(request.form.get("punishment"), 0, 10**9, 0)
+        mine = {p["id"] for p in my_punishment_rows(conn, user)}
+        if not pid or pid not in mine:
+            return bad("invalid_punishment", "請選擇要申訴的處罰")
+        if conn.execute("SELECT 1 FROM support_tickets WHERE punishment_id = ? AND status != 'closed'", (pid,)).fetchone():
+            return bad("appeal_exists", "這筆處罰已經有進行中的申訴")
+        punishment_id = pid
     uploads, err = read_uploads()
     if err:
         return bad(*err)
     ts = D.now_ms()
     cur = conn.execute("INSERT INTO support_tickets (user_id, username, category, title, status, created_at, updated_at, "
-                       "target_name, target_uuid, user_seen_at) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)",
-                       (user["id"], user["username"], category, title, ts, ts, target_name, target_uuid, ts))
+                       "target_name, target_uuid, user_seen_at, fields, punishment_id) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)",
+                       (user["id"], user["username"], category, title, ts, ts, target_name, target_uuid, ts,
+                        json.dumps(fields, ensure_ascii=False) if fields else None, punishment_id))
     tid = cur.lastrowid
     save_message(conn, tid, user, False, text, uploads)
     D.audit(conn, user, "support_open", f"#{tid} {title}", target=("support", tid, title),
@@ -1739,6 +1988,50 @@ def open_ticket():
     conn.commit()
     bridge.submit(_notify, "notify_support_new", tid, user["id"], category, title, text[:300], site_url(f"/admin#support/{tid}"))
     return jsonify({"ok": True, "id": tid}), 201
+
+
+FIELD_CHOICES = {
+    "where": ("web", "discord", "game", "other"),
+    "kind": ("hack", "abuse", "bug", "grief", "spam", "other"),
+    "area": ("web", "game", "discord", "other"),
+}
+
+
+def ticket_fields(category):
+    """Extra per-category form fields → (dict, error)."""
+    f = request.form
+    out = {}
+    if category == "bug":
+        out["where"] = f.get("where") if f.get("where") in FIELD_CHOICES["where"] else "other"
+        out["steps"] = str(f.get("steps") or "").strip()[:1000]
+    elif category == "report":
+        out["kind"] = f.get("kind") if f.get("kind") in FIELD_CHOICES["kind"] else "other"
+        out["world"] = str(f.get("world") or "").strip()[:40]
+        out["when"] = str(f.get("when") or "").strip()[:20]
+        ev = str(f.get("evidence") or "").strip()[:300]
+        if ev and not re.match(r"^https?://", ev):
+            return None, ("invalid_evidence", "證據連結需要以 http:// 或 https:// 開頭")
+        out["evidence"] = ev
+    elif category == "suggest":
+        out["area"] = f.get("area") if f.get("area") in FIELD_CHOICES["area"] else "other"
+    return {k: v for k, v in out.items() if v}, None
+
+
+def my_punishment_rows(conn, user):
+    link = L.link_for(conn, user["id"])
+    player = conn.execute("SELECT uuid, name FROM players WHERE discord_id = ?", (user["id"],)).fetchone()
+    uuid = (link and link["uuid"]) or (player and player["uuid"] and L.norm_uuid(player["uuid"]))
+    return PU.history(conn, uuid=uuid, discord_id=user["id"], name=player and player["name"], limit=30)
+
+
+@route("/api/support/my-punishments")
+def my_punishments():
+    conn = db()
+    rows = my_punishment_rows(conn, current_user())
+    open_appeals = {r["punishment_id"] for r in conn.execute(
+        "SELECT punishment_id FROM support_tickets WHERE punishment_id IS NOT NULL AND status != 'closed'")}
+    return jsonify({"punishments": [{**{k: p[k] for k in ("id", "type", "status", "reason", "created_at", "expires_at", "mc_name", "created_by_name")},
+                                     "appealing": p["id"] in open_appeals} for p in rows]})
 
 
 @route("/api/support/tickets/<int:tid>")
@@ -1787,6 +2080,13 @@ def reply_ticket(tid):
     if err:
         return bad(*err)
     conn = db()
+    if staff and request.form.get("note") == "1":
+        if uploads:
+            return bad("note_no_images", "內部備註不能附加圖片")
+        cur = conn.execute("INSERT INTO support_messages (ticket_id, author_id, author_name, is_staff, body, created_at, kind) "
+                           "VALUES (?, ?, ?, 1, ?, ?, 'note')", (tid, user["id"], user["username"], text, D.now_ms()))
+        conn.commit()
+        return jsonify({"ok": True, "note": cur.lastrowid}), 201
     save_message(conn, tid, user, staff, text, uploads)
     if staff and t["status"] == "open":
         conn.execute("UPDATE support_tickets SET status = 'in_progress' WHERE id = ?", (tid,))
@@ -1882,6 +2182,68 @@ def set_ticket_status(tid):
     conn.commit()
     if status == "closed" and t["status"] != "closed":
         bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "closed", site_url(f"/support#{tid}"))
+    return jsonify({"ok": True})
+
+
+def support_event(conn, tid, user, event, **data):
+    """A system line in the conversation (kind='event', body = JSON)."""
+    conn.execute("INSERT INTO support_messages (ticket_id, author_id, author_name, is_staff, body, created_at, kind) "
+                 "VALUES (?, ?, ?, 1, ?, ?, 'event')", (tid, user["id"], user["username"], json.dumps({"e": event, **data}, ensure_ascii=False), D.now_ms()))
+
+
+@route("/api/admin/support/<int:tid>/manage", methods=["POST"], perm="viewStaff")
+def manage_ticket(tid):
+    """Claim / unclaim and priority."""
+    conn = db()
+    t = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (tid,)).fetchone()
+    if not t:
+        return error(404, "not_found")
+    user = current_user()
+    data = body()
+    if "claim" in data:
+        claim = bool(data["claim"])
+        if claim and t["assigned_to"] and t["assigned_to"] != user["id"] and not permissions(user)["managePlayers"]:
+            return bad("already_claimed", f"這張單已由 {t['assigned_name']} 認領")
+        conn.execute("UPDATE support_tickets SET assigned_to = ?, assigned_name = ? WHERE id = ?",
+                     (user["id"] if claim else None, user["username"] if claim else None, tid))
+        support_event(conn, tid, user, "claim" if claim else "unclaim")
+        D.audit(conn, user, "support_claim" if claim else "support_unclaim", f"#{tid}", target=("support", tid, t["title"]))
+    if data.get("priority") in ("low", "normal", "high", "urgent"):
+        conn.execute("UPDATE support_tickets SET priority = ? WHERE id = ?", (data["priority"], tid))
+        if data["priority"] != t["priority"]:
+            support_event(conn, tid, user, "priority", value=data["priority"])
+            D.audit(conn, user, "support_priority", f"#{tid} → {data['priority']}", target=("support", tid, t["title"]),
+                    changes={"priority": [t["priority"], data["priority"]]})
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@route("/api/admin/support/<int:tid>/appeal", methods=["POST"], perm="managePlayers")
+def decide_appeal(tid):
+    """Accept (revokes the punishment) or reject an appeal, then close the ticket."""
+    conn = db()
+    t = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (tid,)).fetchone()
+    if not t or not t["punishment_id"]:
+        return error(404, "not_found")
+    decision = body().get("decision")
+    note = str(body().get("note") or "").strip()[:500]
+    if decision not in ("accept", "reject"):
+        return bad("invalid_decision", "請選擇通過或駁回")
+    user = current_user()
+    p = None
+    if decision == "accept":
+        try:
+            p = PU.revoke(conn, t["punishment_id"], user, f"申訴通過（客服單 #{tid}）" + (f"：{note}" if note else ""))
+        except PU.PunishError as exc:
+            if exc.code != "not_active":
+                return bad(exc.code, str(exc))
+    support_event(conn, tid, user, f"appeal_{decision}", punishment=t["punishment_id"], note=note)
+    conn.execute("UPDATE support_tickets SET status = 'closed', updated_at = ? WHERE id = ?", (D.now_ms(), tid))
+    D.audit(conn, user, f"appeal_{decision}", f"#{tid} → 處罰 #{t['punishment_id']}", target=("support", tid, t["title"]))
+    conn.commit()
+    if p and p["discord_sync"]:
+        PU.discord_undo(p["id"])
+    bridge.submit(_notify, "dm_support_update", t["user_id"], tid, t["title"], "closed", site_url(f"/support#{tid}"))
     return jsonify({"ok": True})
 
 

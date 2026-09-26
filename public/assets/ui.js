@@ -164,7 +164,7 @@
       const tabs = [['overview', 'tab.overview'], ['players', 'tab.players'], ['bans', 'tab.bans'], ['support', 'tab.support'],
         ['tickets', 'tab.tickets'], ['tests', 'tab.tests'], ['team', 'tab.team'], ['storage', 'tab.storage']];
       if (p.manageKeys) tabs.push(['keys', 'tab.keys']);
-      if (p.manageSettings) tabs.push(['settings', 'tab.settings'], ['site', 'tab.site']);
+      if (p.manageSettings) tabs.push(['settings', 'tab.settings'], ['site', 'tab.site'], ['perms', 'tab.perms']);
       tabs.forEach(([id, key]) => list.push({ group: 'cmd.staff', label: `${t('nav.admin')} · ${t(key)}`, icon: 'shield', run: () => { location.href = `/admin#${id}`; } }));
       if (p.viewAudit) list.push({ group: 'cmd.staff', label: t('nav.audit'), icon: 'search', run: () => { location.href = '/audit'; } });
     }

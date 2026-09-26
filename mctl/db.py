@@ -229,6 +229,19 @@ CREATE TABLE IF NOT EXISTS gs_coreplus (
   login_streak INTEGER NOT NULL DEFAULT 0,
   synced_at    INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS gs_ips (
+  uuid        TEXT NOT NULL,
+  ip          TEXT NOT NULL,
+  first_seen  INTEGER NOT NULL,
+  last_seen   INTEGER NOT NULL,
+  PRIMARY KEY (uuid, ip)
+);
+CREATE TABLE IF NOT EXISTS perm_rules (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  subject     TEXT NOT NULL UNIQUE,
+  nodes       TEXT NOT NULL DEFAULT '[]',
+  updated_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT
@@ -251,6 +264,22 @@ MIGRATIONS = [
     ("support_tickets", "user_seen_at", "INTEGER"),
     ("support_tickets", "staff_seen_at", "INTEGER"),
     ("support_messages", "kind", "TEXT NOT NULL DEFAULT 'message'"),
+    # Punishments: bans grew into a general table (ban / ipban / mute / warn / kick).
+    ("bans", "type", "TEXT NOT NULL DEFAULT 'ban'"),
+    ("bans", "ip", "TEXT"),
+    ("bans", "source", "TEXT"),
+    ("bans", "silent", "INTEGER NOT NULL DEFAULT 0"),
+    ("bans", "discord_sync", "INTEGER NOT NULL DEFAULT 0"),
+    ("bans", "discord_state", "TEXT"),
+    ("bans", "revoke_reason", "TEXT"),
+    ("bans", "revoked_by", "TEXT"),
+    ("bans", "ticket_id", "INTEGER"),
+    ("bans", "updated_at", "INTEGER"),
+    ("support_tickets", "fields", "TEXT"),
+    ("support_tickets", "punishment_id", "INTEGER"),
+    ("support_tickets", "assigned_to", "TEXT"),
+    ("support_tickets", "assigned_name", "TEXT"),
+    ("support_tickets", "priority", "TEXT NOT NULL DEFAULT 'normal'"),
     ("audit_log", "source", "TEXT"),
     ("audit_log", "ip", "TEXT"),
     ("audit_log", "user_agent", "TEXT"),
@@ -299,6 +328,9 @@ def init():
         conn.execute("CREATE INDEX IF NOT EXISTS bans_active ON bans (revoked_at, expires_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_user ON support_tickets (user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_msg_ticket ON support_messages (ticket_id)")
+        conn.execute("UPDATE bans SET updated_at = COALESCE(revoked_at, created_at) WHERE updated_at IS NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS bans_updated ON bans (updated_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_ips_ip ON gs_ips (ip)")
         conn.execute("CREATE INDEX IF NOT EXISTS gs_kills_killer ON gs_kills (killer_uuid, id)")
         conn.execute("CREATE INDEX IF NOT EXISTS gs_kills_victim ON gs_kills (victim_uuid, id)")
         conn.execute("CREATE INDEX IF NOT EXISTS gs_matches_p1 ON gs_matches (p1_uuid, id)")
@@ -398,16 +430,20 @@ def cooldown_until(conn, discord_id):
 
 
 # ---------------------------------------------------------------- bans
-ACTIVE_BAN_SQL = "revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)"
+LIVE_SQL = "revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)"
+ACTIVE_BAN_SQL = LIVE_SQL + " AND type IN ('ban', 'ipban')"
 
 
 def active_bans(conn):
     return [dict(r) for r in conn.execute(f"SELECT * FROM bans WHERE {ACTIVE_BAN_SQL} ORDER BY id DESC", (now_ms(),))]
 
 
-def find_active_ban(conn, discord_id=None, name=None, uuid=None):
-    """The active ban matching any of the given identities, or None."""
+def find_active_ban(conn, discord_id=None, name=None, uuid=None, ip=None):
+    """The active ban (or IP ban) matching any of the given identities, or None."""
     clauses, args = [], []
+    if ip:
+        clauses.append("(type = 'ipban' AND ip = ?)")
+        args.append(ip)
     if discord_id:
         clauses.append("discord_id = ?")
         args.append(str(discord_id))

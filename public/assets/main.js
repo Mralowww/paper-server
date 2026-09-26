@@ -477,6 +477,7 @@
     appeal: '<path d="M12 3v18M5 21h14M3 7h18M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z"/>',
     report: '<path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/>',
     other: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
+    suggest: '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>',
   };
   const catIcon = (c, size = 20) => `<span class="cat-ico ${c}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${CAT_ICONS[c] || CAT_ICONS.other}</svg></span>`;
   const statusPill = (st) => `<span class="st-pill ${st}"><i></i>${t(`support.status.${st}`)}</span>`;

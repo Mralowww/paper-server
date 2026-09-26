@@ -1,7 +1,9 @@
 """Discord bot: test applications, ticket channels, /result flow and tier-role sync."""
 import asyncio
+import json
 import logging
 import re
+from datetime import timedelta
 
 import aiohttp
 import discord
@@ -116,6 +118,8 @@ class TierBot(discord.Client):
             log.error("Bot is not in guild %s — check DISCORD_GUILD_ID and invite the bot.", C.GUILD_ID)
             return
         await self.sync_member_cache(guild)
+        if not getattr(self, "_expiry_task", None):
+            self._expiry_task = asyncio.create_task(expire_discord_punishments())
 
     async def sync_member_cache(self, guild):
         if not guild.chunked:
@@ -313,7 +317,7 @@ async def cmd_setupsupport(interaction: discord.Interaction, channel: discord.Te
 
 
 # ---------------------------------------------------------------- support notifications
-SUPPORT_CATEGORY_LABELS = {"bug": "🐞 問題回報", "appeal": "⚖️ 封禁申訴", "report": "🚩 檢舉", "other": "💬 其他"}
+SUPPORT_CATEGORY_LABELS = {"bug": "🐞 問題回報", "appeal": "⚖️ 處罰申訴", "report": "🚩 檢舉", "suggest": "💡 功能建議", "other": "💬 其他"}
 
 
 async def _support_channel():
@@ -1018,6 +1022,106 @@ async def member_profile(discord_id):
         "roles": [{"id": str(r.id), "name": r.name, "color": f"#{r.color.value:06x}" if r.color.value else None,
                    "managed": r.managed} for r in roles],
     }
+
+
+# ---------------------------------------------------------------- punishments → Discord
+MAX_TIMEOUT_MS = 28 * 86_400_000
+
+
+async def guild_roles():
+    guild = bot.guild
+    if not guild:
+        return []
+    return [{"id": str(r.id), "name": r.name, "color": f"#{r.color.value:06x}" if r.color.value else None, "managed": r.managed}
+            for r in sorted(guild.roles, key=lambda r: r.position, reverse=True) if not r.is_default()]
+
+
+def _punishment(pid):
+    with conn() as c:
+        row = c.execute("SELECT * FROM bans WHERE id = ?", (pid,)).fetchone()
+        return (dict(row), P_settings(c)) if row else (None, None)
+
+
+def P_settings(c):
+    from . import punish
+    return punish.settings(c)
+
+
+def _save_state(pid, state):
+    with conn() as c:
+        c.execute("UPDATE bans SET discord_state = ? WHERE id = ?", (json.dumps(state), pid))
+
+
+async def apply_punishment(pid):
+    """Mirrors a punishment on Discord: timeout or mute role for mutes, a ban role for bans, a DM for warnings."""
+    p, cfg = _punishment(pid)
+    if not p or not p["discord_id"] or not bot.guild:
+        return
+    member = await get_member(bot.guild, p["discord_id"])
+    if not member:
+        return
+    state = {}
+    reason = f"#{p['id']} {p['reason']}"[:500]
+    try:
+        if p["type"] == "mute":
+            left = (p["expires_at"] or 0) - D.now_ms()
+            if p["expires_at"] and 0 < left <= MAX_TIMEOUT_MS:
+                await member.timeout(discord.utils.utcnow() + timedelta(milliseconds=left), reason=reason)
+                state["timeout"] = True
+            elif cfg["muteRole"] and (role := bot.guild.get_role(int(cfg["muteRole"]))):
+                await member.add_roles(role, reason=reason)
+                state["role"] = str(role.id)
+        elif p["type"] in ("ban", "ipban"):
+            if cfg["banRole"] and (role := bot.guild.get_role(int(cfg["banRole"]))):
+                await member.add_roles(role, reason=reason)
+                state["role"] = str(role.id)
+        elif p["type"] == "warn":
+            try:
+                await member.send(embed=discord.Embed(title="你收到一則警告", color=0xF2C14E,
+                                                      description=f"**原因**：{p['reason']}\n**處罰編號**：#{p['id']}")
+                                  .set_footer(text="Mc.Tierlist.Asia"))
+                state["dm"] = True
+            except discord.Forbidden:
+                pass
+    except discord.Forbidden:
+        log.warning("Missing permission to apply punishment #%s on Discord", pid)
+        state["error"] = "forbidden"
+    _save_state(pid, state)
+
+
+async def undo_punishment(pid):
+    p, _cfg = _punishment(pid)
+    if not p or not p["discord_id"] or not bot.guild:
+        return
+    state = json.loads(p["discord_state"] or "{}")
+    if state.get("undone"):
+        return
+    member = await get_member(bot.guild, p["discord_id"])
+    if member:
+        try:
+            if state.get("timeout"):
+                await member.timeout(None, reason=f"#{pid} 解除")
+            if state.get("role") and (role := bot.guild.get_role(int(state["role"]))):
+                await member.remove_roles(role, reason=f"#{pid} 解除")
+        except discord.Forbidden:
+            log.warning("Missing permission to undo punishment #%s on Discord", pid)
+    state["undone"] = True
+    _save_state(pid, state)
+
+
+async def expire_discord_punishments():
+    """Removes Discord mute/ban roles whose punishment has expired (timeouts expire on their own)."""
+    while not bot.is_closed():
+        try:
+            with conn() as c:
+                rows = c.execute("""SELECT id FROM bans WHERE discord_sync = 1 AND discord_state LIKE '%"role"%'
+                                    AND discord_state NOT LIKE '%"undone"%' AND revoked_at IS NULL
+                                    AND expires_at IS NOT NULL AND expires_at <= ?""", (D.now_ms(),)).fetchall()
+            for r in rows:
+                await undo_punishment(r["id"])
+        except Exception:
+            log.exception("expire_discord_punishments failed")
+        await asyncio.sleep(60)
 
 
 # ---------------------------------------------------------------- entry

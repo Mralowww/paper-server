@@ -24,6 +24,9 @@
     target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
     check: '<path d="m5 12 5 5L20 7"/>',
     bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    flag: '<path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   };
 
   async function postForm(url, fd) {
@@ -38,6 +41,38 @@
 
   const stepper = (st) => `<div class="stepper">${STEPS.map((x, i) => `<div class="step ${STEPS.indexOf(st) >= i ? 'done' : ''} ${x === st ? 'current' : ''}"><span>${i + 1}</span>${t(`support.status.${x}`)}</div>`).join('<div class="step-line"></div>')}</div>`;
   const targetChip = (tk) => (tk.target_name ? `<a class="sp-target" href="/player/${encodeURIComponent(tk.target_name)}" target="_blank" rel="noopener"><img src="${avatarUrl(tk.target_uuid || tk.target_name, 32)}" alt="">${t('sp.reported')} <b>${esc(tk.target_name)}</b></a>` : '');
+
+  const PN_LBL = (k) => t(`pn.type.${k}`);
+  const pnWhen = (p) => (p.expires_at ? t('sp.pnUntil', { date: esc(fmtDate(p.expires_at)) }) : (['warn', 'kick'].includes(p.type) ? '' : t('sp.pnPerm')));
+  const punishCard = (p, extra = '') => `<div class="sp-pn ${esc(p.type)} ${esc(p.status)}"><span class="sp-pn-type">${esc(PN_LBL(p.type))}</span>
+    <span class="sp-pn-main"><b>${esc(p.reason || '—')}</b><small><span class="mono">#${p.id}</span> · ${esc(fmtDate(p.created_at))}${pnWhen(p) ? ` · ${pnWhen(p)}` : ''} · ${t(`sp.pnSt.${p.status}`)}</small></span>${extra}</div>`;
+  const FIELD_KEYS = ['where', 'steps', 'kind', 'world', 'when', 'evidence', 'area'];
+  const fieldValue = (k, v) => {
+    if (['where', 'kind', 'area'].includes(k)) return esc(t(`sp.opt.${k}.${v}`));
+    if (k === 'evidence') return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v.length > 48 ? `${v.slice(0, 48)}…` : v)}</a>`;
+    if (k === 'when') return esc(v.replace('T', ' '));
+    return esc(v).replace(/\n/g, '<br>');
+  };
+  function infoHtml(tk, staff) {
+    const f = tk.fields || {};
+    const rows = FIELD_KEYS.filter((k) => f[k]).map((k) => `<div class="sp-info-row ${k === 'steps' ? 'wide' : ''}"><span>${t(`sp.f.${k}`)}</span><b>${fieldValue(k, f[k])}</b></div>`).join('');
+    const pn = tk.punishment ? `<div class="sp-info-row wide"><span>${t('sp.f.punishment')}</span>${punishCard(tk.punishment)}</div>` : '';
+    const hist = staff && tk.targetHistory ? `<div class="sp-info-row wide"><span>${t('sp.f.history', { name: esc(tk.target_name || '') })}</span>${tk.targetHistory.length
+      ? `<div class="sp-hist">${tk.targetHistory.map((p) => `<span class="sp-hist-item ${esc(p.type)} ${esc(p.status)}" title="${esc(p.reason || '')}"><b>${esc(PN_LBL(p.type))}</b>${esc(fmtDate(p.created_at).split(' ')[0])}</span>`).join('')}</div>`
+      : `<small class="muted">${t('sp.f.clean')}</small>`}</div>` : '';
+    if (!rows && !pn && !hist) return '';
+    let open = true;
+    try { open = localStorage.getItem('mctl-sp-info') !== '0'; } catch { /* storage blocked */ }
+    return `<details class="sp-info-box" ${open ? 'open' : ''}><summary>${t('sp.f.details')}</summary><div class="sp-info">${rows}${pn}${hist}</div></details>`;
+  }
+  function eventText(m) {
+    let d = {};
+    try { d = JSON.parse(m.body) || {}; } catch { /* old row */ }
+    const name = `<b>${esc(m.author_name || '—')}</b>`;
+    let s = t(`sp.ev.${d.e}`, { name, value: d.value ? t(`sp.prio.${d.value}`) : '', id: d.punishment || '' });
+    if (d.note) s += `<em>「${esc(d.note)}」</em>`;
+    return { s, e: d.e || '' };
+  }
 
   // ================================================================ image picker (chips + paste + drag)
   function attachPicker(form, { dropArea } = {}) {
@@ -98,14 +133,19 @@
     if (m.kind === 'status') {
       return `<div class="sp-sys" data-id="${m.id}"><span>${svg(IC.status, 14)}${t('sp.statusChanged', { name: esc(m.author_name || '—'), status: `<b class="st-${esc(m.body)}">${t(`support.status.${m.body}`)}</b>` })}</span><time>${esc(fmtClock(m.created_at))}</time></div>`;
     }
+    if (m.kind === 'event') {
+      const ev = eventText(m);
+      return `<div class="sp-sys ev ${esc(ev.e)}" data-id="${m.id}"><span>${svg(ev.e.startsWith('appeal') ? IC.check : IC.bolt, 14)}${ev.s}</span><time>${esc(fmtClock(m.created_at))}</time></div>`;
+    }
     const mine = staffView ? !!m.is_staff : m.author_id === viewerId;
-    const cont = prev && prev.kind !== 'status' && prev.author_id === m.author_id && m.created_at - prev.created_at < GROUP_MS
+    const note = m.kind === 'note';
+    const cont = prev && !['status', 'event'].includes(prev.kind) && (prev.kind === 'note') === note && prev.author_id === m.author_id && m.created_at - prev.created_at < GROUP_MS
       && dayKey(prev.created_at) === dayKey(m.created_at);
     const imgs = m.attachments.length ? `<div class="sp-imgs n${Math.min(m.attachments.length, 3)}">${m.attachments.map((a) => `<a class="msg-img" href="/api/support/attachments/${a.id}" target="_blank" rel="noopener"><img class="thumb" src="/api/support/attachments/${a.id}" alt="${esc(a.orig_name || '')}" loading="lazy"></a>`).join('')}</div>` : '';
-    return `<div class="sp-msg ${mine ? 'mine' : ''} ${m.is_staff ? 'staff' : ''} ${cont ? 'cont' : ''}" data-id="${m.id}">
+    return `<div class="sp-msg ${mine ? 'mine' : ''} ${m.is_staff ? 'staff' : ''} ${note ? 'note' : ''} ${cont ? 'cont' : ''}" data-id="${m.id}">
       ${cont ? '<span class="sp-av-gap"></span>' : `<img class="sp-av" src="${discordAvatar(m.author_id, m.author_avatar)}" alt="">`}
       <div class="sp-bubble-wrap">
-        ${cont ? '' : `<div class="sp-meta"><b>${esc(m.author_name || m.author_id)}</b>${m.is_staff ? `<span class="sp-badge">${svg(IC.check, 11)}${t('support.staff')}</span>` : ''}<time title="${esc(fmtDate(m.created_at))}">${esc(fmtClock(m.created_at))}</time></div>`}
+        ${cont ? '' : `<div class="sp-meta"><b>${esc(m.author_name || m.author_id)}</b>${m.is_staff ? `<span class="sp-badge">${svg(IC.check, 11)}${t('support.staff')}</span>` : ''}${note ? `<span class="sp-badge note">${svg(IC.lock, 11)}${t('sp.noteBadge')}</span>` : ''}<time title="${esc(fmtDate(m.created_at))}">${esc(fmtClock(m.created_at))}</time></div>`}
         <div class="sp-bubble">${nl2br(m.body)}${imgs}</div>
       </div>
     </div>`;
@@ -139,14 +179,16 @@
     function headHtml(x) {
       return `<div class="sp-head-main">${catIcon(x.category, 24)}
         <div class="sp-head-text">
-          <div class="sp-head-meta"><span class="mono">#${x.id}</span><span>${catLabel(x.category)}</span>${opts.staff ? `<span>${esc(x.username || x.user_id)}</span>` : ''}<span>${esc(fmtDate(x.created_at))}</span></div>
+          <div class="sp-head-meta"><span class="mono">#${x.id}</span><span>${catLabel(x.category)}</span>${opts.staff ? `<span>${esc(x.username || x.user_id)}</span>` : ''}<span>${esc(fmtDate(x.created_at))}</span>${x.priority && x.priority !== 'normal' ? `<span class="sp-prio ${esc(x.priority)}">${t(`sp.prio.${x.priority}`)}</span>` : ''}${opts.staff && x.assigned_name ? `<span class="sp-assignee">${svg(IC.user, 12)}${esc(x.assigned_name)}</span>` : ''}</div>
           <h2>${esc(x.title)}</h2>
           <div class="sp-head-row">${stepper(x.status)}${targetChip(x)}</div>
+          ${infoHtml(x, opts.staff)}
         </div>
         ${opts.headExtra ? `<div class="sp-head-extra">${opts.headExtra(x)}</div>` : ''}</div>`;
     }
     const refreshHead = () => {
       $('.sp-head', root).innerHTML = headHtml(tk);
+      $('.sp-info-box', root)?.addEventListener('toggle', (e) => { try { localStorage.setItem('mctl-sp-info', e.target.open ? '1' : '0'); } catch { /* storage blocked */ } });
       opts.bindHead?.(root, tk, reloadAll);
       drawComposer();
     };
@@ -185,6 +227,7 @@
         <div class="sp-tray" hidden></div>
         <div class="sp-input">
           <button type="button" class="sp-icon-btn" data-pick title="${t('support.addImages')}">${svg(IC.clip, 18)}</button>
+          ${opts.staff && tk.user_id !== user.id ? `<button type="button" class="sp-icon-btn sp-note-btn" data-note title="${t('sp.noteToggle')}">${svg(IC.lock, 18)}</button>` : ''}
           <textarea name="body" rows="1" maxlength="4000" placeholder="${t(opts.staff ? 'sp.replyStaffPh' : 'sp.replyPh')}"></textarea>
           <button class="sp-send" title="${t('support.send')} (Ctrl+Enter)">${svg(IC.send, 18)}</button>
         </div>
@@ -202,6 +245,11 @@
         const b = e.target.closest('[data-tpl]');
         if (b) { ta.value = ta.value ? `${ta.value}\n${opts.templates[b.dataset.tpl]}` : opts.templates[b.dataset.tpl]; ta.dispatchEvent(new Event('input')); ta.focus(); }
         if (e.target.closest('[data-tpl-edit]')) opts.manageTemplates();
+        if (e.target.closest('[data-note]')) {
+          const on = form.classList.toggle('noting');
+          ta.placeholder = t(on ? 'sp.notePh' : 'sp.replyStaffPh');
+          ta.focus();
+        }
       });
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -209,6 +257,7 @@
         if (!text) { ta.focus(); return; }
         const fd = new FormData();
         fd.append('body', text);
+        if (form.classList.contains('noting')) fd.append('note', '1');
         picker.files().forEach((f) => fd.append('files', f));
         sendBtn.disabled = true;
         sendBtn.classList.add('sending');
@@ -229,7 +278,8 @@
       if (!alive || (!force && document.hidden)) return;
       try {
         const d = await request(`/api/support/tickets/${tk.id}?since=${lastId}`);
-        if (d.ticket.status !== tk.status || d.ticket.target_name !== tk.target_name) { tk = d.ticket; refreshHead(); }
+        const sig = (x) => [x.status, x.target_name, x.priority, x.assigned_to, x.punishment?.status].join('|');
+        if (sig(d.ticket) !== sig(tk)) { tk = d.ticket; refreshHead(); }
         tk = d.ticket;
         if (d.messages.length) {
           const wasBottom = append(d.messages, true);
@@ -268,6 +318,7 @@
   function previewText(x, staffView) {
     const l = x.last;
     if (!l) return '';
+    if (l.kind === 'event') return `<span class="muted">${eventText({ body: l.body, author_name: l.author }).s.replace(/<[^>]+>/g, '')}</span>`;
     if (l.kind === 'status') return `<span class="muted">${t('sp.statusTo', { status: t(`support.status.${l.body}`) })}</span>`;
     const who = staffView ? (l.staff ? t('sp.you') : esc(l.author || '')) : (l.staff ? t('support.staff') : t('sp.you'));
     return `<b>${who}：</b>${esc(l.body.replace(/\s+/g, ' '))}`;
@@ -347,7 +398,8 @@
     function showNew() {
       stop();
       root.onclick = null;
-      const cats = ['bug', 'appeal', 'report', 'other'];
+      const cats = ['bug', 'appeal', 'report', 'suggest', 'other'];
+      const chips = (k, vals) => `<div class="sp-chips">${vals.map((v, i) => `<label><input type="radio" name="${k}" value="${v}" ${i === 0 ? 'checked' : ''}><span>${t(`sp.opt.${k}.${v}`)}</span></label>`).join('')}</div>`;
       root.innerHTML = `
         <a href="#" class="link-more back-link" data-back>${t('support.back')}</a>
         <div class="sp-new">
@@ -361,6 +413,19 @@
               <div class="sp-player-input"><img alt="" src="/heads/avatar/MHF_Steve/64.png"><input class="input mono" name="target" maxlength="16" placeholder="${t('sp.targetPh')}" autocomplete="off"><span class="sp-check"></span></div>
               <small class="muted">${t('sp.targetHint')}</small>
             </div>
+            <div class="sp-extra" data-cat="appeal" hidden>
+              <div class="sp-field"><label>${t('sp.f.pickPunishment')} <em>*</em></label><div class="sp-pn-pick"><div class="skeleton" style="height:64px;border-radius:14px"></div></div></div></div>
+            <div class="sp-extra" data-cat="report" hidden>
+              <div class="sp-field"><label>${t('sp.f.kind')}</label>${chips('kind', ['hack', 'abuse', 'grief', 'spam', 'bug', 'other'])}</div>
+              <div class="sp-row2">
+                <div class="sp-field"><label>${t('sp.f.world')}</label><input class="input" name="world" maxlength="40" placeholder="${t('sp.f.worldPh')}"></div>
+                <div class="sp-field"><label>${t('sp.f.when')}</label><input class="input" type="datetime-local" name="when"></div></div>
+              <div class="sp-field"><label>${t('sp.f.evidence')}</label><input class="input" name="evidence" maxlength="300" placeholder="https://youtu.be/…"><small class="muted">${t('sp.f.evidenceHint')}</small></div></div>
+            <div class="sp-extra" data-cat="bug">
+              <div class="sp-field"><label>${t('sp.f.where')}</label>${chips('where', ['web', 'discord', 'game', 'other'])}</div>
+              <div class="sp-field"><label>${t('sp.f.steps')}</label><textarea class="input" name="steps" rows="3" maxlength="1000" placeholder="${t('sp.f.stepsPh')}"></textarea></div></div>
+            <div class="sp-extra" data-cat="suggest" hidden>
+              <div class="sp-field"><label>${t('sp.f.area')}</label>${chips('area', ['web', 'game', 'discord', 'other'])}</div></div>
             <div class="sp-field"><label>${t('support.subject')} <em>*</em><span class="sp-count" data-for="title">0/100</span></label><input class="input" name="title" maxlength="100" placeholder="${t('sp.titlePh')}"></div>
             <div class="sp-field"><label>${t('support.body')} <em>*</em><span class="sp-count" data-for="body">0/4000</span></label><textarea class="input" name="body" rows="6" maxlength="4000" placeholder="${t('support.bodyPh')}"></textarea></div>
             <div class="sp-field"><label>${t('sp.images')}</label>
@@ -377,7 +442,22 @@
         tips.classList.remove('in'); void tips.offsetWidth; tips.classList.add('in');
         tips.innerHTML = `${catIcon(c, 26)}<h3>${t(`sp.tip.${c}.t`)}</h3><ul>${t(`sp.tip.${c}.list`).split('|').map((x) => `<li>${svg(IC.check, 14)}<span>${esc(x)}</span></li>`).join('')}</ul><p class="muted">${t('sp.tipFoot')}</p>`;
         $('.sp-target-field', form).hidden = c !== 'report';
+        $$('.sp-extra', form).forEach((x) => { x.hidden = x.dataset.cat !== c; });
+        if (c === 'appeal') loadPunishments();
       };
+      let pnLoaded = false;
+      async function loadPunishments() {
+        if (pnLoaded) return;
+        pnLoaded = true;
+        const box = $('.sp-pn-pick', form);
+        try {
+          const { punishments } = await request('/api/support/my-punishments');
+          const usable = punishments.filter((p) => p.status === 'active' || p.type === 'warn');
+          box.innerHTML = usable.length ? usable.map((p, i) => `<label class="sp-pn-opt ${p.appealing ? 'off' : ''}"><input type="radio" name="punishment" value="${p.id}" ${p.appealing ? 'disabled' : ''} ${i === usable.findIndex((x) => !x.appealing) ? 'checked' : ''}>
+            ${punishCard(p, p.appealing ? `<span class="sp-pn-tag">${t('sp.pnAppealing')}</span>` : '')}</label>`).join('')
+            : `<div class="sp-pn-none">${svg(IC.check, 18)}<span>${t('sp.pnNone')}</span></div>`;
+        } catch (err) { pnLoaded = false; box.innerHTML = `<div class="sp-pn-none">${esc(err.message)}</div>`; }
+      }
       drawTips('bug');
       form.addEventListener('change', (e) => { if (e.target.name === 'category') drawTips(e.target.value); });
       $$('[data-back]', root).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); location.hash = ''; }));
@@ -415,6 +495,8 @@
         const cat = form.category.value;
         const fail = (el, key) => { toast(t(key), 'err'); el.focus(); el.closest('.sp-field').classList.remove('shake'); void el.offsetWidth; el.closest('.sp-field').classList.add('shake'); };
         if (cat === 'report' && (!tInput.value.trim() || tCheck.classList.contains('bad'))) return fail(tInput, 'error.invalid_target');
+        if (cat === 'appeal' && !form.querySelector('[name=punishment]:checked')) return fail($('.sp-pn-pick', form), 'error.invalid_punishment');
+        if (cat === 'report' && form.evidence.value.trim() && !/^https?:\/\//.test(form.evidence.value.trim())) return fail(form.evidence, 'error.invalid_evidence');
         if (!form.title.value.trim()) return fail(form.title, 'error.invalid_title');
         if (!form.body.value.trim()) return fail(form.body, 'error.invalid_body');
         const fd = new FormData();
@@ -422,6 +504,8 @@
         fd.append('title', form.title.value.trim());
         fd.append('body', form.body.value.trim());
         if (cat === 'report') fd.append('target', tInput.value.trim());
+        const extra = { bug: ['where', 'steps'], report: ['kind', 'world', 'when', 'evidence'], suggest: ['area'], appeal: ['punishment'] }[cat] || [];
+        extra.forEach((k) => { const v = new FormData(form).get(k); if (v) fd.append(k, String(v).trim()); });
         form._files?.().forEach((f) => fd.append('files', f));
         const btn = $('.sp-submit', form);
         btn.disabled = true;

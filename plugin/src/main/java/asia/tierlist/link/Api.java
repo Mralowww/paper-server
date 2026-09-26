@@ -51,6 +51,21 @@ final class Api {
         return JsonParser.parseString(res.body()).getAsJsonObject();
     }
 
+    JsonObject get(String path) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + path))
+                .timeout(timeout)
+                .header("Accept", "application/json")
+                .header("User-Agent", userAgent)
+                .header("X-API-Key", key)
+                .GET()
+                .build();
+        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() / 100 != 2) {
+            throw new IllegalStateException("HTTP " + res.statusCode() + ": " + res.body());
+        }
+        return JsonParser.parseString(res.body()).getAsJsonObject();
+    }
+
     int health() throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + "/api/health")).timeout(timeout)
                 .header("User-Agent", userAgent).GET().build();
