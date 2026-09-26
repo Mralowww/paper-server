@@ -532,3 +532,5 @@ Object.assign(window.I18N.en, {
   "act.r.keyCreate": "Created API key", "act.r.keyDelete": "Deleted API key", "act.r.lookup": "Looked up player", "act.r.refreshAll": "Refreshed all links",
   "act.r.punish": "Added punishment", "act.r.pluginLogin": "Player join check", "act.r.logout": "Signed out",
 });
+Object.assign(window.I18N.zh, { "act.punish.import": "匯入舊懲處紀錄" });
+Object.assign(window.I18N.en, { "act.punish.import": "Imported punishment history" });

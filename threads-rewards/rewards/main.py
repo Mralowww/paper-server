@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -38,6 +38,10 @@ async def lifespan(_: FastAPI):
     db.conn()
     activity.ensure_schema()
     activity.prune()
+    try:
+        importer.run()
+    except Exception:  # noqa: BLE001
+        logging.exception("AdvancedBan 匯入失敗")
     background = [asyncio.create_task(tasks.scheduler()), asyncio.create_task(bot.start()),
                   asyncio.create_task(_backfill_linked_role())]
     yield
