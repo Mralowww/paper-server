@@ -4,7 +4,7 @@ import logging
 import discord
 from discord import app_commands
 
-from . import config, db, tasks
+from . import config, db, tasks, tickets
 
 log = logging.getLogger("rewards.bot")
 GOLD = 0xF5C542
@@ -18,12 +18,18 @@ class RewardsBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self) -> None:
-        register(self.tree)
-        if config.DISCORD_GUILD_ID:
-            guild = discord.Object(id=int(config.DISCORD_GUILD_ID))
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
         tasks.announce_hook = self.announce
+        register(self.tree)
+        # 只同步到指定伺服器（伺服器指令），不會覆蓋這個應用程式原有的全域指令
+        if config.DISCORD_GUILD_ID:
+            try:
+                guild = discord.Object(id=int(config.DISCORD_GUILD_ID))
+                self.tree.copy_global_to(guild=guild)
+                self.tree.clear_commands(guild=None)
+                await self.tree.sync(guild=guild)
+            except Exception:  # noqa: BLE001
+                log.exception("同步斜線指令失敗")
+        tickets.notify_hook = self.notify_ticket
 
     async def on_ready(self) -> None:
         log.info("機器人已登入：%s", self.user)
@@ -31,10 +37,10 @@ class RewardsBot(discord.Client):
             type=discord.ActivityType.watching, name="Threads 推廣排行"))
 
     async def announce(self, start, end, winners: list[dict]) -> None:
-        if not config.ANNOUNCE_CHANNEL_ID:
+        channel_id = config.setting_or_env("announce_channel_id", config.ANNOUNCE_CHANNEL_ID)
+        if not channel_id:
             return
-        channel = self.get_channel(int(config.ANNOUNCE_CHANNEL_ID)) or \
-            await self.fetch_channel(int(config.ANNOUNCE_CHANNEL_ID))
+        channel = self.get_channel(int(channel_id)) or await self.fetch_channel(int(channel_id))
         s = db.settings()
         tz = config.TIMEZONE
         embed = discord.Embed(
@@ -52,6 +58,27 @@ class RewardsBot(discord.Client):
                 inline=False,
             )
         await channel.send(embed=embed)
+
+
+    CATEGORY = {"report": ("檢舉玩家", 0xE5534B), "bug": ("問題回報", 0xE8883A), "connection": ("連線問題", 0x4C8EDA),
+                "sponsor": ("贊助", 0xD9B44A), "appeal": ("懲處申訴", 0x9B7BD4), "other": ("其他", 0x8A9098)}
+
+    async def notify_ticket(self, ticket: dict, event: str, message: str) -> None:
+        channel_id = config.setting_or_env("ticket_channel_id", config.TICKET_CHANNEL_ID)
+        if not channel_id or not self.is_ready():
+            return
+        try:
+            channel = self.get_channel(int(channel_id)) or await self.fetch_channel(int(channel_id))
+            name, color = self.CATEGORY.get(ticket["category"], ("支援單", 0x97C8C7))
+            title = f"{'🆕 新支援單' if event == 'new' else '💬 玩家回覆'} #{ticket['id']} · {name}"
+            embed = discord.Embed(title=title, url=f"{config.PUBLIC_URL}/ticket?id={ticket['id']}",
+                                  description=f"**{ticket['subject']}**\n{message[:500]}", color=color)
+            embed.set_footer(text=f"來自 {ticket.get('author', '')} · <@{ticket['user_id']}>")
+            if ticket.get("target"):
+                embed.add_field(name="檢舉對象", value=ticket["target"])
+            await channel.send(embed=embed)
+        except Exception:  # noqa: BLE001
+            log.exception("支援單通知失敗")
 
 
 def board_embed(title: str, rows: list[dict]) -> discord.Embed:

@@ -178,6 +178,7 @@
   const observe = (root = document) => {
     $$(".reveal, .reveal-l, .reveal-s", root).forEach((el, i) => { if (!el.classList.contains("in")) { el.style.transitionDelay = (el.dataset.delay || (i % 6) * 60) + "ms"; revealIO.observe(el); } });
     countAll(root); enhanceSelects(root); applyI18n(root);
+    if (window.ART) $$("[data-ico]", root).forEach((el) => { if (!el.dataset.icoDone) { el.innerHTML = ART.icon(el.dataset.ico, +(el.dataset.size || 16)); el.dataset.icoDone = 1; el.style.display = "inline-flex"; } });
   };
 
   /* ---------- 按鈕波紋 ---------- */
@@ -290,7 +291,8 @@
   }
 
   /* ---------- 導覽列 / 頁尾 ---------- */
-  const LOGO = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="currentColor"/><path d="M6 21 L10 12 L14 21 L18 12 L22 21 L26 12" stroke="#f6f5f1" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/></svg>`;
+  const LOGO = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" style="fill:var(--accent)"/><path d="M6 21 L10 12 L14 21 L18 12 L22 21 L26 12" style="stroke:var(--accent-ink)" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/></svg>`;
+  const THEME_ICON = `<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>`;
   let me = null;
   const mePromise = api("/api/me", { quiet: true }).then((d) => (me = d.user)).catch(() => null);
   function renderNav() {
@@ -299,9 +301,12 @@
     const link = (href, key) => `<a href="${href}" class="${path === href ? "active" : ""}" data-i18n="${key}"></a>`;
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
-      <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-name">${t("brand")}<small>SMP</small></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/news", "nav.news")}${link("/rules", "nav.rules")}${link("/rewards", "nav.rewards")}${me ? link("/links", "nav.links") : ""}${me && me.admin ? link("/admin", "nav.admin") : ""}</nav>
+      <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/news", "nav.news")}${link("/rules", "nav.rules")}${link("/bans", "nav.bans")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
+        <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
+        <button class="btn icon ghost theme-btn" data-theme-toggle aria-label="theme">${THEME_ICON}</button>
+        <button class="btn sm ghost lang-btn" data-lang>${window.ART ? ART.icon("globe", 15) : ""}<span>${lang === "zh" ? "中" : "EN"}</span></button>
         <button class="search-trigger" data-search>🔍 <span class="txt" data-i18n="nav.search"></span><span class="kbd">Ctrl K</span></button>
         ${me ? `<button class="user-chip" data-user-menu data-user='${esc(JSON.stringify({ id: me.id, name: me.name }))}'><span class="avatar-wrap"><img src="${esc(me.avatar)}" alt=""><span class="online-dot"></span></span><span class="nm">${esc(me.name)}</span></button>`
             : `<a class="btn sm btn-discord" href="/login" data-i18n="nav.login"></a>`}
@@ -309,13 +314,23 @@
       </div></div>`;
     $(".menu-btn", nav).addEventListener("click", () => { nav.classList.toggle("open"); sfx("menu"); });
     $("[data-search]", nav).addEventListener("click", openPalette);
+    $("[data-theme-toggle]", nav).addEventListener("click", () => setTheme(theme === "light" ? "dark" : "light"));
+    $("[data-copy-ip]", nav).addEventListener("click", () => copy("sawsmp.me"));
+    $("[data-lang]", nav).addEventListener("click", (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      showCtx(r.left, r.bottom + 8, [{ icon: lang === "zh" ? "✓" : "", label: "中文", act: () => setLang("zh") }, { icon: lang === "en" ? "✓" : "", label: "English", act: () => setLang("en") }]);
+      e.stopPropagation();
+    });
     const um = $("[data-user-menu]", nav);
     if (um) um.addEventListener("click", (e) => {
       const r = um.getBoundingClientRect();
       showCtx(r.right - 210, r.bottom + 8, [
         { head: me.name },
-        { icon: "👤", label: t("nav.links"), act: () => go("/links") },
-        ...(me.admin ? [{ icon: "🛡️", label: t("nav.admin"), act: () => go("/admin") }] : []),
+        { icon: "👤", label: t("nav.account"), act: () => go("/account") },
+        { icon: "💬", label: t("nav.support"), act: () => go("/support") },
+        { icon: "🔗", label: t("nav.links"), act: () => go("/links") },
+        ...(me.mc ? [{ icon: "⛏", label: t("nav.myProfile"), act: () => go("/player?name=" + encodeURIComponent(me.mc.name)) }] : []),
+        ...(me.level >= 1 ? [{ icon: "🛡️", label: t("nav.admin"), act: () => go("/admin") }] : []),
         { icon: "⚙️", label: t("nav.settings"), act: () => go("/settings") },
         { sep: true },
         { icon: "⎋", label: t("nav.logout"), danger: true, act: async () => { await api("/auth/logout", { method: "POST" }); go("/"); } },
@@ -336,8 +351,8 @@
     f.innerHTML = `<div class="container">
       <div class="foot-brand"><a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-name">${t("brand")}<small>SMP</small></span></a><span>${t("footer.tag")}</span><span class="mono">sawsmp.me</span></div>
       <div class="foot-links">
-        <div><b>${t("footer.server")}</b><a href="/news">${t("nav.news")}</a><a href="/rules">${t("nav.rules")}</a><a href="/#join">${t("home.join.title")}</a></div>
-        <div><b>${t("footer.community")}</b><a href="/rewards">${t("nav.rewards")}</a><a href="/links">${t("nav.links")}</a><a href="/settings">${t("nav.settings")}</a></div>
+        <div><b>${t("footer.server")}</b><a href="/news">${t("nav.news")}</a><a href="/rules">${t("nav.rules")}</a><a href="/bans">${t("nav.bans")}</a><a href="/#join">${t("home.join.title")}</a></div>
+        <div><b>${t("footer.community")}</b><a href="/support">${t("nav.support")}</a><a href="/rewards">${t("nav.rewards")}</a><a href="/account">${t("nav.account")}</a><a href="/settings">${t("nav.settings")}</a></div>
       </div>
       <div class="copy"><span>© ${new Date().getFullYear()} ${t("brand")} SMP · ${t("footer")}</span><span class="mono">sawsmp.me</span></div></div>`;
     applyI18n(f);
@@ -417,8 +432,8 @@
   let paletteOpen = false;
   function openPalette() {
     if (paletteOpen) return; paletteOpen = true; sfx("popup");
-    const pages = [["/", "nav.home", "🏠"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
-    if (me && me.admin) pages.splice(5, 0, ["/admin", "nav.admin", "🛡️"]);
+    const pages = [["/", "nav.home", "🏠"], ["/rankings", "nav.rankings", "🏆"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/bans", "nav.bans", "⚖️"], ["/support", "nav.support", "💬"], ["/account", "nav.account", "👤"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
+    if (me && me.level >= 1) pages.splice(5, 0, ["/admin", "nav.admin", "🛡️"]);
     const o = openOverlay(`<div class="modal palette"><input class="input" data-i18n-ph="nav.search" autocomplete="off"><div class="palette-results"></div></div>`, { onClose: () => (paletteOpen = false) });
     const input = $("input", o.el); const res = $(".palette-results", o.el);
     let results = []; let sel = 0; let timer;
@@ -426,7 +441,7 @@
       const ql = q.toLowerCase();
       const pg = pages.filter(([, k]) => !ql || t(k).toLowerCase().includes(ql));
       results = [...pg.map(([h, k, ic]) => ({ go: h, html: `<span>${ic}</span><span>${esc(t(k))}</span><small>${h}</small>`, grp: "pages" })),
-        ...users.map((u) => ({ copy: u.name, html: `<img src="${esc(u.avatar)}" alt=""><span>${esc(u.name)}</span><small>@${esc(u.username)}</small>`, grp: "users" })),
+        ...users.map((u) => ({ go: "/player?name=" + encodeURIComponent(u.name), html: `<img src="${mcHead(u.uuid, 32)}" alt="" style="border-radius:5px;image-rendering:pixelated"><span>${esc(u.name)}</span><small>${u.online ? "● " + t("home.online") : ""}</small>`, grp: "users" })),
         ...links.map((l) => ({ open: l.url, html: `${px("heart", 14)}<span>@${esc(l.author)}</span><small>${esc(l.content || l.url)}</small>`, grp: "links" }))];
       sel = Math.min(sel, Math.max(0, results.length - 1));
       let last = ""; let html = "";
@@ -434,7 +449,7 @@
       res.innerHTML = html || `<div class="empty">${t("noResult")}</div>`;
     };
     const pick = (r) => { if (!r) return; o.close(true); if (r.go) go(r.go); else if (r.open) window.open(r.open, "_blank", "noopener"); else if (r.copy) copy(r.copy); };
-    input.addEventListener("input", () => { clearTimeout(timer); const q = input.value.trim(); draw([], [], q); if (q) timer = setTimeout(async () => { try { const d = await api("/api/search?q=" + encodeURIComponent(q), { quiet: true }); if (input.value.trim() === q) draw(d.users, d.links, q); } catch { /* 忽略 */ } }, 220); });
+    input.addEventListener("input", () => { clearTimeout(timer); const q = input.value.trim(); draw([], [], q); if (q) timer = setTimeout(async () => { try { const d = await api("/api/players?limit=8&q=" + encodeURIComponent(q), { quiet: true }); if (input.value.trim() === q) draw(d.players, [], q); } catch { /* 忽略 */ } }, 220); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); sel = (sel + (e.key === "ArrowDown" ? 1 : -1) + results.length) % Math.max(1, results.length); $$(".res", res).forEach((el, i) => el.classList.toggle("sel", i === sel)); $(".res.sel", res)?.scrollIntoView({ block: "nearest" }); sfx("tick"); }
       if (e.key === "Enter") { e.preventDefault(); pick(results[sel]); }
@@ -452,6 +467,35 @@
     } else if (e.key === "Escape") { hideCtx(); if (overlays.length) overlays[overlays.length - 1](); }
   });
 
+  /* ---------- 主題 ---------- */
+  let theme = store.get("theme", "dark");
+  document.documentElement.dataset.theme = theme;
+  function setTheme(v) {
+    theme = v; store.set("theme", v); document.documentElement.dataset.theme = v;
+    sfx(v === "light" ? "toggleOn" : "toggleOff"); document.dispatchEvent(new CustomEvent("themechange"));
+  }
+
+  /* ---------- Minecraft / 支援單 / 懲處 共用 ---------- */
+  const mcHead = (id, size = 64) => `https://mc-heads.net/avatar/${encodeURIComponent(id || "MHF_Steve")}/${size}`;
+  const CATS = {
+    report: { icon: "⚑" }, bug: { icon: "⚙" }, connection: { icon: "⌁" }, sponsor: { icon: "✦" }, appeal: { icon: "⚖" }, other: { icon: "…" },
+  };
+  const PTYPES = ["ban", "mute", "warn", "kick", "ipban"];
+  const catTag = (c) => `<span class="tag cat" data-cat="${c}">${t("cat." + c)}</span>`;
+  const ptTag = (p, active = true) => `<span class="tag pt ${active ? "" : "inactive"}" data-pt="${p}">${t("pt." + p)}</span>`;
+  function dur(sec) {
+    if (sec == null) return t("pt.permanent");
+    const units = [["d", 86400], ["h", 3600], ["m", 60]]; let out = "";
+    for (const [u, n] of units) { const v = Math.floor(sec / n); if (v) { out += v + u + " "; sec -= v * n; } }
+    return out.trim() || "<1m";
+  }
+  function parseDur(text) {
+    const m = String(text).toLowerCase().match(/(\d+)\s*(mo|y|w|d|h|m|s)/g); if (!m) return null;
+    const mult = { s: 1, m: 60, h: 3600, d: 86400, w: 604800, mo: 2592000, y: 31536000 };
+    return m.reduce((a, part) => { const [, n, u] = part.match(/(\d+)\s*(mo|y|w|d|h|m|s)/); return a + n * mult[u]; }, 0);
+  }
+  const remaining = (iso) => iso ? dur(Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000))) : t("pt.permanent");
+
   /* ---------- 減少動畫 ---------- */
   if (store.get("motion", false)) document.documentElement.dataset.motion = "reduce";
 
@@ -467,5 +511,6 @@
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress,
     fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, mePromise,
+    setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,
   };
 })();

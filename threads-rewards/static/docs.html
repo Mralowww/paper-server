@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>開發者 API · 鋸齒 SMP</title>
+<meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<meta name="theme-color" content="#0c0f11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%2397c8c7'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%230b1716' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page grid-bg">
+  <div class="container docs" style="max-width:900px">
+    <div class="section-head reveal"><div><span class="eyebrow-text" style="color:var(--accent)">DEVELOPERS</span><h2 data-i18n="docs.title"></h2><p class="muted" data-i18n="docs.sub"></p></div><a class="btn gold" href="/account#dev" data-i18n="acc.devKeys"></a></div>
+    <div class="card reveal"><h3 data-i18n="docs.auth"></h3><p class="muted" data-i18n="docs.auth.d"></p>
+<pre><code>curl -H "X-API-Key: saw_xxxxxxxx" https://&lt;host&gt;/api/v1/leaderboard?sort=kills</code></pre></div>
+    <div class="card reveal section tight"><h3>Endpoints</h3>
+      <p><span class="method">GET</span><code>/api/v1/players/{name}</code> — <span data-i18n="docs.e1"></span></p>
+      <p><span class="method">GET</span><code>/api/v1/leaderboard?sort=kills|kdr|wins|winrate|streak|playtime&amp;limit=50</code> — <span data-i18n="docs.e2"></span></p>
+      <p><span class="method">GET</span><code>/api/v1/punishments/{name}</code> — <span data-i18n="docs.e3"></span></p>
+<pre><code>{
+  "player": { "uuid": "069a79f4-…", "name": "Notch", "online": false },
+  "stats": { "kills": 14, "deaths": 15, "kdr": 0.93, "wins": 14, "losses": 9, "winrate": 60.9, "tier": { "name": "戰鬥新手" } },
+  "rank": 3, "methods": [ { "method": "crystal", "count": 7 } ], "matches": [ … ], "rivals": [ … ]
+}</code></pre></div>
+    <div class="card reveal section tight"><h3 data-i18n="docs.errors"></h3>
+      <p><code>401 missing_api_key</code> · <code>401 invalid_api_key</code> · <code>404 not_found</code></p></div>
+    <div class="card reveal section tight"><h3 data-i18n="docs.plugin"></h3><p class="muted" data-i18n="docs.plugin.d"></p>
+      <p><span class="method post">POST</span><code>/api/plugin/login</code> <code>{uuid, name, ip}</code></p>
+      <p><span class="method post">POST</span><code>/api/plugin/heartbeat</code> <code>{online:[{uuid,name}]}</code> → <code>{actions}</code></p>
+      <p><span class="method post">POST</span><code>/api/plugin/actions/ack</code> <code>{ids}</code></p>
+      <p><span class="method post">POST</span><code>/api/plugin/kill</code> <code>{killer, victim, method}</code></p>
+      <p><span class="method post">POST</span><code>/api/plugin/match</code> <code>{winner, loser, winner_score, loser_score, world}</code></p>
+      <p><span class="method post">POST</span><code>/api/plugin/punish</code> · <code>/api/plugin/revoke</code> · <code>/api/plugin/link</code></p>
+      <p><span class="method">GET</span><code>/api/plugin/permissions/{uuid}</code> → <code>{allow, deny}</code></p></div>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/art.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/docs.js"></script>
+</body>
+</html>

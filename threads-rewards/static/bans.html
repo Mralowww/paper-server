@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>公告 · 鋸齒 SMP</title>
+<title>懲處公示 · 鋸齒 SMP</title>
 <meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
 <script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <meta name="theme-color" content="#0c0f11">
@@ -13,17 +13,19 @@
 <body>
 <div id="topbar"></div>
 <header id="nav"></header>
-<main class="page">
-  <div class="container" style="max-width:860px">
-    <div class="section-head reveal"><div><span class="eyebrow-text">News</span><h1 style="font-size:clamp(40px,7vw,64px)" data-i18n="news.title"></h1><p class="muted" data-i18n="news.sub"></p></div></div>
-    <hr class="rule" style="margin-bottom:28px">
-    <div id="news"><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div></div>
+<main class="page grid-bg">
+  <div class="container">
+    <div class="section-head reveal"><div><span class="eyebrow-text">Punishments</span><h2 data-i18n="bans.title"></h2><p class="muted" data-i18n="bans.sub"></p></div></div>
+    <div class="grid" id="counts" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px"></div>
+    <div class="row" style="margin-bottom:12px"><div class="seg" id="types"></div><input class="input" id="q" data-i18n-ph="bans.search" style="max-width:260px;margin-left:auto"></div>
+    <div class="card" style="padding:6px 16px"><div id="list"><div class="skeleton sk-row" style="margin:10px 0"></div></div></div>
+    <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" id="more" hidden data-i18n="bans.more"></button></div>
   </div>
 </main>
 <footer id="footer"></footer>
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/art.js"></script>
 <script src="/static/js/core.js"></script>
-<script src="/static/js/news.js"></script>
+<script src="/static/js/bans.js"></script>
 </body>
 </html>

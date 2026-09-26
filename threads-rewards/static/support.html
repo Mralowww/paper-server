@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客服 · 鋸齒 SMP</title>
+<meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<meta name="theme-color" content="#0c0f11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%2397c8c7'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%230b1716' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page grid-bg">
+  <div class="container">
+    <div id="list-view" hidden>
+      <div class="section-head reveal">
+        <div><span class="eyebrow-text" style="color:var(--accent)">SUPPORT</span><h2 data-i18n="sup.title"></h2><p class="muted" data-i18n="sup.sub"></p></div>
+        <a class="btn gold" href="/support?new=1"><span data-ico="plus"></span><span data-i18n="sup.new"></span></a>
+      </div>
+      <div class="card reveal" style="padding:8px 0"><div id="mine"><div class="skeleton sk-row" style="margin:12px"></div></div></div>
+    </div>
+    <div id="new-view" hidden>
+      <a class="btn sm ghost" href="/support" style="margin-bottom:14px">← <span data-i18n="sup.back"></span></a>
+      <div class="support-grid">
+        <form class="card reveal" id="new-form" autocomplete="off" style="padding:28px">
+          <span class="eyebrow-text" style="color:var(--accent)">SUPPORT</span>
+          <h2 style="font-family:var(--font-body);font-weight:800;margin:6px 0 22px" data-i18n="sup.new"></h2>
+          <div class="field"><label data-i18n="tk.category"></label><div class="cat5" id="cats"></div></div>
+          <div id="extra" class="stack" style="gap:18px;margin-top:22px"></div>
+          <div class="stack" style="gap:18px;margin-top:18px">
+            <div class="field"><label><span data-i18n="sup.subject"></span><span class="req">*</span></label><input class="input" name="subject" maxlength="120" required></div>
+            <div class="field"><label><span data-i18n="sup.body"></span><span class="req">*</span></label><textarea class="input" name="body" rows="6" data-i18n-ph="sup.bodyPh" required></textarea></div>
+            <div class="row" style="justify-content:space-between">
+              <div class="row"><label class="btn sm" style="cursor:pointer"><span data-ico="clip"></span><span data-i18n="sup.attach"></span><input type="file" accept="image/*" multiple hidden id="files"></label><div class="att-preview" id="preview"></div></div>
+              <button class="btn gold" type="submit" id="submit"><span data-ico="send"></span><span data-i18n="sup.submit"></span></button>
+            </div>
+            <div class="composer-note" data-i18n="sup.note"></div>
+          </div>
+        </form>
+        <aside class="card hint-card reveal-l" id="hint" style="position:sticky;top:84px"></aside>
+      </div>
+    </div>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/art.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/support.js"></script>
+</body>
+</html>

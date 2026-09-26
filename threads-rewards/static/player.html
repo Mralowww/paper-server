@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>玩家 · 鋸齒 SMP</title>
+<meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<meta name="theme-color" content="#0c0f11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%2397c8c7'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%230b1716' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page grid-bg">
+  <div class="container">
+    <div class="profile-top reveal">
+      <h1 class="pixel-title" id="pname">…</h1>
+      <div class="seg" id="ptabs">
+        <button data-tab="overview"><span data-ico="user"></span><span data-i18n="pp.overview"></span></button>
+        <button data-tab="stats"><span data-ico="chart"></span><span data-i18n="pp.stats"></span></button>
+        <button data-tab="matches"><span data-ico="history"></span><span data-i18n="pp.matches"></span></button>
+      </div>
+    </div>
+    <div class="profile-grid">
+      <aside class="stack" style="align-items:center">
+        <div class="skin-card reveal-s" style="width:100%"><img id="skin" alt=""></div>
+        <div class="tier-badge" id="tier"><span class="dia"></span><span></span></div>
+        <div class="row" style="justify-content:center">
+          <a class="btn" id="namemc" target="_blank" rel="noopener">NameMC <span data-ico="external"></span></a>
+          <a class="btn" href="/settings"><span data-ico="settings"></span><span data-i18n="nav.settings"></span></a>
+        </div>
+      </aside>
+      <div id="pbody"><div class="card skeleton" style="height:320px"></div></div>
+    </div>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/art.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/player.js"></script>
+</body>
+</html>

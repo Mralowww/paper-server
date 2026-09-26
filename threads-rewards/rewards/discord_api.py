@@ -58,13 +58,15 @@ async def _guild_roles(client: httpx.AsyncClient) -> dict:
 
 
 async def member_status(user_id: str, use_cache: bool = True) -> dict:
-    """回傳 {"member": bool, "admin": bool, "roles": [名稱...]}。
+    """回傳 {"member": bool, "level": 0-3, "admin": bool, "roles": [名稱...]}。
 
-    管理員判定：伺服器擁有者、身分組含 Administrator 或 Manage Server 權限、
-    或身分組在 ADMIN_ROLE_IDS 設定中。結果快取 60 秒。
+    等級：3 超級管理員（擁有者、Administrator / Manage Server 權限、ADMIN_ROLE_IDS）、
+    2 管理員（MOD_ROLE_IDS）、1 客服（SUPPORT_ROLE_IDS）、0 一般成員。結果快取 60 秒。
     """
+    if user_id in config.OWNER_IDS:
+        return {"member": True, "level": 3, "admin": True, "roles": ["Owner"]}
     if not config.DISCORD_BOT_TOKEN or not config.DISCORD_GUILD_ID:
-        return {"member": True, "admin": False, "roles": []}
+        return {"member": True, "level": 0, "admin": False, "roles": []}
     cached = _admin_cache.get(user_id)
     if use_cache and cached and time.time() - cached[0] < 60:
         return cached[1]
@@ -73,7 +75,7 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
         resp = await client.get(f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}",
                                 headers=_bot_headers())
         if resp.status_code == 404:
-            status = {"member": False, "admin": False, "roles": []}
+            status = {"member": False, "level": 0, "admin": False, "roles": []}
         else:
             resp.raise_for_status()
             member = resp.json()
@@ -89,8 +91,9 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
                 or bool(perms & (ADMINISTRATOR | MANAGE_GUILD))
                 or bool(role_ids & config.ADMIN_ROLE_IDS)
             )
+            level = 3 if admin else 2 if role_ids & config.MOD_ROLE_IDS else 1 if role_ids & config.SUPPORT_ROLE_IDS else 0
             names = [guild["roles"][r]["name"] for r in member.get("roles", []) if r in guild["roles"]]
-            status = {"member": True, "admin": admin, "roles": names}
+            status = {"member": True, "level": level, "admin": admin, "roles": names}
     _admin_cache[user_id] = (time.time(), status)
     return status
 
@@ -99,3 +102,60 @@ def avatar_url(user: dict) -> str:
     if user.get("avatar"):
         return f"https://cdn.discordapp.com/avatars/{user['id']}/{user['avatar']}.png?size=128"
     return f"https://cdn.discordapp.com/embed/avatars/{(int(user['id']) >> 22) % 6}.png"
+
+
+# ---------- 懲處同步 / 身分組 ----------
+
+async def guild_roles() -> list[dict]:
+    """伺服器身分組（不含 @everyone），依位置排序。"""
+    if not config.DISCORD_BOT_TOKEN or not config.DISCORD_GUILD_ID:
+        return []
+    async with httpx.AsyncClient(timeout=15) as client:
+        info = await _guild_roles(client)
+    roles = [r for r in info["roles"].values() if r["id"] != config.DISCORD_GUILD_ID and not r.get("managed")]
+    return [{"id": r["id"], "name": r["name"], "color": f"#{r['color']:06x}" if r["color"] else None, "position": r["position"]}
+            for r in sorted(roles, key=lambda r: -r["position"])]
+
+
+async def member_role_ids(user_id: str) -> set[str]:
+    if not config.DISCORD_BOT_TOKEN or not config.DISCORD_GUILD_ID:
+        return set()
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}", headers=_bot_headers())
+    return set(r.json().get("roles", [])) if r.status_code == 200 else set()
+
+
+async def timeout(user_id: str, until_iso: str | None, reason: str = "") -> bool:
+    """禁言 = Discord 逾時（最長 28 天）；until_iso 為 None 代表解除。"""
+    headers = {**_bot_headers(), "X-Audit-Log-Reason": reason[:500].encode("utf-8").decode("latin-1", "ignore")}
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.patch(f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}",
+                               headers=headers, json={"communication_disabled_until": until_iso})
+    return r.status_code < 300
+
+
+async def set_role(user_id: str, role_id: str, add: bool) -> bool:
+    async with httpx.AsyncClient(timeout=15) as client:
+        url = f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}/roles/{role_id}"
+        r = await (client.put(url, headers=_bot_headers()) if add else client.delete(url, headers=_bot_headers()))
+    return r.status_code < 300
+
+
+async def dm(user_id: str, content: str = "", embed: dict | None = None) -> bool:
+    async with httpx.AsyncClient(timeout=15) as client:
+        ch = await client.post(f"{API}/users/@me/channels", headers=_bot_headers(), json={"recipient_id": user_id})
+        if ch.status_code >= 300:
+            return False
+        body = {"content": content} if content else {}
+        if embed:
+            body["embeds"] = [embed]
+        r = await client.post(f"{API}/channels/{ch.json()['id']}/messages", headers=_bot_headers(), json=body)
+    return r.status_code < 300
+
+
+async def send_channel(channel_id: str, embed: dict) -> bool:
+    if not channel_id or not config.DISCORD_BOT_TOKEN:
+        return False
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(f"{API}/channels/{channel_id}/messages", headers=_bot_headers(), json={"embeds": [embed]})
+    return r.status_code < 300

@@ -3,115 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>管理後台 · 鋸齒 SMP</title>
+<title>後台 · 鋸齒 SMP</title>
 <meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
-<meta name="theme-color" content="#f6f5f1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%23161616'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%23f6f5f1' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<meta name="theme-color" content="#0c0f11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%2397c8c7'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%230b1716' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 <div id="topbar"></div>
 <header id="nav"></header>
-<main class="page">
-  <div class="container">
-    <div class="section-head reveal">
-      <div><span class="eyebrow-text">Admin</span><h2 data-i18n="admin.title"></h2><p class="muted" data-i18n="admin.sub"></p></div>
-      <div class="row">
-        <select class="enhance" id="week"></select>
-        <button class="btn" id="refresh-all">⟳ <span data-i18n="admin.refreshAll"></span></button>
-        <button class="btn gold" id="settle"><span data-i18n="admin.settle"></span></button>
-      </div>
+<main class="page grid-bg">
+  <div class="container" style="max-width:1320px">
+    <div class="admin-shell">
+      <aside class="admin-side">
+        <div class="admin-me" id="me-card"><div class="skeleton" style="width:48px;height:48px;border-radius:50%"></div></div>
+        <nav class="admin-nav" id="side"></nav>
+      </aside>
+      <div class="admin-main" id="main"><div class="card skeleton" style="height:320px"></div></div>
     </div>
-
-    <section class="grid grid-4" id="kpis">
-      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="chart"></span><span data-i18n="home.stats.links"></span></span><span class="value" data-k="links">0</span></div>
-      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="user"></span><span data-i18n="home.stats.users"></span></span><span class="value" data-k="users">0</span></div>
-      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="heart"></span><span data-i18n="home.stats.likes"></span></span><span class="value" data-k="likes">0</span></div>
-      <div class="card hover stat reveal"><span class="label"><span class="icon-spin" data-px="star"></span><span data-i18n="admin.errors"></span></span><span class="value" data-k="errors">0</span></div>
-    </section>
-
-    <div class="section">
-      <div class="tabs" id="tabs">
-        <button data-tab="board" data-i18n="admin.tab.board"></button>
-        <button data-tab="links" data-i18n="admin.tab.links"></button>
-        <button data-tab="users" data-i18n="admin.tab.users"></button>
-        <button data-tab="settings" data-i18n="admin.tab.settings"></button>
-        <button data-tab="news" data-i18n="admin.tab.news"></button>
-        <button data-tab="site" data-i18n="admin.tab.site"></button>
-      </div>
-      <span class="tag ok" id="settled-tag" hidden style="margin-left:10px"></span>
-    </div>
-
-    <div data-panel="board" class="card" hidden><div class="board" id="board"></div></div>
-
-    <div data-panel="links" hidden>
-      <div class="row" style="margin-bottom:12px"><input class="input" id="link-filter" data-i18n-ph="nav.search" style="max-width:320px"></div>
-      <div class="table-wrap responsive"><table>
-        <thead><tr><th data-i18n="admin.user"></th><th data-i18n="admin.link"></th><th data-i18n="m.likes"></th><th data-i18n="m.replies"></th><th data-i18n="m.reposts"></th><th data-i18n="m.views"></th><th data-i18n="m.score"></th><th data-i18n="admin.status"></th><th data-i18n="admin.actions"></th></tr></thead>
-        <tbody id="links"></tbody>
-      </table></div>
-    </div>
-
-    <div data-panel="users" hidden>
-      <div class="table-wrap responsive"><table>
-        <thead><tr><th data-i18n="admin.user"></th><th>ID</th><th data-i18n="admin.role"></th><th data-i18n="links.count"></th><th data-i18n="admin.joined"></th><th data-i18n="admin.actions"></th></tr></thead>
-        <tbody id="users"></tbody>
-      </table></div>
-    </div>
-
-    <form data-panel="settings" hidden id="settings-form" class="grid grid-2" data-settings>
-      <div class="card">
-        <div class="card-title"><h3 data-i18n="admin.weights"></h3></div>
-        <p class="dim" style="font-size:13px;margin-top:-6px" data-i18n="admin.weightsSub"></p>
-        <div class="grid grid-2">
-          <div class="field"><label data-i18n="m.likes"></label><input class="input mono" name="w_likes" type="number" step="0.01" min="0"></div>
-          <div class="field"><label data-i18n="m.replies"></label><input class="input mono" name="w_replies" type="number" step="0.01" min="0"></div>
-          <div class="field"><label data-i18n="m.reposts"></label><input class="input mono" name="w_reposts" type="number" step="0.01" min="0"></div>
-          <div class="field"><label data-i18n="m.views"></label><input class="input mono" name="w_views" type="number" step="0.01" min="0"></div>
-        </div>
-        <div class="card-title" style="margin-top:22px"><h3 data-i18n="admin.schedule"></h3></div>
-        <div class="grid grid-2">
-          <div class="field"><label data-i18n="admin.weekday"></label><select class="enhance" name="settle_weekday" id="wd"></select></div>
-          <div class="field"><label data-i18n="admin.hour"></label><select class="enhance" name="settle_hour" id="hr"></select></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title"><h3 data-i18n="admin.rewards"></h3></div>
-        <div class="stack" style="gap:12px">
-          <div class="field"><label id="r1l"></label><input class="input" name="reward_1"></div>
-          <div class="field"><label id="r2l"></label><input class="input" name="reward_2"></div>
-          <div class="field"><label id="r3l"></label><input class="input" name="reward_3"></div>
-        </div>
-        <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn gold" type="submit"><span data-i18n="admin.save"></span><span class="kbd hide-sm" style="background:transparent;border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.65)">Ctrl ↵</span></button></div>
-      </div>
-    </form>
-
-    <div data-panel="news" hidden>
-      <div class="row" style="margin-bottom:14px"><button class="btn gold" id="add-news">＋ <span data-i18n="admin.newNews"></span></button></div>
-      <div class="card"><div class="board" id="news-list"></div></div>
-    </div>
-
-    <form data-panel="site" hidden id="site-form" class="grid grid-2" data-settings>
-      <div class="card">
-        <div class="card-title"><h3 data-i18n="admin.server"></h3></div>
-        <div class="stack" style="gap:12px">
-          <div class="field"><label data-i18n="admin.address"></label><input class="input mono" name="server_address" placeholder="sawsmp.me"></div>
-          <div class="field"><label data-i18n="admin.invite"></label><input class="input mono" name="discord_invite" placeholder="https://discord.gg/..."></div>
-          <div class="field"><label data-i18n="admin.announce"></label><textarea class="input" name="announcement" rows="3"></textarea></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title"><h3 data-i18n="admin.rulesEdit"></h3></div>
-        <p class="dim" style="font-size:13px;margin-top:-6px" data-i18n="admin.rulesHint"></p>
-        <textarea class="input mono" name="rules" rows="12" placeholder="# 尊重每一位玩家&#10;禁止辱罵、歧視…"></textarea>
-        <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn gold" type="submit" data-i18n="admin.save"></button></div>
-      </div>
-    </form>
   </div>
 </main>
 <footer id="footer"></footer>
 <script src="/static/js/i18n.js"></script>
+<script src="/static/js/art.js"></script>
 <script src="/static/js/core.js"></script>
+<script src="/static/js/player-panel.js"></script>
+<script src="/static/js/ticket-view.js"></script>
 <script src="/static/js/admin.js"></script>
 </body>
 </html>

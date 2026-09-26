@@ -14,12 +14,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import bot, config, db, discord_api, scraper, tasks
+from . import account, admin_ext, bot, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from .deps import admin_user, current_user, public_user, with_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 STATIC = Path(__file__).resolve().parent.parent / "static"
 PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
-         "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html"}
+         "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html",
+         "/support": "support.html", "/ticket": "ticket.html", "/account": "account.html",
+         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html"}
 
 
 @asynccontextmanager
@@ -33,10 +36,18 @@ async def lifespan(_: FastAPI):
         await bot.bot.close()
 
 
-app = FastAPI(title="Threads 獎勵計畫", lifespan=lifespan)
+app = FastAPI(title="鋸齒 SMP", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET, max_age=60 * 60 * 24 * 30,
                    same_site="lax", https_only=config.DISCORD_REDIRECT_URI.startswith("https"))
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+Path(config.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")
+app.include_router(tickets.router)
+app.include_router(punish.router)
+app.include_router(account.router)
+app.include_router(stats.router)
+app.include_router(admin_ext.router)
+app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
 for route, file in PAGES.items():
@@ -45,50 +56,19 @@ for route, file in PAGES.items():
 
 # ---------- helpers ----------
 
-def public_user(u: dict) -> dict:
-    return {"id": u["id"], "username": u["username"], "name": u.get("global_name") or u["username"],
-            "avatar": discord_api.avatar_url(u)}
-
-
-def with_user(row: dict) -> dict:
-    row.update(public_user(row))
-    return row
-
-
 def period_payload(start, end) -> dict:
     return {"start": db.iso(start), "end": db.iso(end)}
 
 
-async def current_user(request: Request) -> dict:
-    uid = request.session.get("uid")
-    user = uid and db.one("SELECT * FROM users WHERE id = ?", (uid,))
-    if not user:
-        raise HTTPException(401, "請先登入")
-    if user["banned"]:
-        raise HTTPException(403, "你的帳號已被停權")
-    return user
-
-
-async def admin_user(request: Request) -> dict:
-    user = await current_user(request)
-    if request.session.get("dev_admin") and config.DEV_LOGIN:
-        return user
-    status = await discord_api.member_status(user["id"])
-    if status["admin"] != bool(user["is_admin"]):
-        db.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(status["admin"]), user["id"]))
-    if not status["admin"]:
-        raise HTTPException(403, "需要伺服器管理權限")
-    return user
-
-
-def upsert_user(u: dict, admin: bool) -> None:
+def upsert_user(u: dict, level: int) -> None:
     now = db.iso(db.now_utc())
     db.execute(
-        """INSERT INTO users(id, username, global_name, avatar, is_admin, created_at, last_login)
-           VALUES (?,?,?,?,?,?,?)
+        """INSERT INTO users(id, username, global_name, avatar, is_admin, level, created_at, last_login)
+           VALUES (?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET username=excluded.username, global_name=excluded.global_name,
-               avatar=excluded.avatar, is_admin=excluded.is_admin, last_login=excluded.last_login""",
-        (u["id"], u["username"], u.get("global_name"), u.get("avatar"), int(admin), now, now),
+               avatar=excluded.avatar, is_admin=excluded.is_admin, level=excluded.level,
+               last_login=excluded.last_login""",
+        (u["id"], u["username"], u.get("global_name"), u.get("avatar"), int(level >= 3), level, now, now),
     )
 
 
@@ -100,6 +80,9 @@ async def login(request: Request):
         raise HTTPException(500, "尚未設定 DISCORD_CLIENT_ID")
     state = secrets.token_urlsafe(16)
     request.session["oauth_state"] = state
+    nxt = request.query_params.get("next", "")
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        request.session["next"] = nxt
     return RedirectResponse(discord_api.authorize_url(state))
 
 
@@ -115,19 +98,19 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
         return RedirectResponse("/login?error=discord")
     if config.REQUIRE_GUILD_MEMBER and not status["member"]:
         return RedirectResponse("/login?error=not_member")
-    upsert_user(user, status["admin"])
+    upsert_user(user, status.get("level", 0))
     request.session["uid"] = user["id"]
-    return RedirectResponse("/links")
+    return RedirectResponse(request.session.pop("next", None) or "/account")
 
 
 @app.get("/auth/dev-login", include_in_schema=False)
-async def dev_login(request: Request, id: str = "100000000000000001", name: str = "tester", admin: int = 0):
+async def dev_login(request: Request, id: str = "100000000000000001", name: str = "tester", level: int = 0):
     if not config.DEV_LOGIN:
         raise HTTPException(404)
-    upsert_user({"id": id, "username": name, "global_name": name, "avatar": None}, bool(admin))
+    upsert_user({"id": id, "username": name, "global_name": name, "avatar": None}, level)
     request.session["uid"] = id
-    request.session["dev_admin"] = bool(admin)
-    return RedirectResponse("/admin" if admin else "/links")
+    request.session["dev_level"] = level
+    return RedirectResponse("/admin" if level else "/account")
 
 
 @app.post("/auth/logout")
@@ -144,9 +127,10 @@ async def me(request: Request):
     user = uid and db.one("SELECT * FROM users WHERE id = ?", (uid,))
     if not user:
         return {"user": None}
-    return {"user": {**public_user(user), "admin": bool(user["is_admin"]) or
-                     bool(request.session.get("dev_admin") and config.DEV_LOGIN),
-                     "banned": bool(user["banned"])}}
+    level = request.session.get("dev_level") if config.DEV_LOGIN and request.session.get("dev_level") is not None \
+        else user.get("level") or 0
+    return {"user": {**public_user(user), "level": level, "admin": level >= 3, "banned": bool(user["banned"]),
+                     "mc": {"uuid": user["mc_uuid"], "name": user["mc_name"]} if user.get("mc_uuid") else None}}
 
 
 @app.get("/api/overview")

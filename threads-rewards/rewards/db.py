@@ -22,6 +22,18 @@ DEFAULT_SETTINGS = {
     "server_address": "sawsmp.me",
     "discord_invite": "",
     "rules": "",
+    "warn_threshold": "3",        # 累積幾次有效警告後自動限時封鎖（0 = 關閉）
+    "warn_ban_hours": "24",
+    "plugin_api_key": "",
+    "ticket_channel_id": "",
+    "announce_channel_id": "",
+    "punish_log_channel_id": "",
+    "discord_ban_role": "",
+    "discord_mute_role": "",
+    "reason_presets": "使用外掛\n辱罵他人\n洗頻\n利用 Bug\n惡意破壞\n使用小號規避處罰",
+    "violation_types": "外掛 / 作弊\n辱罵 / 騷擾\n惡意破壞\n洗頻 / 廣告\n利用漏洞\n其他",
+    "canned_replies": "你好，我們已經收到你的回報，正在處理中，請耐心等候。\n可以提供更多細節或截圖嗎？\n已處理完畢，感謝你的回報！\n此問題已轉交相關人員處理。",
+    "rank_tiers": "0:戰鬥新手\n50:熟練戰士\n150:精英鬥士\n400:戰場大師\n1000:傳奇",
 }
 
 SCHEMA = """
@@ -77,8 +89,165 @@ CREATE TABLE IF NOT EXISTS news (
     author_id TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS link_codes (
+    code TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS players (
+    uuid TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    first_seen TEXT,
+    last_seen TEXT,
+    last_ip TEXT,
+    online INTEGER NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_players_name ON players(name COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS player_ips (
+    uuid TEXT NOT NULL,
+    ip TEXT NOT NULL,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    PRIMARY KEY (uuid, ip)
+);
+CREATE INDEX IF NOT EXISTS idx_player_ips_ip ON player_ips(ip);
+CREATE TABLE IF NOT EXISTS punishments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,              -- ban / mute / warn / kick / ipban
+    uuid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    ip TEXT,
+    reason TEXT NOT NULL,
+    staff_id TEXT,
+    staff_name TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'web',   -- web / game / auto
+    created_at TEXT NOT NULL,
+    expires_at TEXT,                      -- NULL = 永久
+    active INTEGER NOT NULL DEFAULT 1,
+    revoked_by TEXT,
+    revoked_at TEXT,
+    revoke_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pun_uuid ON punishments(uuid);
+CREATE INDEX IF NOT EXISTS idx_pun_active ON punishments(active, type);
+CREATE TABLE IF NOT EXISTS plugin_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    done_at TEXT
+);
+CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    category TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',   -- open / answered / closed
+    urgent INTEGER NOT NULL DEFAULT 0,
+    target TEXT,                            -- 檢舉對象玩家名稱
+    punishment_id INTEGER,                  -- 申訴的懲處
+    claimed_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status, updated_at);
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    author_id TEXT,
+    body TEXT NOT NULL,
+    attachments TEXT NOT NULL DEFAULT '[]',
+    staff INTEGER NOT NULL DEFAULT 0,
+    internal INTEGER NOT NULL DEFAULT 0,
+    system INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tmsg_ticket ON ticket_messages(ticket_id, id);
+CREATE TABLE IF NOT EXISTS ticket_reads (
+    user_id TEXT NOT NULL,
+    ticket_id INTEGER NOT NULL,
+    last_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, ticket_id)
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id TEXT,
+    actor_name TEXT,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS player_stats (
+    uuid TEXT PRIMARY KEY,
+    kills INTEGER NOT NULL DEFAULT 0,
+    deaths INTEGER NOT NULL DEFAULT 0,
+    streak INTEGER NOT NULL DEFAULT 0,
+    best_streak INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0,
+    playtime INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS kill_methods (
+    uuid TEXT NOT NULL,
+    method TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (uuid, method)
+);
+CREATE TABLE IF NOT EXISTS matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    winner_uuid TEXT NOT NULL, winner_name TEXT NOT NULL,
+    loser_uuid TEXT NOT NULL, loser_name TEXT NOT NULL,
+    winner_score INTEGER NOT NULL DEFAULT 1, loser_score INTEGER NOT NULL DEFAULT 0,
+    world TEXT, method TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_matches_w ON matches(winner_uuid, id);
+CREATE INDEX IF NOT EXISTS idx_matches_l ON matches(loser_uuid, id);
+CREATE TABLE IF NOT EXISTS perm_nodes (
+    group_key TEXT NOT NULL,          -- all / linked / level:1..3 / role:<discord role id>
+    node TEXT NOT NULL,
+    allow INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (group_key, node)
+);
+CREATE TABLE IF NOT EXISTS perm_groups (group_key TEXT PRIMARY KEY, name TEXT, color TEXT);
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    last_used TEXT,
+    uses INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS settled_periods (period_start TEXT PRIMARY KEY, settled_at TEXT NOT NULL);
 """
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    cols = {r[1] for r in c.execute("PRAGMA table_info(users)")}
+    for name, ddl in (("level", "INTEGER NOT NULL DEFAULT 0"), ("mc_uuid", "TEXT"), ("mc_name", "TEXT"),
+                      ("linked_at", "TEXT")):
+        if name not in cols:
+            c.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_mc ON users(mc_uuid) WHERE mc_uuid IS NOT NULL")
+    extra = {"users": [("ticket_banned", "INTEGER NOT NULL DEFAULT 0")],
+             "punishments": [("silent", "INTEGER NOT NULL DEFAULT 0"), ("discord_sync", "INTEGER NOT NULL DEFAULT 0")],
+             "tickets": [("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("fields", "TEXT NOT NULL DEFAULT '{}'")]}
+    for table, columns in extra.items():
+        have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in columns:
+            if name not in have:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
+def audit(actor: dict | None, action: str, detail: str) -> None:
+    execute("INSERT INTO audit_log(actor_id, actor_name, action, detail, created_at) VALUES (?,?,?,?,?)",
+            (actor and actor.get("id"), actor and (actor.get("global_name") or actor.get("username")) or "system",
+             action, detail, iso(now_utc())))
 
 
 def now_utc() -> datetime:
@@ -98,6 +267,7 @@ def conn() -> sqlite3.Connection:
         _conn.execute("PRAGMA journal_mode=WAL")
         _conn.execute("PRAGMA foreign_keys=ON")
         _conn.executescript(SCHEMA)
+        _migrate(_conn)
         for k, v in DEFAULT_SETTINGS.items():
             _conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
         _conn.commit()
