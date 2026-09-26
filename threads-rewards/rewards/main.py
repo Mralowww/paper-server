@@ -25,10 +25,19 @@ PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewa
          "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html"}
 
 
+async def _backfill_linked_role() -> None:
+    """啟動時替所有已綁定的使用者補上 linked 身分組。"""
+    await asyncio.sleep(10)
+    for u in db.query("SELECT id FROM users WHERE mc_uuid IS NOT NULL"):
+        await account.sync_linked_role(u["id"], True)
+        await asyncio.sleep(1)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.conn()
-    background = [asyncio.create_task(tasks.scheduler()), asyncio.create_task(bot.start())]
+    background = [asyncio.create_task(tasks.scheduler()), asyncio.create_task(bot.start()),
+                  asyncio.create_task(_backfill_linked_role())]
     yield
     for t in background:
         t.cancel()

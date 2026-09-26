@@ -624,6 +624,8 @@ async def plugin_link(body: dict):
     db.execute("DELETE FROM link_codes WHERE user_id = ?", (row["user_id"],))
     user = db.one("SELECT * FROM users WHERE id = ?", (row["user_id"],))
     db.audit(user, "account.link", f"{name} ({uuid})")
+    from .account import sync_linked_role
+    await sync_linked_role(user["id"], True)
     return {"ok": True, "message": f"綁定成功！已連結 Discord 帳號 {display_name(user)}。", "discord_id": user["id"]}
 
 

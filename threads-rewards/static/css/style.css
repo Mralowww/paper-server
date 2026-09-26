@@ -1024,6 +1024,25 @@ details.fold[open] summary .ico { transform: rotate(180deg); }
 @media (max-width: 1100px) { .mm-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { .mm-fighter img { height: 110px; } .mm-vs { gap: 14px; } .mm-vs .vs { font-size: 22px; } }
 
+/* 排行榜分類列 */
+.sortbar { position: relative; display: flex; gap: 2px; padding: 5px; margin-bottom: 26px; border-radius: 16px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(10px); overflow-x: auto; scrollbar-width: none; box-shadow: var(--shadow-sm); }
+.sortbar::-webkit-scrollbar { display: none; }
+.sortbar button { position: relative; z-index: 1; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 18px; border: 0; border-radius: 12px; background: transparent; color: var(--text-3); font: 600 14px var(--font-body); cursor: pointer; white-space: nowrap; transition: color .3s; }
+.sortbar button:hover { color: var(--text); }
+.sortbar button.active { color: var(--accent-ink); }
+.sortbar button .ico { transition: transform .5s var(--ease-spring); }
+.sortbar button.active .ico { transform: scale(1.12); }
+.sortbar .sb-ind { position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 5px; width: 0; border-radius: 12px; background: var(--accent); box-shadow: 0 6px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,.25); transition: left .45s var(--ease-spring), width .45s var(--ease-spring); }
+@media (max-width: 760px) { .sortbar button { padding: 10px 14px; font-size: 13px; } .sortbar button span { display: none; } .sortbar button.active span { display: inline; } }
+
+@media (max-width: 760px) {
+  .nav-right { gap: 4px; min-width: 0; }
+  .nav-right .btn-discord { padding: 6px 10px; font-size: 12.5px; }
+  .nav .lang-btn, .nav .ip-chip { display: none; }
+  .brand-text b { font-size: 15px; }
+}
+@media (max-width: 380px) { .nav .theme-btn { display: none; } }
+
 /* ---------- 手機版 ---------- */
 @media (max-width: 1360px) {
   .nav .container { gap: 10px; }

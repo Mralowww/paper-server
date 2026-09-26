@@ -5,8 +5,14 @@
   const hours = (s) => (s / 3600).toFixed(1) + "h";
   const main = (p) => ({ kills: fmt(p.kills), kdr: p.kdr.toFixed(2), wins: fmt(p.wins), winrate: p.winrate + "%", streak: fmt(p.best_streak), playtime: hours(p.playtime) })[sort];
 
+  const ICON = { kills: "sword", kdr: "chart", wins: "trophy", winrate: "activity", streak: "gem", playtime: "history" };
+  function moveInd() {
+    const bar = $("#sorts"); const b = bar.querySelector("button.active"); const ind = bar.querySelector(".sb-ind");
+    if (b && ind) { ind.style.left = b.offsetLeft + "px"; ind.style.width = b.offsetWidth + "px"; }
+  }
   function renderSorts() {
-    $("#sorts").innerHTML = SORTS.map((s) => `<button data-sort="${s}" class="${s === sort ? "active" : ""}">${t("rk." + s)}</button>`).join("");
+    $("#sorts").innerHTML = `<i class="sb-ind"></i>` + SORTS.map((s) => `<button data-sort="${s}" class="${s === sort ? "active" : ""}">${ART.icon(ICON[s], 16)}<span>${t("rk." + s)}</span></button>`).join("");
+    requestAnimationFrame(moveInd);
     $("#rank-head").innerHTML = `<span>#</span><span></span><span>${t("rk.player")}</span><span>${t("rk." + sort)}</span><span>${t("rk.kills")}</span><span>KDR</span><span>${t("rk.wins")}</span>`;
   }
 
@@ -33,7 +39,13 @@
 
   document.addEventListener("app:ready", () => {
     renderSorts(); load().catch((e) => App.fail(e.message));
-    $("#sorts").addEventListener("click", (e) => { const b = e.target.closest("[data-sort]"); if (!b) return; sort = b.dataset.sort; store.set("rk.sort", sort); App.sfx("switch"); renderSorts(); load(); });
+    $("#sorts").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sort]"); if (!b || b.dataset.sort === sort) return;
+      sort = b.dataset.sort; store.set("rk.sort", sort); App.sfx("switch");
+      $("#sorts").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b)); moveInd();
+      $("#rank-head").children[3].textContent = t("rk." + sort); load();
+    });
+    addEventListener("resize", moveInd);
     $("#q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { q = $("#q").value.trim(); load(); }, 250); });
     setInterval(() => document.visibilityState === "visible" && load().catch(() => {}), 60000);
   });

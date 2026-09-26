@@ -297,7 +297,7 @@
     { title: "admin.rulesEdit", hint: "admin.rulesHint", items: [["rules", "admin.rulesEdit", "textarea"]] },
   ]);
   const settings = (el) => settingsForm(el, "settings", [
-    { title: "set.discord", hint: "set.discord.d", items: [["ticket_channel_id", "set.ticketCh", "channel"], ["punish_log_channel_id", "set.punCh", "channel"], ["announce_channel_id", "set.annCh", "channel"], ["discord_ban_role", "set.banRole", "role"], ["discord_mute_role", "set.muteRole", "role"]] },
+    { title: "set.discord", hint: "set.discord.d", items: [["ticket_channel_id", "set.ticketCh", "channel"], ["punish_log_channel_id", "set.punCh", "channel"], ["announce_channel_id", "set.annCh", "channel"], ["discord_ban_role", "set.banRole", "role"], ["discord_mute_role", "set.muteRole", "role"], ["discord_linked_role", "set.linkedRole", "role"]] },
     { title: "set.punish", items: [["reason_presets", "set.reasons", "textarea"], ["warn_threshold", "set.warnN", "num"], ["warn_ban_hours", "set.warnH", "num"]] },
     { title: "set.support", items: [["canned_replies", "set.canned", "textarea"], ["violation_types", "set.violations", "textarea"]] },
     { title: "set.ranks", hint: "set.ranks.d", items: [["rank_tiers", "set.tiers", "textarea"]] },

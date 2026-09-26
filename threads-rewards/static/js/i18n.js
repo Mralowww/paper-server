@@ -314,7 +314,7 @@ Object.assign(window.I18N.zh, {
   "set.ranks": "段位", "set.ranks.d": "格式：擊殺數:段位名稱，每行一個。", "set.tiers": "段位設定",
   "key.plugin": "Minecraft 插件金鑰", "key.plugin.d": "插件呼叫 /api/plugin/* 時放在 X-API-Key 標頭。重新產生後舊金鑰立即失效。", "key.none": "尚未產生", "key.regen": "重新產生金鑰",
   "key.regenConfirm": "重新產生後，插件必須更新成新金鑰才能連線。確定嗎？", "key.regenDone": "請把新金鑰填入插件設定。", "key.dev": "開發者 API", "key.dev.d": "任何玩家都能在「我的帳號」申請金鑰，讀取排行榜與玩家戰績。",
-  "team.replies": "客服回覆", "team.puns": "執行處罰", "team.empty": "還沒有團隊成員登入過網站。", "team.hint": "權限依 Discord 身分組自動判定：SUPPORT_ROLE_IDS = 客服、MOD_ROLE_IDS = 管理員、ADMIN_ROLE_IDS 或伺服器管理權限 = 最高管理。",
+  "team.replies": "客服回覆", "team.puns": "執行處罰", "team.empty": "還沒有團隊成員登入過網站。", "team.hint": "權限依 Discord 身分組判定：小幫手 = 客服、管理員 = 管理員、服主 / 開發人員 = 最高管理。",
   "st.web": "網站", "st.connecting": "連線中…", "st.notSet": "未設定", "st.never": "從未連線", "st.storage": "儲存空間", "st.db": "資料庫", "st.uploads": "上傳圖片", "st.cleanup": "清理未使用的圖片", "st.cleaned": "已刪除 {n} 個檔案", "st.counts": "資料筆數",
   "acc.devKeys": "開發者 API 金鑰", "acc.devKeys.d": "用來讀取鋸齒 SMP 的排行榜與玩家戰績，每個帳號最多 5 組。", "acc.keyName": "金鑰名稱，例如：我的 Discord 機器人", "acc.keyCreate": "建立金鑰",
   "acc.keyCreated": "金鑰已建立", "acc.keyOnce": "這是唯一一次顯示完整金鑰，請立即複製保存。", "acc.keyDelete": "確定要刪除這組金鑰嗎？", "acc.noKeys": "還沒有任何金鑰。",
@@ -375,7 +375,7 @@ Object.assign(window.I18N.en, {
   "set.ranks": "Tiers", "set.ranks.d": "Format: kills:tier name, one per line.", "set.tiers": "Tier table",
   "key.plugin": "Minecraft plugin key", "key.plugin.d": "Sent as X-API-Key to /api/plugin/*. Regenerating revokes the old key immediately.", "key.none": "Not generated", "key.regen": "Regenerate key",
   "key.regenConfirm": "The plugin must be updated with the new key. Continue?", "key.regenDone": "Put the new key in the plugin config.", "key.dev": "Developer API", "key.dev.d": "Anyone can request a key in My account to read rankings and stats.",
-  "team.replies": "Replies", "team.puns": "Punishments", "team.empty": "No staff have logged in yet.", "team.hint": "Levels come from Discord roles: SUPPORT_ROLE_IDS = support, MOD_ROLE_IDS = moderator, ADMIN_ROLE_IDS or server admin = owner.",
+  "team.replies": "Replies", "team.puns": "Punishments", "team.empty": "No staff have logged in yet.", "team.hint": "Levels come from Discord roles: Helper = support, 管理員 = moderator, 服主 / 開發人員 = owner.",
   "st.web": "Website", "st.connecting": "Connecting…", "st.notSet": "Not configured", "st.never": "Never connected", "st.storage": "Storage", "st.db": "Database", "st.uploads": "Uploads", "st.cleanup": "Clean unused images", "st.cleaned": "Removed {n} files", "st.counts": "Rows",
   "acc.devKeys": "Developer API keys", "acc.devKeys.d": "Read Saw SMP rankings and player stats. Up to 5 keys per account.", "acc.keyName": "Key name, e.g. My Discord bot", "acc.keyCreate": "Create key",
   "acc.keyCreated": "Key created", "acc.keyOnce": "This is the only time the full key is shown — copy it now.", "acc.keyDelete": "Delete this key?", "acc.noKeys": "No keys yet.",
@@ -413,3 +413,6 @@ Object.assign(window.I18N.en, {
   "mm.found": "Match found!", "mm.foundD": "Teleporting you to the arena.", "mm.lastResult": "Last match",
   "set.match": "PvP matchmaking", "set.matchOn": "Enabled (1 = on, 0 = off)", "set.matchLimit": "Time limit (minutes)",
 });
+
+Object.assign(window.I18N.zh, { "set.linkedRole": "綁定後給予的身分組（linked）" });
+Object.assign(window.I18N.en, { "set.linkedRole": "Role granted after linking" });

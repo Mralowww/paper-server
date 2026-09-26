@@ -88,8 +88,8 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
                     perms |= int(role["permissions"])
             admin = (
                 user_id == guild["owner_id"]
-                or bool(perms & (ADMINISTRATOR | MANAGE_GUILD))
                 or bool(role_ids & config.ADMIN_ROLE_IDS)
+                or (not config.ROLE_IDS_ONLY and bool(perms & (ADMINISTRATOR | MANAGE_GUILD)))
             )
             level = 3 if admin else 2 if role_ids & config.MOD_ROLE_IDS else 1 if role_ids & config.SUPPORT_ROLE_IDS else 0
             names = [guild["roles"][r]["name"] for r in member.get("roles", []) if r in guild["roles"]]

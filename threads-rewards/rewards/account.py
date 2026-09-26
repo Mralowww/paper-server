@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 
-from . import db
+from . import config, db, discord_api
 from .deps import current_user
 
 router = APIRouter()
@@ -40,8 +40,25 @@ async def link_code(user: dict = Depends(current_user)):
     return {"code": code, "expires_at": expires}
 
 
+def linked_role() -> str:
+    return config.setting_or_env("discord_linked_role", config.LINKED_ROLE_ID)
+
+
+async def sync_linked_role(user_id: str, linked: bool) -> None:
+    """綁定 / 解除綁定時同步 Discord 的 linked 身分組（失敗只記錄，不影響綁定）。"""
+    role = linked_role()
+    if not role or not config.DISCORD_BOT_TOKEN:
+        return
+    try:
+        await discord_api.set_role(user_id, role, linked)
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger("rewards.account").warning("同步 linked 身分組失敗 %s", user_id, exc_info=True)
+
+
 @router.delete("/api/account/link")
 async def unlink(user: dict = Depends(current_user)):
     db.execute("UPDATE users SET mc_uuid = NULL, mc_name = NULL, linked_at = NULL WHERE id = ?", (user["id"],))
+    await sync_linked_role(user["id"], False)
     db.audit(user, "account.unlink", user.get("mc_name") or "")
     return {"ok": True}

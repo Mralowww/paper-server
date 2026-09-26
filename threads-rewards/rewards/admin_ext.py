@@ -159,6 +159,8 @@ async def manual_link(body: LinkIn, staff: dict = Depends(require(MOD))):
         raise HTTPException(409, "這個 Minecraft 帳號已綁定其他帳號")
     db.execute("UPDATE users SET mc_uuid = ?, mc_name = ?, linked_at = ? WHERE id = ?", (p["uuid"], p["name"], now_iso(), body.user_id))
     db.audit(staff, "link.manual", f"{body.user_id} → {p['name']}")
+    from .account import sync_linked_role
+    await sync_linked_role(body.user_id, True)
     return {"ok": True}
 
 
@@ -166,6 +168,8 @@ async def manual_link(body: LinkIn, staff: dict = Depends(require(MOD))):
 async def manual_unlink(user_id: str, staff: dict = Depends(require(MOD))):
     db.execute("UPDATE users SET mc_uuid = NULL, mc_name = NULL, linked_at = NULL WHERE id = ?", (user_id,))
     db.audit(staff, "link.remove", user_id)
+    from .account import sync_linked_role
+    await sync_linked_role(user_id, False)
     return {"ok": True}
 
 

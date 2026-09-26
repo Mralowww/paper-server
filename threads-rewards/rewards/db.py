@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
     "punish_log_channel_id": "",
     "discord_ban_role": "",
     "discord_mute_role": "",
+    "discord_linked_role": "",
     "reason_presets": "使用外掛\n辱罵他人\n洗頻\n利用 Bug\n惡意破壞\n使用小號規避處罰",
     "violation_types": "外掛 / 作弊\n辱罵 / 騷擾\n惡意破壞\n洗頻 / 廣告\n利用漏洞\n其他",
     "canned_replies": "你好，我們已經收到你的回報，正在處理中，請耐心等候。\n可以提供更多細節或截圖嗎？\n已處理完畢，感謝你的回報！\n此問題已轉交相關人員處理。",
