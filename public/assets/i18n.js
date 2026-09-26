@@ -388,6 +388,18 @@
     'error.invalid_target': ['請輸入被檢舉玩家的 Minecraft ID', "Enter the reported player's Minecraft ID", 'Nhập ID Minecraft người bị tố cáo'],
     'error.target_not_found': ['找不到這個 Minecraft 帳號', 'That Minecraft account does not exist', 'Không tìm thấy tài khoản Minecraft'],
     'action.support_templates': ['修改客服快速回覆', 'edited support quick replies', 'đã sửa mẫu trả lời nhanh'],
+    'snd.title': ['音效', 'Sound', 'Âm thanh'],
+    'snd.desc': ['點擊、切換、彈窗、通知與客服訊息的音效，只儲存在這台裝置。', 'Sounds for clicks, tabs, dialogs, notifications and support messages — saved on this device.', 'Âm thanh khi nhấn, chuyển tab, hộp thoại, thông báo — lưu trên thiết bị này.'],
+    'snd.enable': ['開啟音效', 'Enable sounds', 'Bật âm thanh'],
+    'snd.volume': ['音量', 'Volume', 'Âm lượng'],
+    'snd.n.tap': ['點擊', 'Click', 'Nhấn'],
+    'snd.n.switch': ['切換', 'Switch', 'Chuyển'],
+    'snd.n.open': ['開啟視窗', 'Open', 'Mở'],
+    'snd.n.success': ['成功', 'Success', 'Thành công'],
+    'snd.n.error': ['錯誤', 'Error', 'Lỗi'],
+    'snd.n.message': ['新訊息', 'Message', 'Tin nhắn'],
+    'snd.n.send': ['送出', 'Send', 'Gửi'],
+    'snd.n.launch': ['開站', 'Launch', 'Ra mắt'],
     'ann.close': ['關閉公告', 'Dismiss', 'Đóng'],
 
     // ---- staff: site status tab

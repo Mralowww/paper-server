@@ -679,7 +679,7 @@
         <div class="panel-head reveal"><div><div class="kicker">SETTINGS</div><h1 class="set-title">${t('nav.settings')}</h1><p>${t('set.subtitle')}</p></div></div>
         <div class="set-grid">
           <nav class="set-nav reveal">
-            <a href="#account">${t('set.account')}</a><a href="#minecraft">${t('link.title')}</a><a href="#language">${t('nav.language')}</a>
+            <a href="#account">${t('set.account')}</a><a href="#minecraft">${t('link.title')}</a><a href="#language">${t('nav.language')}</a><a href="#sound">${t('snd.title')}</a>
             ${perms.accountKeys ? `<a href="#keys">${t('akey.title')}</a>` : ''}
           </nav>
           <div class="set-main">
@@ -695,10 +695,51 @@
               <h3>${t('nav.language')}</h3>
               <div class="seg">${LANGS.map((l) => `<button data-lang="${l.id}" class="${l.id === lang ? 'active' : ''}">${l.label}</button>`).join('')}</div>
             </section>
+            <section id="sound" class="card card-pad set-card reveal">
+              <h3>${t('snd.title')}</h3>
+              <p class="muted" style="margin:-6px 0 16px;font-size:13px">${t('snd.desc')}</p>
+              <div class="snd-row">
+                <label class="snd-switch"><input type="checkbox" id="sndOn"><span></span><b>${t('snd.enable')}</b></label>
+              </div>
+              <div class="snd-row snd-vol">
+                <span class="snd-ico" id="sndIco"></span>
+                <input type="range" id="sndVol" min="0" max="100" step="1" aria-label="${t('snd.volume')}">
+                <b class="mono" id="sndPct"></b>
+              </div>
+              <div class="snd-preview">${['tap', 'switch', 'open', 'success', 'error', 'message', 'send', 'launch'].map((n) => `<button type="button" class="btn btn-sm" data-snd="${n}">${t(`snd.n.${n}`)}</button>`).join('')}</div>
+            </section>
             <section id="keysWrap"></section>
           </div>
         </div>`;
       bindLinkCard(root, () => pages.settings());
+      const SND = window.MCTL_SOUND;
+      if (SND) {
+        const on = $('#sndOn', root);
+        const vol = $('#sndVol', root);
+        const pct = $('#sndPct', root);
+        const ico = $('#sndIco', root);
+        const draw = () => {
+          const v = Math.round(SND.volume * 100);
+          vol.value = v;
+          vol.style.setProperty('--p', `${v}%`);
+          pct.textContent = `${v}%`;
+          on.checked = SND.enabled;
+          root.querySelector('#sound').classList.toggle('muted-off', !SND.enabled);
+          const waves = !SND.enabled || v === 0 ? '<path d="m22 9-6 6M16 9l6 6"/>' : v < 50 ? '<path d="M15.5 8.5a5 5 0 0 1 0 7"/>' : '<path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/>';
+          ico.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/>${waves}</svg>`;
+        };
+        draw();
+        on.addEventListener('change', () => { SND.setEnabled(on.checked); draw(); if (on.checked) SND.play('toggleOn'); });
+        let tick = 0;
+        vol.addEventListener('input', () => {
+          SND.setVolume(Number(vol.value) / 100);
+          if (!SND.enabled && Number(vol.value) > 0) SND.setEnabled(true);
+          draw();
+          if (performance.now() - tick > 90) { tick = performance.now(); SND.play('tap', { force: true }); }
+        });
+        ico.addEventListener('click', () => { SND.setEnabled(!SND.enabled); draw(); });
+        $$('[data-snd]', root).forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); SND.play(b.dataset.snd, { force: true }); }));
+      }
       $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => window.I18N.setLang(b.dataset.lang)));
       $('#logoutForm', root).addEventListener('submit', async (e) => {
         e.preventDefault();

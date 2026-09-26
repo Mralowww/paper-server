@@ -1771,3 +1771,23 @@ body.pfx-open { overflow: hidden; }
 .sp-head-main { flex-wrap: wrap; }
 .sp-head-text { flex: 1 1 320px; }
 .sp-head-extra { margin-left: auto; }
+
+/* ---------- sound settings ---------- */
+.snd-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.snd-switch { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+.snd-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.snd-switch span { position: relative; width: 46px; height: 26px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border-strong); transition: background 0.25s, border-color 0.25s; }
+.snd-switch span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform 0.3s cubic-bezier(.3, 1.5, .5, 1), background 0.25s; }
+.snd-switch input:checked + span { background: var(--gold-grad); border-color: transparent; box-shadow: 0 0 14px -4px rgba(242, 181, 44, 0.8); }
+.snd-switch input:checked + span::after { transform: translateX(20px); background: #1a1204; }
+.snd-switch input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
+.snd-vol { max-width: 460px; }
+.snd-ico { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: rgba(242, 193, 78, 0.1); color: var(--gold); cursor: pointer; flex: none; transition: transform 0.2s; }
+.snd-ico:hover { transform: scale(1.06); }
+.snd-vol b { width: 4ch; text-align: right; color: var(--text); }
+#sndVol { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--gold) var(--p, 40%), var(--surface-2) var(--p, 40%)); outline: none; cursor: pointer; }
+#sndVol::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--gold); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); transition: transform 0.15s; }
+#sndVol::-webkit-slider-thumb:hover { transform: scale(1.15); }
+#sndVol::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--gold); }
+.snd-preview { display: flex; flex-wrap: wrap; gap: 8px; }
+#sound.muted-off .snd-vol, #sound.muted-off .snd-preview { opacity: 0.45; }
