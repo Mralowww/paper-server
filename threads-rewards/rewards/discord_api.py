@@ -159,3 +159,22 @@ async def send_channel(channel_id: str, embed: dict) -> bool:
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(f"{API}/channels/{channel_id}/messages", headers=_bot_headers(), json={"embeds": [embed]})
     return r.status_code < 300
+
+
+async def member_detail(user_id: str) -> dict:
+    """Discord 帳號建立時間、是否在伺服器、加入時間與身分組（含顏色）。"""
+    created = ((int(user_id) >> 22) + 1420070400000) / 1000 if user_id.isdigit() else None
+    out = {"created_at": created, "in_guild": False, "joined_at": None, "roles": [], "username": None}
+    if not config.DISCORD_BOT_TOKEN or not config.DISCORD_GUILD_ID:
+        return out
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}", headers=_bot_headers())
+        if r.status_code != 200:
+            return out
+        m = r.json()
+        guild = await _guild_roles(client)
+    roles = [guild["roles"][rid] for rid in m.get("roles", []) if rid in guild["roles"]]
+    out.update(in_guild=True, joined_at=m.get("joined_at"), username=m.get("user", {}).get("username"),
+               roles=[{"id": x["id"], "name": x["name"], "color": f"#{x['color']:06x}" if x["color"] else None}
+                      for x in sorted(roles, key=lambda x: -x["position"])])
+    return out

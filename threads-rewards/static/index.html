@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>鋸齒 SMP · 官方網站</title>
 <meta name="description" content="鋸齒 SMP 官方網站 — Minecraft 生存伺服器 sawsmp.me">
-<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"')}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"');if(JSON.parse(localStorage.getItem("tr.motion")||"false"))document.documentElement.dataset.motion="reduce"}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <meta name="theme-color" content="#0c0f11">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='4' fill='%2397c8c7'/%3E%3Cpath d='M3 10.5 L5 6 L7 10.5 L9 6 L11 10.5 L13 6' stroke='%230b1716' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/css/style.css">
@@ -15,18 +15,19 @@
 <header id="nav"></header>
 <main class="page">
   <div class="container">
-    <section class="hero hero-grid">
+    <section class="hero-v2">
       <div>
-        <span class="eyebrow"><span class="tag live" id="status-tag"><span data-i18n="home.checking"></span></span><span class="eyebrow-text" data-i18n="home.hero.eyebrow"></span></span>
+        <span class="eyebrow row" style="gap:10px;margin-bottom:22px"><span class="tag live" id="status-tag"><span data-i18n="home.checking"></span></span><span class="eyebrow-text" data-i18n="home.hero.eyebrow"></span></span>
         <h1 data-i18n-html="home.hero.title"></h1>
         <p class="lead" data-i18n="home.hero.lead"></p>
         <div class="ip-box">
-          <div class="ip"><small data-i18n="home.ip"></small><b id="ip">sawsmp.me</b></div>
+          <div class="ip"><small data-i18n="home.ip"></small><b id="ip" class="typed"></b></div>
           <button type="button" id="copy-ip" data-i18n="home.copyIp"></button>
         </div>
-        <div class="row" style="margin-top:14px">
-          <a class="btn gold" id="discord-btn" href="#" target="_blank" rel="noopener" hidden data-i18n="home.discord"></a>
-          <a class="btn" href="/rules" data-i18n="home.readRules"></a>
+        <div class="row" style="margin-top:16px">
+          <a class="btn gold lg" id="discord-btn" href="#" target="_blank" rel="noopener" hidden data-i18n="home.discord"></a>
+          <a class="btn lg" href="/rankings" data-i18n="nav.rankings"></a>
+          <a class="btn lg ghost" href="/rules" data-i18n="home.readRules"></a>
         </div>
         <div class="status-line" id="status-line">
           <span><i class="dot" id="st-dot"></i><span id="st-text" data-i18n="home.checking"></span></span>
@@ -34,8 +35,13 @@
           <span id="st-version" class="mono" hidden></span>
         </div>
       </div>
-      <div class="hero-art reveal-s" id="hero-art"></div>
+      <div class="hero-stage" id="stage" data-parallax="0.04">
+        <canvas id="stage-canvas"></canvas>
+        <div class="stage-cap"><span class="stage-status"><i class="pulse-dot" id="stage-dot"></i><span id="stage-text">SAWSMP.ME</span></span><span id="stage-season">SEASON 1</span></div>
+      </div>
+      <div class="scroll-hint"><i></i>SCROLL</div>
     </section>
+    <div class="marquee"><div id="marquee"></div></div>
 
     <section class="section">
       <div class="section-head reveal"><div><span class="eyebrow-text">01</span><h2 data-i18n="home.features"></h2><p class="muted" data-i18n="home.featuresSub"></p></div></div>
@@ -78,6 +84,7 @@
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/art.js"></script>
 <script src="/static/js/core.js"></script>
+<script src="/static/js/fx.js"></script>
 <script src="/static/js/site.js"></script>
 </body>
 </html>

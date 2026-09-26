@@ -383,3 +383,6 @@ Object.assign(window.I18N.en, {
   "docs.title": "Developer API", "docs.sub": "Read Saw SMP rankings, player stats and punishments over HTTP.", "docs.auth": "Authentication", "docs.auth.d": "Create a key in My account and send it in the X-API-Key header.",
   "docs.e1": "Player profile, stats, kill methods, matches and rivals", "docs.e2": "Leaderboard", "docs.e3": "Public punishment history", "docs.errors": "Errors", "docs.plugin": "Minecraft plugin API", "docs.plugin.d": "For the Saw SMP server plugin, using the plugin key from Admin → API Keys.",
 });
+
+Object.assign(window.I18N.zh, { "lk.inGuild": "在 Discord 伺服器中", "lk.notInGuild": "不在伺服器中", "lk.dcCreated": "Discord 帳號建立", "lk.joined": "加入伺服器", "lk.webLevel": "網站權限", "lk.lastLogin": "最後登入網站", "lk.roles": "身分組", "lk.live": "即時資料", "lk.unranked": "未排名", "lk.activity": "動態", "lk.stats": "伺服器戰績", "lk.names": "名稱紀錄", "lk.related": "相關紀錄" });
+Object.assign(window.I18N.en, { "lk.inGuild": "In Discord server", "lk.notInGuild": "Not in server", "lk.dcCreated": "Discord account created", "lk.joined": "Joined server", "lk.webLevel": "Website rank", "lk.lastLogin": "Last website login", "lk.roles": "roles", "lk.live": "live", "lk.unranked": "Unranked", "lk.activity": "Activity", "lk.stats": "Server stats", "lk.names": "Name history", "lk.related": "Related" });

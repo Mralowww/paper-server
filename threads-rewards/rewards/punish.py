@@ -92,6 +92,7 @@ def upsert_player(uuid: str, name: str, ip: str | None = None, online: bool | No
                last_ip = COALESCE(excluded.last_ip, players.last_ip),
                online = COALESCE(?, players.online)""",
         (uuid, name, now if ip else None, now if ip else None, ip, int(bool(online)), None if online is None else int(online)))
+    db.execute("INSERT OR IGNORE INTO player_names(uuid, name, first_seen) VALUES (?,?,?)", (uuid, name, now))
     if ip:
         db.execute("""INSERT INTO player_ips(uuid, ip, first_seen, last_seen) VALUES (?,?,?,?)
                       ON CONFLICT(uuid, ip) DO UPDATE SET last_seen = excluded.last_seen""", (uuid, ip, now, now))

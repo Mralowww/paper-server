@@ -189,21 +189,70 @@
     let timer;
     const load = async () => {
       const d = await api(`/api/admin/links?q=${encodeURIComponent($("#lq").value.trim())}`, { quiet: true });
-      $("#lb").innerHTML = d.users.map((u) => `<tr data-uid="${u.id}"><td data-label="Discord"><span class="cell-user"><img src="${esc(u.avatar)}" alt="">${esc(u.name)} <span class="dim mono" style="font-size:11px">${u.id}</span></span></td>
+      $("#lb").innerHTML = d.users.map((u) => `<tr data-uid="${u.id}" style="cursor:pointer"><td data-label="Discord"><span class="cell-user"><img src="${esc(u.avatar)}" alt="">${esc(u.name)} <span class="dim mono" style="font-size:11px">${u.id}</span></span></td>
         <td data-label="Minecraft">${u.mc_uuid ? `<span class="cell-user"><img src="${mcHead(u.mc_uuid, 24)}" alt="" style="border-radius:4px">${esc(u.mc_name)}</span>` : `<span class="dim">${t("acc.notLinked")}</span>`}</td>
         <td data-label="${t("adm.linkedAt")}" class="dim">${u.linked_at ? date(u.linked_at) : "—"}</td><td data-label="${t("admin.role")}">${lvlTags(u.level) || `<span class="dim">—</span>`}</td>
         <td data-label="">${u.mc_uuid ? `<button class="btn sm danger" data-unlink>${t("acc.unlink")}</button>` : `<button class="btn sm" data-link>${t("adm.manualLink")}</button>`}</td></tr>`).join("");
     };
     el.addEventListener("click", async (e) => {
       const tr = e.target.closest("[data-uid]"); if (!tr) return; const uid = tr.dataset.uid;
-      if (e.target.closest("[data-unlink]")) { if (!(await App.confirm(t("acc.confirmUnlink"), { danger: true }))) return; await api(`/api/admin/links/${uid}`, { method: "DELETE" }); sfx("delete"); load(); }
-      if (e.target.closest("[data-link]")) {
-        const o = App.modal({ title: t("adm.manualLink"), body: `<form id="mlf"><div class="field"><label>${t("pl.mcName")}</label><input class="input mono" name="p" required></div></form>`, foot: `<button class="btn" data-close>${t("cancel")}</button><button class="btn gold" form="mlf">${t("save")}</button>` });
-        $("#mlf", o.el).addEventListener("submit", async (ev) => { ev.preventDefault(); try { await api("/api/admin/links", { method: "POST", body: { user_id: uid, player: ev.target.p.value.trim() } }); o.close(true); App.ok(t("acc.linkedOk")); load(); } catch (err) { App.fail(err.message); } });
-      }
+      if (e.target.closest("[data-unlink]")) { if (!(await App.confirm(t("acc.confirmUnlink"), { danger: true }))) return; await api(`/api/admin/links/${uid}`, { method: "DELETE" }); sfx("delete"); load(); return; }
+      if (e.target.closest("[data-link]")) return manualLink(uid, load);
+      sfx("popup"); linkModal(uid, load);
     });
     $("#lq").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 250); });
     await load();
+  }
+
+  /* 帳號綁定詳細視窗（Discord / Minecraft / 相關紀錄） */
+  async function linkModal(uid, reload) {
+    let d; try { d = await api(`/api/admin/links/${uid}`); } catch (e) { return App.fail(e.message); }
+    const u = d.user, dc = d.discord, mc = d.mc;
+    const since = (iso) => iso ? `${new Date(iso).toLocaleString(App.lang === "zh" ? "zh-TW" : "en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} <span class="dim">(${ago(iso)})</span>` : "—";
+    const copyBtn = (v) => `<button class="btn icon ghost sm" data-copy="${esc(v)}" title="copy">${ART.icon("copy", 15)}</button>`;
+    const lvName = (l) => l >= 1 ? t("lv." + l) : t("admin.member");
+    const tabDiscord = `<div class="lk-card"><img class="lk-av" src="${esc(u.avatar)}" alt="" data-zoom><div style="min-width:0">
+        <h3>${esc(u.name)}</h3><div class="lk-sub mono">${esc(u.username)} · ${u.id} ${copyBtn(u.id)}</div>
+        <div class="row" style="gap:8px;margin-top:10px"><span class="tag gray">${lvName(u.level)}</span>${dc.in_guild ? `<span class="tag ok live">${t("lk.inGuild")}</span>` : dc.in_guild === false ? `<span class="tag err">${t("lk.notInGuild")}</span>` : ""}${u.ticket_banned ? `<span class="tag err">${t("tk.ban")}</span>` : ""}</div></div></div>
+      <div class="info-table"><div><span>${t("lk.dcCreated")}</span><b>${since(dc.created_at)}</b></div><div><span>${t("lk.joined")}</span><b>${since(dc.joined_at)}</b></div>
+        <div><span>${t("lk.webLevel")}</span><b>${lvName(u.level)}</b></div><div><span>${t("lk.lastLogin")}</span><b>${since(u.last_login)}</b></div></div>
+      <div class="lk-label">DISCORD ${t("lk.roles")} (${dc.roles.length}) <span class="dim">${t("lk.live")}</span></div>
+      <div class="chips">${dc.roles.map((r) => `<span class="role-chip"><i style="background:${r.color || "var(--text-3)"}"></i>${esc(r.name)}</span>`).join("") || `<span class="dim">—</span>`}</div>`;
+    const tabMc = !mc ? `<div class="empty">${t("acc.notLinked")}<div style="margin-top:12px"><button class="btn" data-manual>${t("adm.manualLink")}</button></div></div>` : `
+      <div class="lk-card"><img class="lk-av sq" src="${mcHead(mc.uuid, 96)}" alt=""><div style="min-width:0;flex:1">
+        <h3>${esc(mc.name)}</h3><div class="lk-sub mono">${mc.uuid} ${copyBtn(mc.uuid)}</div>
+        <div class="row" style="gap:14px;margin-top:10px"><b>${mc.rank ? "#" + mc.rank : t("lk.unranked")}</b><span><i class="status-dot ${mc.online ? "on" : ""}"></i>${t(mc.online ? "home.online" : "home.offline")}</span></div></div>
+        <a class="btn" href="/player?name=${encodeURIComponent(mc.name)}" target="_blank">${t("tk.openPlayer")} ${ART.icon("external", 15)}</a></div>
+      <div class="info-table"><div><span>${t("adm.linkedAt")}</span><b>${since(mc.linked_at)}</b></div><div><span>${t("pl.firstSeen")}</span><b>${since(mc.first_seen)}</b></div>
+        <div><span>${t("lk.activity")}</span><b>${mc.online ? `<span style="color:var(--green)">${t("home.online")}</span>` : since(mc.last_seen)}</b></div>
+        <div><span>${t("lk.stats")}</span><b>${mc.stats ? `${mc.stats.kills} ${t("pp.kills")} · ${mc.stats.deaths} ${t("pp.deaths")} · ${mc.stats.matches} ${t("pp.duels")}` : `0 ${t("pp.kills")} · 0 ${t("pp.deaths")} · 0 ${t("pp.duels")}`}</b></div></div>
+      <div class="lk-label">${t("lk.names")}</div>
+      <div class="chips">${mc.names.map((n) => `<span class="role-chip">${esc(n.name)} <span class="dim">${date(n.first_seen, false)}</span></span>`).join("") || `<span class="role-chip">${esc(mc.name)}</span>`}</div>`;
+    const tabRel = `<div class="lk-label" style="margin-top:0">${t("sup.mine")} (${d.tickets.length})</div>
+      ${d.tickets.map((x) => `<a class="t-row" data-cat="${x.category}" href="/admin#tickets/${x.id}"><span class="bar"></span><div class="t-main"><b>#${x.id} ${esc(x.subject)}</b><small>${date(x.created_at)}</small></div><div class="t-side">${catTag(x.category)}<span class="tag">${t("st." + x.status)}</span></div></a>`).join("") || `<div class="dim">—</div>`}
+      <div class="lk-label">${t("pp.history")} (${d.punishments.length})</div>
+      ${d.punishments.map((p) => App.punItem(p, false)).join("") || `<div class="dim">—</div>`}
+      <div class="lk-label">${t("staff.tab.audit")}</div>
+      ${d.audit.map((a) => `<div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px"><span><b>${esc(a.action)}</b> <span class="muted">${esc(a.detail)}</span></span><span class="dim">${ago(a.created_at)}</span></div>`).join("") || `<div class="dim">—</div>`}`;
+    const o = App.modal({ wide: true, title: `<span class="row" style="gap:14px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" class="lk-av sm" alt=""><span style="min-width:0"><span class="eyebrow-text" style="color:var(--accent);display:block">${t("adm.links")}</span><span class="lk-title">${esc(u.name)} <span class="dim">↔</span> ${mc ? esc(mc.name) : `<span class="dim">${t("acc.notLinked")}</span>`}</span></span></span>`,
+      body: `<div class="lk-tabs"><button data-lt="dc" class="on">Discord</button><button data-lt="mc">Minecraft</button><button data-lt="rel">${t("lk.related")}</button><i class="lk-ind"></i></div>
+        <div data-lp="dc" class="tab-panel">${tabDiscord}</div><div data-lp="mc" hidden>${tabMc}</div><div data-lp="rel" hidden>${tabRel}</div>` });
+    const modal = $(".modal", o.el); modal.classList.add("lk-modal");
+    if (mc) $(".modal-head .btn", o.el).insertAdjacentHTML("beforebegin", `<button class="btn red-outline" data-unlink style="margin-left:auto">${t("acc.unlink")}</button>`);
+    const ind = $(".lk-ind", o.el);
+    const show = (b) => { $$(".lk-tabs button", o.el).forEach((x) => x.classList.toggle("on", x === b)); ind.style.left = b.offsetLeft + "px"; ind.style.width = b.offsetWidth + "px";
+      $$("[data-lp]", o.el).forEach((p) => { const on = p.dataset.lp === b.dataset.lt; p.hidden = !on; if (on) { p.classList.remove("tab-panel"); void p.offsetWidth; p.classList.add("tab-panel"); } }); };
+    requestAnimationFrame(() => show($(".lk-tabs button", o.el)));
+    o.el.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-lt]"); if (b) { sfx("switch"); show(b); return; }
+      const c = e.target.closest("[data-copy]"); if (c) { App.copy(c.dataset.copy); return; }
+      if (e.target.closest("[data-unlink]")) { if (!(await App.confirm(t("acc.confirmUnlink"), { danger: true }))) return; await api(`/api/admin/links/${uid}`, { method: "DELETE" }); sfx("delete"); o.close(true); reload && reload(); }
+      if (e.target.closest("[data-manual]")) { o.close(true); manualLink(uid, reload); }
+    });
+  }
+  function manualLink(uid, reload) {
+    const o = App.modal({ title: t("adm.manualLink"), body: `<form id="mlf"><div class="field"><label>${t("pl.mcName")}</label><input class="input mono" name="p" required></div></form>`, foot: `<button class="btn" data-close>${t("cancel")}</button><button class="btn gold" form="mlf">${t("save")}</button>` });
+    $("#mlf", o.el).addEventListener("submit", async (ev) => { ev.preventDefault(); try { await api("/api/admin/links", { method: "POST", body: { user_id: uid, player: ev.target.p.value.trim() } }); o.close(true); App.ok(t("acc.linkedOk")); reload && reload(); } catch (err) { App.fail(err.message); } });
   }
 
   /* ---------- 公告 ---------- */

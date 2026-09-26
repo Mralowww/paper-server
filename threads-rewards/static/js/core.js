@@ -20,9 +20,9 @@
     return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
   };
   const applyI18n = (root = document) => {
-    $$("[data-i18n]", root).forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    $$("[data-i18n]", root).forEach((el) => { const v = t(el.dataset.i18n); if (el.dataset.i18nV !== v) { el.textContent = v; el.dataset.i18nV = v; delete el.dataset.splitDone; } });
     $$("[data-i18n-ph]", root).forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
-    $$("[data-i18n-html]", root).forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+    $$("[data-i18n-html]", root).forEach((el) => { const v = t(el.dataset.i18nHtml); if (el.dataset.i18nV !== v) { el.innerHTML = v; el.dataset.i18nV = v; delete el.dataset.splitDone; el.classList.remove("fx-split-in"); } });
     $$("[data-i18n-title]", root).forEach((el) => { el.title = t(el.dataset.i18nTitle); });
     document.documentElement.lang = { zh: "zh-Hant", en: "en" }[lang];
   };
@@ -302,15 +302,15 @@
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
       <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/news", "nav.news")}${link("/rules", "nav.rules")}${link("/bans", "nav.bans")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
         <button class="btn icon ghost theme-btn" data-theme-toggle aria-label="theme">${THEME_ICON}</button>
         <button class="btn sm ghost lang-btn" data-lang>${window.ART ? ART.icon("globe", 15) : ""}<span>${lang === "zh" ? "中" : "EN"}</span></button>
-        <button class="search-trigger" data-search>🔍 <span class="txt" data-i18n="nav.search"></span><span class="kbd">Ctrl K</span></button>
+        <button class="search-trigger" data-search>${window.ART ? ART.icon("search", 15) : ""}<span class="txt" data-i18n="nav.search"></span><span class="kbd">Ctrl K</span></button>
         ${me ? `<button class="user-chip" data-user-menu data-user='${esc(JSON.stringify({ id: me.id, name: me.name }))}'><span class="avatar-wrap"><img src="${esc(me.avatar)}" alt=""><span class="online-dot"></span></span><span class="nm">${esc(me.name)}</span></button>`
             : `<a class="btn sm btn-discord" href="/login" data-i18n="nav.login"></a>`}
-        <button class="btn icon ghost menu-btn" aria-label="menu">☰</button>
+        <button class="btn icon ghost menu-btn" aria-label="menu">${window.ART ? ART.icon("menu", 18) : "☰"}</button>
       </div></div>`;
     $(".menu-btn", nav).addEventListener("click", () => { nav.classList.toggle("open"); sfx("menu"); });
     $("[data-search]", nav).addEventListener("click", openPalette);

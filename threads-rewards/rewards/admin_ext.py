@@ -246,3 +246,33 @@ async def presets(_: dict = Depends(require(SUPPORT))):
     s = db.settings()
     split = lambda k: [x.strip() for x in (s.get(k) or "").splitlines() if x.strip()]  # noqa: E731
     return {"reasons": split("reason_presets"), "canned": split("canned_replies"), "violations": split("violation_types")}
+
+
+@router.get("/api/admin/links/{user_id}")
+async def link_detail(user_id: str, _: dict = Depends(require(MOD))):
+    from datetime import datetime, timezone
+    from .stats import enrich
+    u = db.one("SELECT * FROM users WHERE id = ?", (user_id,))
+    if not u:
+        raise HTTPException(404, "找不到網站帳號")
+    try:
+        dd = await discord_api.member_detail(user_id)
+    except Exception:  # noqa: BLE001
+        dd = {"created_at": None, "in_guild": None, "joined_at": None, "roles": []}
+    if dd.get("created_at"):
+        dd["created_at"] = datetime.fromtimestamp(dd["created_at"], timezone.utc).isoformat(timespec="seconds")
+    mc = None
+    if u["mc_uuid"]:
+        p = db.one("SELECT * FROM players WHERE uuid = ?", (u["mc_uuid"],)) or {"uuid": u["mc_uuid"], "name": u["mc_name"], "online": 0, "last_seen": None, "first_seen": None}
+        st = db.one("SELECT * FROM player_stats WHERE uuid = ?", (u["mc_uuid"],))
+        stats = enrich(st) if st else None
+        rank = db.one("SELECT COUNT(*) + 1 AS r FROM player_stats WHERE kills > ?", (st["kills"],))["r"] if st and st["kills"] else None
+        mc = {"uuid": p["uuid"], "name": p["name"], "online": bool(p.get("online")), "last_seen": p.get("last_seen"),
+              "first_seen": p.get("first_seen"), "linked_at": u["linked_at"], "stats": stats, "rank": rank,
+              "names": db.query("SELECT name, first_seen FROM player_names WHERE uuid = ? ORDER BY first_seen DESC", (p["uuid"],))}
+    tickets = db.query("SELECT id, category, subject, status, created_at FROM tickets WHERE user_id = ? ORDER BY id DESC LIMIT 30", (user_id,))
+    puns = db.query("SELECT * FROM punishments WHERE uuid = ? ORDER BY id DESC LIMIT 30", (u["mc_uuid"],)) if u["mc_uuid"] else []
+    audit = db.query("SELECT * FROM audit_log WHERE actor_id = ? OR detail LIKE ? ORDER BY id DESC LIMIT 30", (user_id, f"%{user_id}%"))
+    return {"user": dict(public_user(u), level=u.get("level") or 0, ticket_banned=bool(u.get("ticket_banned")),
+                         created_at=u["created_at"], last_login=u["last_login"]),
+            "discord": dd, "mc": mc, "tickets": tickets, "punishments": puns, "audit": audit}

@@ -223,6 +223,12 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used TEXT,
     uses INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS player_names (
+    uuid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    first_seen TEXT NOT NULL,
+    PRIMARY KEY (uuid, name)
+);
 CREATE TABLE IF NOT EXISTS settled_periods (period_start TEXT PRIMARY KEY, settled_at TEXT NOT NULL);
 """
 
