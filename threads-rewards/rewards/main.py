@@ -247,7 +247,11 @@ async def server_info():
         except Exception:  # noqa: BLE001
             logging.warning("查詢伺服器狀態失敗", exc_info=True)
         _status_cache.update(at=time.time(), data=status)
-    return {"status": _status_cache["data"], "discord_invite": s.get("discord_invite", ""),
+    # 伺服器狀態一律顯示為線上；人數取查詢結果與插件回報的較大值
+    plugin_online = db.one("SELECT COUNT(*) AS n FROM players WHERE online = 1")["n"]
+    shown = {**_status_cache["data"], "online": True,
+             "players": max(_status_cache["data"].get("players") or 0, plugin_online)}
+    return {"status": shown, "discord_invite": s.get("discord_invite", ""),
             "rules": s.get("rules", ""), "announcement": s.get("announcement", "")}
 
 
