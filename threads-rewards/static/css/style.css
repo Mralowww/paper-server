@@ -1568,3 +1568,32 @@ body.standalone:has(.desk) { overflow: hidden; }
 .mt-tile:disabled { opacity: .45; cursor: not-allowed; }
 .mt-savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); box-shadow: var(--shadow); }
 .mt-savebar #mt-dirty { margin-right: auto; color: #e8a33d; font-size: 13px; }
+
+/* ================= 客服工作台：收起 / 拖曳排序 ================= */
+.dk-lays { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; border: 1px solid var(--border); background: var(--sunken); }
+.dk-lay { display: grid; place-items: center; width: 32px; height: 28px; border: 0; border-radius: 7px; background: none; color: var(--text-3); cursor: pointer; transition: background .2s, color .2s; }
+.dk-lay:hover { color: var(--text); } .dk-lay.on { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.desk-body { transition: grid-template-columns .35s var(--ease-out); }
+.desk.c-side .desk-body { grid-template-columns: 0 minmax(0, 1fr); }
+.desk-list { overflow: hidden; transition: opacity .25s; }
+.desk.c-side .desk-list { opacity: 0; pointer-events: none; border-right-color: transparent; }
+/* 上方：只留一行標題 */
+.desk.c-top .desk-main .tk-head { padding: 10px 16px; gap: 10px; align-items: center; cursor: pointer; }
+.desk.c-top .desk-main .tk-head .icon-box { width: 32px; height: 32px; } .desk.c-top .desk-main .tk-head .icon-box svg { width: 18px; height: 18px; }
+.desk.c-top .desk-main .tk-head h2 { font-size: 15px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk.c-top .desk-main .tk-head .meta, .desk.c-top .desk-main .tk-head .stepper, .desk.c-top .desk-main .tk-head .fold, .desk.c-top .desk-main [data-r="actions"] { display: none; }
+.desk.c-top .desk-main .tk-head::after { content: "⌄"; margin-left: auto; color: var(--text-3); font-size: 18px; line-height: 1; }
+/* 下方：隱藏快速回覆與提示列 */
+.desk.c-bottom .desk-main .canned, .desk.c-bottom .desk-main form .row:last-child { display: none !important; }
+.desk.c-bottom .desk-main form { padding: 10px 14px !important; }
+.desk-main .tk-head, .desk-main [data-r="actions"], .desk-main .canned { animation: itemIn .25s var(--ease-out); }
+/* 拖曳排序 */
+.dk-item { grid-template-columns: 14px 36px minmax(0, 1fr); touch-action: pan-y; }
+.dk-grip { display: grid; place-items: center; align-self: stretch; width: 14px; margin-left: -4px; color: var(--text-3); opacity: 0; cursor: grab; transition: opacity .15s; touch-action: none; }
+.dk-grip svg { transform: rotate(90deg); pointer-events: none; }
+.dk-item:hover .dk-grip, .dk-item.ordered .dk-grip { opacity: .7; } @media (hover: none) { .dk-grip { opacity: .6; } }
+.dk-item.ordered::after { content: ""; position: absolute; right: 8px; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: .7; }
+.desk-items.sorting .dk-item { transition: transform .18s var(--ease-out); user-select: none; }
+.desk-items.sorting .dk-item.dragging { transition: none; z-index: 5; position: relative; background: var(--surface); border-color: var(--accent); box-shadow: 0 14px 34px -12px rgba(0,0,0,.6), 0 0 0 1px var(--accent); cursor: grabbing; }
+.desk-items.sorting .dk-item.dragging .dk-grip { opacity: 1; color: var(--accent); cursor: grabbing; }
+.ctx { max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }

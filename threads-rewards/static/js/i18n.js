@@ -648,3 +648,21 @@ Object.assign(window.I18N.en, {
   "mt.fd.punish_public": "Public punishments and lookup", "mt.fd.devapi": "API keys and /api/v1", "mt.fd.notify": "Subscribe to push",
   "mt.rb.on": "Maintenance mode on", "mt.rb.bypass": "you're bypassing as staff", "mt.rb.manage": "Manage", "mt.rb.part": "Under maintenance: ",
 });
+Object.assign(window.I18N.zh, {
+  "tk.quote": "引用到輸入框", "tk.copyWithMeta": "複製（含作者與時間）", "tk.viewPlayer": "查看玩家 {name}", "tk.refresh": "重新整理對話", "tk.toLatest": "跳到最新訊息",
+  "tk.toggleInternal": "切換內部備註", "tk.internalOn": "已切換為內部備註", "tk.internalOff": "已切換為一般回覆",
+  "dk.drag": "拖曳排序", "dk.markAnswered": "標記為已回覆", "dk.markOpen": "標記為待回覆", "dk.toTop": "移到最上面", "dk.moveUp": "上移一格", "dk.moveDown": "下移一格",
+  "dk.resetOrder": "恢復預設排序", "dk.copyId": "複製編號",
+  "dk.hide.side": "收起側邊清單", "dk.show.side": "展開側邊清單", "dk.hide.top": "收起上方資訊與操作", "dk.show.top": "展開上方資訊與操作",
+  "dk.hide.bottom": "收起下方快速回覆", "dk.show.bottom": "展開下方快速回覆",
+  "dk.hint": "右鍵清單或訊息可快速操作 · 拖曳 ⋮ 排序 · J / K 切換 · Alt 1/2/3 收起版面",
+});
+Object.assign(window.I18N.en, {
+  "tk.quote": "Quote into reply", "tk.copyWithMeta": "Copy with author & time", "tk.viewPlayer": "View player {name}", "tk.refresh": "Refresh conversation", "tk.toLatest": "Jump to latest",
+  "tk.toggleInternal": "Toggle internal note", "tk.internalOn": "Internal note on", "tk.internalOff": "Normal reply",
+  "dk.drag": "Drag to reorder", "dk.markAnswered": "Mark answered", "dk.markOpen": "Mark awaiting", "dk.toTop": "Move to top", "dk.moveUp": "Move up", "dk.moveDown": "Move down",
+  "dk.resetOrder": "Reset order", "dk.copyId": "Copy number",
+  "dk.hide.side": "Hide ticket list", "dk.show.side": "Show ticket list", "dk.hide.top": "Collapse header & actions", "dk.show.top": "Expand header & actions",
+  "dk.hide.bottom": "Collapse quick replies", "dk.show.bottom": "Expand quick replies",
+  "dk.hint": "Right-click for actions · drag ⋮ to reorder · J / K to switch · Alt 1/2/3 to collapse",
+});

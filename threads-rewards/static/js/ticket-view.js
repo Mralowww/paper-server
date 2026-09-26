@@ -178,7 +178,9 @@
     function msgInfo(el) {
       const mid = +el.dataset.id; const text = el.querySelector(".bubble")?.childNodes;
       const body = [...(text || [])].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
-      return { id: mid, name: el.dataset.name, body: body.slice(0, 120), mine: App.me && el.dataset.author === App.me.id, deleted: el.classList.contains("deleted") };
+      const full = [...(text || [])].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
+      const time = el.querySelector(".meta small, .meta span:last-child")?.textContent || "";
+      return { id: mid, name: el.dataset.name, body: body.slice(0, 120), full, time, author: el.dataset.author, mine: App.me && el.dataset.author === App.me.id, deleted: el.classList.contains("deleted"), internal: el.classList.contains("internal") };
     }
     async function markRead(mid, unread = false) {
       try { await api(`/api/tickets/${id}/read`, { method: "POST", body: { last_id: mid, unread } }); sfx("tick"); App.ok(t(unread ? "tk.markedUnread" : "tk.markedRead"), "", 900); opts.onChange && opts.onChange(); }
@@ -212,7 +214,10 @@
       $("#fq", o.el).addEventListener("input", (e) => { const q = e.target.value.trim().toLowerCase().replace(/^#/, "");
         $$(".fwd-item", o.el).forEach((x) => { x.hidden = q && !x.textContent.toLowerCase().includes(q); }); });
     }
-    root._tv = { msgInfo, setReply, markRead, deleteMsg, forwardMsg, showLogs, closeDialog, get staff() { return data && data.staff; } };
+    const insertText = (txt) => { ta.value = (ta.value ? ta.value.replace(/\s*$/, "\n") : "") + txt; ta.dispatchEvent(new Event("input")); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); };
+    const toggleInternal = () => { if (form.internal) { form.internal.checked = !form.internal.checked; sfx(form.internal.checked ? "toggleOn" : "toggleOff"); App.ok(t(form.internal.checked ? "tk.internalOn" : "tk.internalOff"), "", 900); } };
+    root._tv = { msgInfo, setReply, markRead, deleteMsg, forwardMsg, showLogs, closeDialog, act, insertText, toggleInternal, toBottom, reload: () => { root._headSig = ""; return load(true); },
+      get data() { return data; }, get id() { return id; }, get staff() { return data && data.staff; } };
 
     async function upload(files) {
       for (const f of [...files].slice(0, 3 - attachments.length)) {
@@ -260,10 +265,32 @@
     const el = target.closest(".chat .msg[data-id]"); if (!el) return null;
     const root = el.closest("[data-tv-root]"); const v = root && root._tv; if (!v) return null;
     const m = v.msgInfo(el); const items = [{ head: `${m.name} · #${m.id}` }];
-    if (!m.deleted) items.push({ icon: "back", label: t("tk.reply"), key: "R", act: () => v.setReply(m) }, { icon: "copy", label: t("ctx.copy"), act: () => App.copy(m.body) });
+    if (!m.deleted) items.push({ icon: "back", label: t("tk.reply"), key: "R", act: () => v.setReply(m) },
+      { icon: "message", label: t("tk.quote"), act: () => v.insertText(m.full.split("\n").map((l) => "> " + l).join("\n") + "\n") },
+      { icon: "copy", label: t("ctx.copy"), act: () => App.copy(m.full) },
+      { icon: "clip", label: t("tk.copyWithMeta"), act: () => App.copy(`[#${v.id} · ${m.name} · ${m.time}]\n${m.full}`) });
     if (v.staff && !m.deleted) items.push({ icon: "send", label: t("tk.forward"), act: () => v.forwardMsg(m) });
     items.push({ sep: true }, { icon: "check", label: t("tk.markRead"), act: () => v.markRead(m.id) }, { icon: "eye", label: t("tk.markUnread"), act: () => v.markRead(m.id, true) });
+    if (v.staff && m.author && App.me && m.author !== App.me.id && v.data && v.data.owner_mc && m.author === v.data.owner.id) items.push({ icon: "user", label: t("tk.viewPlayer", { name: v.data.owner_mc.name }), act: () => App.openPlayerByName ? App.openPlayerByName(v.data.owner_mc.name) : App.go(`/player?name=${encodeURIComponent(v.data.owner_mc.name)}`) });
     if (!m.deleted && (v.staff || m.mine)) items.push({ sep: true }, { icon: "trash", label: t("tk.deleteMsg"), danger: true, act: () => v.deleteMsg(m) });
+    return items;
+  });
+
+  if (!App._tvCtx2) App._tvCtx2 = true, App.ctxProviders.push((target) => {
+    if (target.closest(".msg[data-id]") || target.closest("input, textarea")) return null;
+    const root = target.closest("[data-tv-root]"); const v = root && root._tv; if (!v || !v.data) return null;
+    const tk = v.data.ticket; const items = [{ head: `#${tk.id} · ${tk.subject}` }, { icon: "refresh", label: t("tk.refresh"), act: () => v.reload() }, { icon: "up", label: t("tk.toLatest"), act: () => v.toBottom() }];
+    if (v.staff) {
+      const mine = v.data.claimed && v.data.claimed.id === App.me.id;
+      items.push({ sep: true }, { icon: "user", label: t(mine ? "tk.unclaim" : "tk.claim"), act: () => v.act("claim") },
+        ...["urgent", "high", "normal", "low"].filter((p) => p !== tk.priority).map((p) => ({ icon: "flag", label: `${t("tk.priority")}：${t("pr." + p)}`, act: () => v.act("priority", p) })),
+        { icon: "edit", label: t("tk.toggleInternal"), act: () => v.toggleInternal() });
+      if (v.data.logs && v.data.logs.length) items.push({ icon: "history", label: t("tk.logs"), act: () => v.showLogs() });
+    }
+    items.push({ icon: "link", label: t("ctx.copyLink"), act: () => App.copy(`${location.origin}/ticket?id=${tk.id}`) });
+    if (tk.status !== "closed") items.push({ sep: true }, { icon: "x", label: t("tk.closeBtn"), danger: true, act: () => v.closeDialog() });
+    else items.push({ sep: true }, { icon: "refresh", label: t("tk.reopen"), act: () => v.act("reopen") });
+    if (document.querySelector(".desk")) items.push({ sep: true }, ...window.DeskLayout.ctxItems());
     return items;
   });
 

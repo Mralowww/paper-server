@@ -155,8 +155,9 @@
     if (THROTTLE[name] && now - (lastBy[name] || 0) < THROTTLE[name]) return;
     lastBy[name] = now;
     try {
+      if (!actx && navigator.userActivation && !navigator.userActivation.hasBeenActive) return; // 使用者尚未互動前不建立音效（避免瀏覽器警告）
       if (!ensureAudio()) return;
-      if (actx.state === "suspended") { actx.resume(); if (name === "hover" || name === "reveal" || name === "count") return; }
+      if (actx.state === "suspended") { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; actx.resume(); if (name === "hover" || name === "reveal" || name === "count") return; }
       if (name !== "hover" && name !== "count" && name !== "reveal") lastSfx = now;
       SFX[name](arg);
     } catch { /* 瀏覽器不支援 */ }
