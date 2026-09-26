@@ -1002,6 +1002,24 @@ class RoleupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"mctl:ra
         await self.finish(interaction, f"已由 {interaction.user.mention} 核准並套用。", 0x3DDC97)
 
 
+# ---------------------------------------------------------------- web helpers
+async def member_profile(discord_id):
+    """Live Discord details for the staff panel, or None when the user is not in the guild."""
+    guild = bot.guild
+    member = guild and await get_member(guild, discord_id)
+    if not member:
+        return None
+    roles = sorted((r for r in member.roles if not r.is_default()), key=lambda r: r.position, reverse=True)
+    return {
+        "displayName": member.display_name, "username": str(member), "nick": member.nick,
+        "joinedAt": int(member.joined_at.timestamp() * 1000) if member.joined_at else None,
+        "boostingSince": int(member.premium_since.timestamp() * 1000) if member.premium_since else None,
+        "bot": member.bot,
+        "roles": [{"id": str(r.id), "name": r.name, "color": f"#{r.color.value:06x}" if r.color.value else None,
+                   "managed": r.managed} for r in roles],
+    }
+
+
 # ---------------------------------------------------------------- entry
 def run():
     if not (C.DISCORD_BOT_TOKEN and C.GUILD_ID):

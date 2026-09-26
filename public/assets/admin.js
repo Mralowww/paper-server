@@ -743,7 +743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <form class="toolbar" id="linkSearch" style="margin-bottom:14px"><input class="input" name="q" value="${esc(q)}" placeholder="${t('links.search')}" style="max-width:420px"></form>
           <div class="card">${links.length ? `<div class="table-wrap"><table class="data">
             <thead><tr><th>Minecraft</th><th>Discord</th><th>${t('col.date')}</th><th></th></tr></thead>
-            <tbody>${links.map((l, i) => `<tr style="animation-delay:${Math.min(i, 20) * 0.02}s">
+            <tbody>${links.map((l, i) => `<tr class="row-link" data-detail="${esc(l.discord_id)}" style="animation-delay:${Math.min(i, 20) * 0.02}s">
               <td><div class="cell-player"><img src="${avatarUrl(l.uuid, 32)}" alt="">${esc(l.mc_name)}</div><div class="mono muted" style="font-size:11px">${esc(l.uuid)}</div></td>
               <td><div class="cell-player"><img src="${discordAvatar(l.discord_id, l.avatar)}" alt="" style="border-radius:50%">${esc(l.username || '—')}</div><div class="mono muted" style="font-size:11px">${esc(l.discord_id)}</div></td>
               <td class="muted" style="font-size:13px">${esc(fmtDate(l.linked_at))}</td>
@@ -755,6 +755,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { await api('/link-required', { method: 'PUT', body: { on: !req } }); go(`links/${encodeURIComponent(q)}`); } catch (err) { toast(err.message, 'err'); }
       });
       panel.addEventListener('click', async (e) => {
+        const row = e.target.closest('[data-detail]');
+        if (row && !e.target.closest('button, a')) return linkDetail(row.dataset.detail, () => go(`links/${encodeURIComponent(q)}`));
         const b = e.target.closest('[data-unlink]');
         if (!b || !(await confirmDialog(t('links.unlinkT'), t('links.unlinkD', { name: esc(b.dataset.name) })))) return;
         try { await api(`/links/${b.dataset.unlink}`, { method: 'DELETE' }); toast(t('links.unlinked')); go(`links/${encodeURIComponent(q)}`); } catch (err) { toast(err.message, 'err'); }
@@ -915,6 +917,125 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
 
+
+  // ---------- account link detail dialog ----------
+  async function linkDetail(did, onChange) {
+    const bg = document.createElement('div');
+    bg.className = 'pfx-bg';
+    bg.innerHTML = `<div class="pfx ld" role="dialog" aria-modal="true"><div class="skeleton" style="height:100%;border-radius:0"></div></div>`;
+    document.body.append(bg);
+    document.body.classList.add('pfx-open');
+    const close = () => {
+      bg.classList.add('closing'); document.body.classList.remove('pfx-open');
+      removeEventListener('keydown', onKey); setTimeout(() => bg.remove(), 320);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    addEventListener('keydown', onKey);
+    bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
+
+    let d;
+    try { d = await api(`/links/${did}/detail`); } catch (err) { close(); toast(err.message, 'err'); return; }
+    const dc = d.discord;
+    const mc = d.minecraft;
+    const live = dc.live;
+    const roles = live ? live.roles : dc.storedRoles;
+    const kv = (rows) => `<div class="ld-kv">${rows.filter(Boolean).map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('')}</div>`;
+    const when = (ms) => (ms ? `${esc(fmtDate(ms))} <span class="muted">(${esc(fmtRelative(ms))})</span>` : '<span class="muted">—</span>');
+    const copyBtn = (v) => `<button class="ld-copy" data-copy="${esc(v)}" title="${t('common.copy')}">⧉</button>`;
+    const tabs = [['discord', 'Discord'], ['minecraft', 'Minecraft'], ['tests', t('me.history')]];
+    if (d.audit) tabs.push(['records', t('ld.records')]);
+
+    const views = {
+      discord: () => `
+        <div class="ld-hero">
+          <img class="ld-avatar" src="${discordAvatar(dc.id, dc.avatar)}" alt="">
+          <div><h3>${esc(live?.displayName || dc.username || dc.id)}</h3>
+            <div class="muted mono" style="font-size:12.5px">${esc(live?.username || dc.username || '')} · ${esc(dc.id)} ${copyBtn(dc.id)}</div>
+            <div class="chips-row" style="margin-top:8px">${levelChips({ ...dc, badges: dc.badges || [] })}
+              <span class="pill ${dc.inGuild ? 'on' : 'off'}">● ${t(dc.inGuild ? 'ld.inGuild' : 'ld.notInGuild')}</span></div></div>
+        </div>
+        ${kv([
+          [t('ld.created'), when(dc.createdAt)],
+          live?.joinedAt ? [t('ld.joined'), when(live.joinedAt)] : null,
+          live?.nick ? [t('ld.nick'), esc(live.nick)] : null,
+          live?.boostingSince ? [t('ld.boosting'), when(live.boostingSince)] : null,
+          [t('ld.level'), `${esc(t(`level.${dc.levelName}`))}${dc.seniorTester ? ` · ${t('level.senior')}` : dc.tester ? ` · ${t('level.tester')}` : ''}`],
+        ])}
+        <h4 class="ld-h">${t('ld.roles')} <span class="muted">(${roles.length})</span>
+          <small class="muted">${live ? t('ld.rolesLive') : dc.botOnline && dc.liveError ? t('ld.rolesFailed') : t('ld.rolesCached', { time: esc(fmtRelative(dc.cachedAt || Date.now())) })}</small></h4>
+        <div class="ld-roles">${roles.length ? roles.map((r, i) => `<span class="ld-role" style="--rc:${esc(r.color || '#99aab5')};--i:${i}"><i></i>${esc(r.name)}</span>`).join('') : `<span class="muted">${t('pf.none')}</span>`}</div>`,
+      minecraft: () => (!mc ? `<p class="muted pfx-empty">${t('ld.noMc')}</p>` : `
+        <div class="ld-hero">
+          <img class="ld-avatar px" src="${avatarUrl(mc.uuid || mc.name, 96)}" alt="">
+          <div><h3>${esc(mc.name)}</h3>
+            <div class="muted mono" style="font-size:12px">${esc(mc.uuid || '—')} ${mc.uuid ? copyBtn(mc.uuid) : ''}</div>
+            <div class="chips-row" style="margin-top:8px">
+              ${mc.player ? tierBadge(mc.player.tiers.vanilla.tier, { retired: mc.player.tiers.vanilla.retired }) : `<span class="pill">${t('ld.unranked')}</span>`}
+              ${mc.player?.banned ? `<span class="pill off">⛔ ${t('ld.banned')}</span>` : ''}
+              ${mc.presence ? `<span class="pill ${mc.presence.online ? 'on' : ''}">● ${mc.presence.online ? t('ld.online') : t('pf.offline')}</span>` : ''}
+            </div></div>
+          <a class="btn btn-sm" href="/player/${encodeURIComponent(mc.name)}" target="_blank" rel="noopener" style="margin-left:auto">${t('ctx.openPlayer')} ↗</a>
+        </div>
+        ${kv([
+          mc.linkedAt ? [t('ld.linkedAt'), when(mc.linkedAt)] : [t('ld.linkedAt'), `<span class="muted">${t('ld.notLinked')}</span>`],
+          mc.player ? [t('card.position'), `#${mc.player.rank} · ${mc.player.points} ${t('common.pts')}`] : null,
+          mc.player ? [t('pf.testRecord'), `<span class="win">${mc.player.stats.wins}</span> – <span class="loss">${mc.player.stats.losses}</span>`] : null,
+          [t('me.cooldown'), d.cooldownUntil ? when(d.cooldownUntil) : `<span class="win">${t('me.ready')}</span>`],
+          d.openTicket ? [t('me.openTicket'), `${esc(d.openTicket.mc_name)} ${d.guildId ? `<a href="https://discord.com/channels/${d.guildId}/${d.openTicket.channel_id}" target="_blank" rel="noopener">↗</a>` : ''}`] : null,
+          mc.presence ? [t('pf.activity'), mc.presence.online ? `<span class="win">${t('ld.online')}</span> · ${esc(mc.presence.world || '')}` : when(mc.presence.last_seen)] : null,
+          mc.server ? [t('pf.fullKicker'), `${mc.server.kills} ${t('pf.kills')} · ${mc.server.deaths} ${t('pf.deaths')} · ${mc.server.matches} ${t('pf.matches')}`] : null,
+        ])}
+        ${mc.names.length ? `<h4 class="ld-h">${t('pf.names')}</h4><div class="ld-names">${mc.names.map((n) => `<span>${esc(n.name)} <small class="muted">${esc(new Date(n.first_seen).toLocaleDateString())}</small></span>`).join('')}</div>` : ''}`),
+      tests: () => (d.tests.length ? testsTable(d.tests, [
+        ['col.date', (x) => `<span class="muted">${esc(fmtDate(x.created_at))}</span>`],
+        ['col.result', resultCell], ['col.score', scoreCell], ['col.tester', (x) => esc(x.tester_name || '—')],
+      ]) : `<p class="muted pfx-empty">${t('me.noTests')}</p>`),
+      records: () => `
+        <h4 class="ld-h">${t('tab.bans')} <span class="muted">(${d.bans.length})</span></h4>
+        ${d.bans.length ? `<div class="ld-list">${d.bans.map((b) => `<div><span class="pill ${b.status === 'active' ? 'off' : ''}">${t(`bans.status.${b.status}`)}</span><b>${esc(b.mc_name)}</b><span class="muted">${esc(b.reason)}</span><time>${esc(fmtDate(b.created_at))}</time></div>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}
+        <h4 class="ld-h">${t('tab.support')} <span class="muted">(${d.support.length})</span></h4>
+        ${d.support.length ? `<div class="ld-list">${d.support.map((x) => `<a href="#support/${x.id}" data-close>${statusPill(x.status)}<b>#${x.id} ${esc(x.title)}</b><span class="muted">${catLabel(x.category)}</span><time>${esc(fmtRelative(x.updated_at))}</time></a>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}
+        ${d.reportedIn.length ? `<h4 class="ld-h">${t('ld.reportedIn')} <span class="muted">(${d.reportedIn.length})</span></h4><div class="ld-list">${d.reportedIn.map((x) => `<a href="#support/${x.id}" data-close>${statusPill(x.status)}<b>#${x.id} ${esc(x.title)}</b><span class="muted">${esc(x.username || '')}</span><time>${esc(fmtRelative(x.updated_at))}</time></a>`).join('')}</div>` : ''}
+        <h4 class="ld-h">${t('akey.title')} <span class="muted">(${d.keys.length})</span></h4>
+        ${d.keys.length ? `<div class="ld-list">${d.keys.map((k) => `<div><span class="mono muted">${esc(k.prefix)}…</span><b>${esc(k.name)}</b><span class="muted">${t('col.calls')} ${k.usage_count}</span><time>${esc(fmtRelative(k.last_used_at || k.created_at))}</time></div>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}
+        <h4 class="ld-h">${t('nav.audit')} <a class="ld-more" href="/audit#user/${encodeURIComponent(dc.id)}">${t('au.d.profile')} →</a></h4>
+        ${d.audit.length ? `<div class="ld-list">${d.audit.map((a) => `<div><span class="au-src-badge ${esc(a.source || 'legacy')}">${esc(t(`au.src.${a.source || 'legacy'}`))}</span><b>${esc(window.I18N.has(`action.${a.action}`) ? t(`action.${a.action}`) : a.action)}</b><span class="muted">${esc(a.actor_id === dc.id ? '' : a.actor_name || '')} ${esc(a.detail || '')}</span><time>${esc(fmtRelative(a.created_at))}</time></div>`).join('')}</div>` : `<p class="muted">${t('pf.none')}</p>`}`,
+    };
+
+    const box = $('.pfx', bg);
+    box.innerHTML = `
+      <header class="pfx-head">
+        <img src="${discordAvatar(dc.id, dc.avatar)}" alt="" style="border-radius:50%">
+        <div><div class="kicker">${t('tab.links')}</div><h2>${esc(live?.displayName || dc.username || dc.id)}${mc ? ` <span class="muted">↔</span> ${esc(mc.name)}` : ''}</h2></div>
+        ${perms.managePlayers && mc?.linkedAt ? `<button class="btn btn-sm btn-danger" data-unlink-now>${t('links.unlink')}</button>` : ''}
+        <button class="pfx-x" aria-label="${t('card.close')}">✕</button>
+      </header>
+      <nav class="pfx-tabs"><i class="pfx-ink"></i>${tabs.map(([id, label]) => `<button data-t="${id}">${label}</button>`).join('')}</nav>
+      <div class="pfx-body"></div>`;
+    const body = $('.pfx-body', box);
+    const ink = $('.pfx-ink', box);
+    const select = (id) => {
+      $$('.pfx-tabs button', box).forEach((b) => {
+        b.classList.toggle('active', b.dataset.t === id);
+        if (b.dataset.t === id) { ink.style.width = `${b.offsetWidth}px`; ink.style.transform = `translateX(${b.offsetLeft}px)`; }
+      });
+      body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap');
+      body.innerHTML = views[id]();
+      body.scrollTop = 0;
+    };
+    $$('.pfx-tabs button', box).forEach((b) => b.addEventListener('click', () => select(b.dataset.t)));
+    $('.pfx-x', box).addEventListener('click', close);
+    box.addEventListener('click', async (e) => {
+      const c = e.target.closest('[data-copy]');
+      if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast(t('common.copied')); } catch { /* ignore */ } }
+      if (e.target.closest('[data-close]')) close();
+      if (e.target.closest('[data-unlink-now]')) {
+        if (!(await confirmDialog(t('links.unlinkT'), t('links.unlinkD', { name: esc(mc.name) })))) return;
+        try { await api(`/links/${did}`, { method: 'DELETE' }); toast(t('links.unlinked')); close(); onChange?.(); } catch (err) { toast(err.message, 'err'); }
+      }
+    });
+    requestAnimationFrame(() => select('discord'));
+  }
 
   function showKey(key) {
     modal(`

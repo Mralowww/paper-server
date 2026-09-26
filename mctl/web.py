@@ -1207,6 +1207,78 @@ def list_links():
     return jsonify({"total": total, "links": [{**dict(r), "uuid": L.dashed(r["uuid"])} for r in rows]})
 
 
+KNOWN_ROLE_NAMES = {
+    **{str(r): f"Tier {t}" for t, r in C.TIER_ROLE.items()},
+    str(C.ROLE_FOUNDER): "創始人", str(C.ROLE_DEVELOPER): "開發者", str(C.ROLE_ADMIN): "管理員",
+    str(C.ROLE_MODERATOR): "管理者", str(C.ROLE_HELPER): "小幫手", str(C.ROLE_SENIOR_TESTER): "高階考官",
+    str(C.ROLE_TESTER): "考官", str(C.ROLE_BOOSTER): "Booster", str(C.ROLE_MEDIA): "Media",
+}
+
+
+@route("/api/admin/links/<did>/detail", perm="viewStaff")
+def link_detail(did):
+    """Everything about one linked account for the staff panel."""
+    if not DISCORD_ID_RE.match(did):
+        return error(404, "not_found")
+    conn = db()
+    link = L.link_for(conn, did)
+    m = D.member(conn, did)
+    if not link and not m:
+        return error(404, "not_found")
+    roles_stored = (m["roles"] if m and m["in_guild"] else (m and m["saved_roles"])) or []
+    live, live_err = None, None
+    if bridge.running():
+        live, err = bot_call("member_profile", did)
+        live_err = err is not None
+    snowflake_ms = (int(did) >> 22) + 1420070400000
+    discord = {
+        "id": did, "username": m and m["username"], "avatar": m and m["avatar"], "inGuild": bool(m and m["in_guild"]),
+        "createdAt": snowflake_ms, "cachedAt": m and m["updated_at"], "live": live, "liveError": live_err,
+        "botOnline": bridge.running(), **C.access_for(did, m["roles"] if m and m["in_guild"] else []),
+        "storedRoles": [{"id": str(r), "name": KNOWN_ROLE_NAMES.get(str(r), str(r))} for r in roles_stored],
+    }
+    uuid = link and link["uuid"]
+    player = next((p for p in D.ranked_players(conn)
+                   if p["discord_id"] == did or (uuid and L.norm_uuid(p["uuid"]) == uuid)), None)
+    uuid = uuid or (player and L.norm_uuid(player["uuid"])) or None
+    minecraft = None
+    if uuid or player:
+        stats = GS.stats(conn, uuid) if uuid else None
+        minecraft = {
+            "uuid": L.dashed(uuid) if uuid else None, "name": (link and link["mc_name"]) or (player and player["name"]),
+            "linkedAt": link and link["linked_at"], "names": GS.names(conn, uuid) if uuid else [],
+            "player": D.public_player(player, detailed=True) if player else None,
+            "presence": GS.presence_of(conn, uuid) if uuid else None,
+            "server": stats and {k: stats[k] for k in ("kills", "deaths", "pvpDeaths", "matches", "wins", "losses", "bestStreak",
+                                                       "playtimeMs", "firstSeen", "lastSeen")},
+        }
+    tests = [dict(r) for r in conn.execute(
+        "SELECT id, mc_name, tester_name, prev_tier, new_tier, wins, losses, created_at FROM tests WHERE discord_id = ? "
+        "ORDER BY id DESC LIMIT 10", (did,)).fetchall()]
+    ticket = conn.execute("SELECT channel_id, mc_name, kind, created_at FROM tickets WHERE applicant_id = ? AND status = 'open'",
+                          (did,)).fetchone()
+    out = {"discord": discord, "minecraft": minecraft, "tests": tests, "cooldownUntil": D.cooldown_until(conn, did),
+           "openTicket": dict(ticket) if ticket else None, "guildId": str(C.GUILD_ID) if C.GUILD_ID else None}
+    if permissions(current_user())["viewAudit"]:
+        name = minecraft and minecraft["name"]
+        bans = conn.execute("""SELECT * FROM bans WHERE discord_id = ? OR (? IS NOT NULL AND REPLACE(LOWER(uuid), '-', '') = ?)
+                               OR (? IS NOT NULL AND mc_name = ? COLLATE NOCASE) ORDER BY id DESC LIMIT 20""",
+                            (did, uuid, uuid, name, name)).fetchall()
+        out["bans"] = [ban_row(dict(b)) for b in bans]
+        out["support"] = [dict(r) for r in conn.execute(
+            "SELECT id, title, category, status, updated_at, target_name FROM support_tickets WHERE user_id = ? ORDER BY id DESC LIMIT 20",
+            (did,)).fetchall()]
+        out["reportedIn"] = [dict(r) for r in conn.execute(
+            "SELECT id, title, status, updated_at, username FROM support_tickets WHERE ? IS NOT NULL AND target_uuid = ? ORDER BY id DESC LIMIT 20",
+            (uuid, uuid)).fetchall()] if uuid else []
+        out["keys"] = [dict(r) for r in conn.execute(
+            "SELECT id, name, prefix, created_at, last_used_at, usage_count FROM user_keys WHERE user_id = ? ORDER BY id DESC", (did,)).fetchall()]
+        out["audit"] = [dict(r) for r in conn.execute(
+            """SELECT id, actor_id, actor_name, action, detail, created_at, source FROM audit_log
+               WHERE actor_id = ? OR (target_type = 'member' AND target_id = ?) ORDER BY id DESC LIMIT 15""", (did, did)).fetchall()]
+    return jsonify(out)
+
+
 @route("/api/admin/links/<did>", methods=["DELETE"], perm="managePlayers")
 def delete_link(did):
     conn = db()
