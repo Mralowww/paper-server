@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from . import activity, bot, config, db, discord_api
+from .roles import badges_of
 from .deps import ADMIN, MOD, SUPPORT, display_name, public_user, require, roles_of, save_roles
 from .punish import dashed, expire_old, now_iso, plugin_auth, plugin_last_seen, queue, resolve_player
 
@@ -150,7 +151,7 @@ async def links(q: str = "", _: dict = Depends(require(MOD))):
         params = (f"%{q}%", f"%{q}%", f"%{q}%", q)
     rows = db.query(f"SELECT * FROM users WHERE 1=1 {where} ORDER BY mc_uuid IS NULL, linked_at DESC, last_login DESC LIMIT 200", params)
     return {"users": [dict(public_user(u), mc_uuid=u["mc_uuid"], mc_name=u["mc_name"], linked_at=u["linked_at"],
-                           level=3 if u["id"] == config.SUPER_OWNER else u.get("level") or 0, roles=roles_of(u), ticket_banned=bool(u.get("ticket_banned"))) for u in rows]}
+                           level=3 if u["id"] == config.SUPER_OWNER else u.get("level") or 0, roles=roles_of(u), badges=badges_of(u), ticket_banned=bool(u.get("ticket_banned"))) for u in rows]}
 
 
 @router.post("/api/admin/links")
@@ -191,7 +192,7 @@ async def team(_: dict = Depends(require(SUPPORT))):
     await asyncio.gather(*(refresh(u) for u in rows))
     stats = {r["staff_id"]: r["c"] for r in db.query("SELECT staff_id, COUNT(*) AS c FROM punishments WHERE staff_id IS NOT NULL GROUP BY staff_id")}
     replies = {r["author_id"]: r["c"] for r in db.query("SELECT author_id, COUNT(*) AS c FROM ticket_messages WHERE staff = 1 GROUP BY author_id")}
-    return {"team": [dict(public_user(u), level=3 if u["id"] == config.SUPER_OWNER else u["level"], roles=roles_of(u), last_login=u["last_login"], mc_name=u["mc_name"],
+    return {"team": [dict(public_user(u), level=3 if u["id"] == config.SUPER_OWNER else u["level"], roles=roles_of(u), badges=badges_of(u), last_login=u["last_login"], mc_name=u["mc_name"],
                           punishments=stats.get(u["id"], 0), replies=replies.get(u["id"], 0)) for u in rows],
             "roles": {"support": sorted(config.SUPPORT_ROLE_IDS), "mod": sorted(config.MOD_ROLE_IDS), "admin": sorted(config.ADMIN_ROLE_IDS)}}
 

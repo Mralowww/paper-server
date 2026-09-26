@@ -214,7 +214,8 @@ async def get_ticket(ticket_id: int, request: Request, after: int = 0, user: dic
         claimer = t["claimed_by"] and db.one("SELECT * FROM users WHERE id = ?", (t["claimed_by"],))
         extra["claimed"] = public_user(claimer) if claimer else None
         extra["logs"] = db.query("SELECT id, closed_by_name, reason, message_count, created_at FROM ticket_logs WHERE ticket_id = ? ORDER BY id DESC", (ticket_id,))
-    return {"ticket": t, "owner": public_user(owner), "messages": msgs, "staff": staff, "level": level, **extra}
+    from .roles import badges_of
+    return {"ticket": t, "owner": dict(public_user(owner), badges=badges_of(owner)), "messages": msgs, "staff": staff, "level": level, **extra}
 
 
 @router.post("/api/tickets/{ticket_id}/messages")

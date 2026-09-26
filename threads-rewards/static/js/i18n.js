@@ -666,3 +666,21 @@ Object.assign(window.I18N.en, {
   "dk.hide.bottom": "Collapse quick replies", "dk.show.bottom": "Expand quick replies",
   "dk.hint": "Right-click for actions · drag ⋮ to reorder · J / K to switch · Alt 1/2/3 to collapse",
 });
+Object.assign(window.I18N.zh, {
+  "bd.sponsor": "贊助者", "bd.sponsor.d": "感謝支持伺服器的贊助者", "bd.booster": "加成者", "bd.booster.d": "為 Discord 伺服器加成的玩家",
+  "nr.bot": "鋸齒機器人", "nr.title": "通知身分組領取", "nr.desc": "點擊下方按鈕加入或移除對應的通知身分組。", "nr.subs": "已訂閱 {n} 人",
+  "nr.on": "已訂閱", "nr.off": "未訂閱", "nr.added": "已加入「{name}」", "nr.removed": "已移除「{name}」",
+  "nr.needLogin": "登入 Discord 帳號後就能直接在這裡領取通知身分組。", "nr.notMember": "你還沒加入鋸齒 SMP 的 Discord 伺服器，加入後才能領取身分組。",
+  "nr.hint": "身分組會立即套用到你的 Discord 帳號 · 伺服器共 {n} 位成員",
+  "act.notify.role.add": "領取通知身分組", "act.notify.role.remove": "移除通知身分組",
+  "set.sponsorRole": "贊助者身分組 ID", "set.boosterRole": "加成者身分組 ID", "set.notifyRoles": "通知身分組（每行：ID | 名稱 | 說明 | 圖示）",
+});
+Object.assign(window.I18N.en, {
+  "bd.sponsor": "Sponsor", "bd.sponsor.d": "Supports the server", "bd.booster": "Booster", "bd.booster.d": "Boosts the Discord server",
+  "nr.bot": "Saw Bot", "nr.title": "Notification roles", "nr.desc": "Click a button below to add or remove that notification role.", "nr.subs": "{n} subscribed",
+  "nr.on": "Subscribed", "nr.off": "Off", "nr.added": "Added \"{name}\"", "nr.removed": "Removed \"{name}\"",
+  "nr.needLogin": "Sign in with Discord to pick your notification roles here.", "nr.notMember": "Join the Saw SMP Discord server first to pick roles.",
+  "nr.hint": "Roles apply to your Discord account instantly · {n} members",
+  "act.notify.role.add": "Took notification role", "act.notify.role.remove": "Removed notification role",
+  "set.sponsorRole": "Sponsor role ID", "set.boosterRole": "Booster role ID", "set.notifyRoles": "Notification roles (one per line: ID | name | description | icon)",
+});

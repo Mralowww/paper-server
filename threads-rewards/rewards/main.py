@@ -1,4 +1,5 @@
 import asyncio
+import os
 import logging
 
 import httpx
@@ -14,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, maintenance, push, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, maintenance, push, roles, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user, protect_owner, roles_of, save_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,7 +23,7 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
          "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html",
          "/support": "support.html", "/ticket": "ticket.html", "/account": "account.html",
-         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html", "/desk": "desk.html"}
+         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html", "/desk": "desk.html", "/notify-roles": "notify-roles.html"}
 
 
 async def _backfill_linked_role() -> None:
@@ -44,7 +45,7 @@ async def lifespan(_: FastAPI):
         importer.run()
     except Exception:  # noqa: BLE001
         logging.exception("AdvancedBan 匯入失敗")
-    background = [asyncio.create_task(tasks.scheduler()), asyncio.create_task(bot.start()),
+    background = [asyncio.create_task(tasks.scheduler()), *([] if os.getenv("BOT_DISABLED") else [asyncio.create_task(bot.start())]),
                   asyncio.create_task(_backfill_linked_role())]
     yield
     for t in background:
@@ -72,6 +73,7 @@ app.include_router(activity.router)
 app.include_router(push.router)
 app.include_router(sync.router)
 app.include_router(maintenance.router)
+app.include_router(roles.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
@@ -177,7 +179,7 @@ async def me(request: Request):
         else user.get("level") or 0
     if user["id"] == config.SUPER_OWNER:
         level = 3
-    return {"user": {**public_user(user), "level": level, "owner": user["id"] == config.SUPER_OWNER, "roles": roles_of(user), "admin": level >= 3, "banned": bool(user["banned"]),
+    return {"user": {**public_user(user), "level": level, "owner": user["id"] == config.SUPER_OWNER, "roles": roles_of(user), "badges": roles.badges_of(user), "admin": level >= 3, "banned": bool(user["banned"]),
                      "mc": {"uuid": user["mc_uuid"], "name": user["mc_name"]} if user.get("mc_uuid") else None}}
 
 

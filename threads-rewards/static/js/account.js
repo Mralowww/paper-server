@@ -6,7 +6,7 @@
     const me = App.me;
     const node = (ok, ico, title, sub) => `<div class="node ${ok ? "ok" : ""}"><span class="icon-box" style="margin:0 auto;${ok ? "--c:var(--green);--cb:var(--green-bg)" : ""}">${ico}</span><b>${title}</b><small>${sub}</small></div>`;
     $("#flow").innerHTML = node(true, ART.icon("globe", 22), t("acc.web"), t("acc.linked"))
-      + node(true, `<img src="${esc(me.avatar)}" style="width:26px;height:26px;border-radius:50%" alt="">`, "Discord", esc(me.name))
+      + node(true, `<img src="${esc(me.avatar)}" style="width:26px;height:26px;border-radius:50%" alt="">`, "Discord", esc(me.name) + " " + App.badges(me.badges))
       + node(!!d.mc, d.mc ? `<img src="${mcHead(d.mc.uuid, 26)}" style="width:26px;height:26px;border-radius:5px;image-rendering:pixelated" alt="">` : ART.icon("server", 22), "Minecraft", d.mc ? esc(d.mc.name) : t("acc.notLinked"));
     const lc = $("#link-card");
     if (d.mc) {

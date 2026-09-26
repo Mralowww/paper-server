@@ -451,6 +451,8 @@
   addEventListener("scroll", (e) => { if (openSelect && !(e.target instanceof Element && e.target.closest(".select-list"))) openSelect.place(); }, true);
 
   /* ---------- 分頁標籤 ---------- */
+  /** 贊助者 / 加成者徽章（依 Discord 身分組） */
+  const badges = (list) => (list || []).map((b) => `<span class="sup-badge ${b}" title="${t("bd." + b + ".d")}">${window.ART ? ART.icon(b === "sponsor" ? "gem" : "sparkle", 11) : ""}${t("bd." + b)}</span>`).join(" ");
   /** 切換內容時先鎖住高度，避免內容短暫清空讓頁面被拉回頂端；內容載入後再放開。 */
   function holdHeight(el, ms = 700) {
     if (!el) return () => {};
@@ -820,7 +822,7 @@
 
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
-    holdHeight, fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
+    holdHeight, badges, fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, get mePromise() { return mePromise; },
     setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,
   };

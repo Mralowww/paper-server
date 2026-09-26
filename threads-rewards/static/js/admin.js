@@ -82,7 +82,7 @@
   function renderSide() {
     const me = App.me; const card = $("#me-card"); const side = $("#side");
     const cardSig = me.avatar + me.name + level + App.lang + JSON.stringify(me.roles || []);
-    if (card.dataset.sig !== cardSig) { card.dataset.sig = cardSig; card.innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)}</b><div class="role-line">${lvlTags(level, me.roles)}</div></div>`; }
+    if (card.dataset.sig !== cardSig) { card.dataset.sig = cardSig; card.innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)} ${App.badges(me.badges)}</b><div class="role-line">${lvlTags(level, me.roles)}</div></div>`; }
     const sig = level + App.lang;
     if (side.dataset.sig !== sig) {
       side.dataset.sig = sig;
@@ -380,7 +380,7 @@
     { title: "admin.rulesEdit", hint: "admin.rulesHint", items: [["rules", "admin.rulesEdit", "textarea"]] },
   ]);
   const settings = (el) => settingsForm(el, "settings", [
-    { title: "set.discord", hint: "set.discord.d", items: [["ticket_channel_id", "set.ticketCh", "channel"], ["punish_log_channel_id", "set.punCh", "channel"], ["announce_channel_id", "set.annCh", "channel"], ["discord_ban_role", "set.banRole", "role"], ["discord_mute_role", "set.muteRole", "role"], ["discord_linked_role", "set.linkedRole", "role"]] },
+    { title: "set.discord", hint: "set.discord.d", items: [["ticket_channel_id", "set.ticketCh", "channel"], ["punish_log_channel_id", "set.punCh", "channel"], ["announce_channel_id", "set.annCh", "channel"], ["discord_ban_role", "set.banRole", "role"], ["discord_mute_role", "set.muteRole", "role"], ["discord_linked_role", "set.linkedRole", "role"], ["sponsor_role_id", "set.sponsorRole", "role"], ["booster_role_id", "set.boosterRole", "role"], ["notify_roles", "set.notifyRoles", "textarea"]] },
     { title: "set.punish", items: [["reason_presets", "set.reasons", "textarea"], ["warn_threshold", "set.warnN", "num"], ["warn_ban_hours", "set.warnH", "num"]] },
     { title: "set.support", items: [["canned_replies", "set.canned", "textarea"], ["violation_types", "set.violations", "textarea"]] },
     { title: "set.ranks", hint: "set.ranks.d", items: [["rank_tiers", "set.tiers", "textarea"]] },
@@ -444,7 +444,7 @@
   /* ---------- 團隊 ---------- */
   async function team(el) {
     const d = await api("/api/admin/team");
-    el.innerHTML = head("team") + `<div class="grid grid-3">${d.team.map((u) => `<div class="card hover reveal"><div class="row" style="gap:12px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" style="width:48px;height:48px;border-radius:50%" alt=""><div style="min-width:0"><b>${esc(u.name)}</b><div class="role-line">${lvlTags(u.level, u.roles)}</div></div></div>
+    el.innerHTML = head("team") + `<div class="grid grid-3">${d.team.map((u) => `<div class="card hover reveal"><div class="row" style="gap:12px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" style="width:48px;height:48px;border-radius:50%" alt=""><div style="min-width:0"><b>${esc(u.name)} ${App.badges(u.badges)}</b><div class="role-line">${lvlTags(u.level, u.roles)}</div></div></div>
       <div class="kpi-mini" style="margin-top:16px"><div><b>${u.replies}</b><small>${t("team.replies")}</small></div><div><b>${u.punishments}</b><small>${t("team.puns")}</small></div></div>
       <small class="dim">${u.mc_name ? ART.icon("pickaxe", 12) + " " + esc(u.mc_name) + " · " : ""}${u.last_login ? ago(u.last_login) : ""}</small></div>`).join("") || `<div class="card empty" style="grid-column:1/-1">${t("team.empty")}</div>`}</div>
       <p class="dim" style="margin-top:18px;font-size:13px">${t("team.hint")}</p>`;

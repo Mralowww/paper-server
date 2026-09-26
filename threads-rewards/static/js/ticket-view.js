@@ -54,7 +54,7 @@
       R("head").innerHTML = `<div class="tk-head" data-cat="${tk.category}">
         <span class="icon-box lg">${ART.icon(CAT_ICON[tk.category], 26)}</span>
         <div style="min-width:0;flex:1">
-          <div class="meta"><span class="mono">#${tk.id}</span><span>${t("cat." + tk.category)}</span>${data.staff ? `<span>${esc(data.owner.name)}</span>` : ""}<span>${date(tk.created_at)}</span>
+          <div class="meta"><span class="mono">#${tk.id}</span><span>${t("cat." + tk.category)}</span>${data.staff ? `<span>${esc(data.owner.name)} ${App.badges(data.owner.badges)}</span>` : ""}<span>${date(tk.created_at)}</span>
             ${tk.priority && tk.priority !== "normal" ? `<span class="tag ${tk.priority === "urgent" ? "red pulse" : tk.priority === "high" ? "warn" : "gray"}">${t("pr." + tk.priority)}</span>` : ""}</div>
           <h2>${esc(tk.subject)}</h2>
           <div class="stepper">${[1, 2, 3].map((n) => `${n > 1 ? `<span class="ln"></span>` : ""}<span class="st ${n <= step ? "done" : ""}"><i>${n}</i>${t(["", "st.open", "st.answered", "st.closed"][n])}</span>`).join("")}

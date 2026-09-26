@@ -9,6 +9,7 @@ _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 
 DEFAULT_SETTINGS = {
+    "sponsor_role_id": "1539867828839252020", "booster_role_id": "1533474407354339562", "notify_roles": "",
     "maintenance": "", "vapid_private_pem": "",
     "w_views": "1",
     "w_likes": "10",

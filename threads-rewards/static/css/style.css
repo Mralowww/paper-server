@@ -1605,3 +1605,35 @@ body.standalone:has(.desk) { overflow: hidden; }
 .dc-role i { width: 7px; height: 7px; border-radius: 50%; background: var(--rc); flex: none; }
 .dc-role.sub { font-weight: 500; opacity: .85; }
 .role-line .lvl-tag { font-size: 10.5px; }
+
+/* ================= 通知身分組領取 ================= */
+.nr { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 90px 16px 40px;
+  background: radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, #5865f2 16%, transparent), transparent 70%); }
+.nr-card { width: min(640px, 100%); display: grid; gap: 14px; animation: popIn .5s var(--ease-spring) both; }
+.nr-head { display: flex; align-items: center; gap: 10px; } .nr-bot { width: 40px; height: 40px; border-radius: 50%; }
+.nr-head b { font-size: 16px; } .nr-app { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #5865f2; color: #fff; font: 700 10.5px var(--font-body); vertical-align: 2px; }
+.nr-embed { padding: 18px 20px; border-radius: 6px; border-left: 4px solid #5865f2; background: var(--surface); box-shadow: 0 1px 0 var(--border); }
+.nr-embed h1 { font: 700 18px var(--font-body); margin: 0 0 8px; }
+.nr-embed p { margin: 0 0 14px; color: var(--text-2); }
+.nr-stats { display: grid; gap: 4px; font-size: 15px; } .nr-stat b { font-weight: 700; } .nr-stat span { color: var(--text-2); } .nr-stat i { font-style: normal; font-family: var(--font-mono); }
+.nr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.nr-btn { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  animation: itemIn .4s var(--ease-out) both; animation-delay: calc(var(--i) * 60ms); transition: border-color .25s, background .25s, transform .25s var(--ease-spring), box-shadow .25s; }
+.nr-btn:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: 0 10px 28px -16px rgba(0,0,0,.6); }
+.nr-btn:active:not(:disabled) { transform: scale(.98); }
+.nr-btn:disabled { opacity: .55; cursor: not-allowed; }
+.nr-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--sunken); color: var(--text-3); transition: background .3s, color .3s; }
+.nr-txt { display: grid; gap: 2px; min-width: 0; } .nr-txt b { font-size: 15px; } .nr-txt small { color: var(--text-3); font-size: 12.5px; line-height: 1.4; }
+.nr-state { display: grid; justify-items: center; gap: 4px; } .nr-state small { font-size: 11px; color: var(--text-3); }
+.nr-sw { position: relative; width: 38px; height: 22px; border-radius: 11px; background: var(--border-strong); transition: background .3s; }
+.nr-sw em { position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .35s var(--ease-spring); }
+.nr-btn.on { border-color: color-mix(in srgb, #5865f2 60%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, #5865f2 12%, var(--surface)), var(--surface)); }
+.nr-btn.on .nr-ic { background: #5865f2; color: #fff; } .nr-btn.on .nr-sw { background: #5865f2; } .nr-btn.on .nr-sw em { transform: translateX(16px); } .nr-btn.on .nr-state small { color: #8b93ff; }
+.nr-btn.busy { pointer-events: none; } .nr-btn.busy .nr-sw em { animation: nrPulse .8s infinite alternate; } @keyframes nrPulse { to { opacity: .4; } }
+.nr-foot { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; text-align: center; color: var(--text-2); font-size: 13.5px; }
+@media (max-width: 560px) { .nr-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* 贊助者 / 加成者徽章 */
+.sup-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font: 700 11px var(--font-body); color: #fff; white-space: nowrap; vertical-align: 1px; }
+.sup-badge.sponsor { background: linear-gradient(135deg, #5800ff, #9b5cff); box-shadow: 0 0 12px -3px #7b3bff; }
+.sup-badge.booster { background: linear-gradient(135deg, #e800ff, #ff73fa); box-shadow: 0 0 12px -3px #f47fff; }
