@@ -467,7 +467,10 @@
     while (items.length && items[items.length - 1].sep) items.pop();
     e.preventDefault(); showCtx(e.clientX, e.clientY, items);
   });
-  ["click", "scroll", "resize", "blur"].forEach((ev) => window.addEventListener(ev, hideCtx, true));
+  window.addEventListener("click", (e) => { if (!(ctxEl && ctxEl.contains(e.target))) hideCtx(); }, true);
+  window.addEventListener("resize", hideCtx);
+  window.addEventListener("scroll", (e) => { if (!(ctxEl && e.target instanceof Node && ctxEl.contains(e.target))) hideCtx(); }, true);
+  window.addEventListener("blur", (e) => { if (e.target === window) hideCtx(); });
 
   /* ---------- Ctrl+K 搜尋面板 ---------- */
   let paletteOpen = false;
