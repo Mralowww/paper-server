@@ -225,6 +225,12 @@ async def search(q: str = ""):
 _status_cache: dict = {"at": 0.0, "data": None}
 
 
+@app.get("/api/rules")
+async def rules_text():
+    """規則頁只需要規則文字；不像 /api/server 需要等 Minecraft 伺服器回應。"""
+    return {"rules": db.settings().get("rules", "")}
+
+
 @app.get("/api/server")
 async def server_info():
     """伺服器位址、Discord 邀請、規則，以及透過 mcsrvstat.us 查詢的即時狀態（快取 60 秒）。"""

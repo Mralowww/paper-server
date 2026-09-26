@@ -143,9 +143,10 @@
     $$(".rb-sec[id]").forEach((s) => spyIO.observe(s));
   }
 
-  document.addEventListener("app:ready", async () => {
-    try { custom = (await api("/api/server", { quiet: true })).rules || ""; } catch { /* 使用預設規則 */ }
-    render();
+  // 立即顯示內建規則，不等登入狀態或伺服器狀態；若後台有自訂規則再替換
+  render();
+  api("/api/rules", { quiet: true }).then((d) => { const c = (d.rules || "").trim(); if (c && c !== custom) { custom = c; render(); } }).catch(() => {});
+  document.addEventListener("app:ready", () => {
     $("#rb-toc").addEventListener("click", (e) => {
       const a = e.target.closest("a[href^='#']"); if (!a) return; e.preventDefault();
       document.querySelector(a.getAttribute("href"))?.scrollIntoView({ behavior: "smooth", block: "start" }); App.sfx("switch");
