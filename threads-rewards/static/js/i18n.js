@@ -668,6 +668,10 @@ Object.assign(window.I18N.en, {
 });
 Object.assign(window.I18N.zh, {
   "bd.sponsor": "贊助者", "bd.sponsor.d": "感謝支持伺服器的贊助者", "bd.booster": "加成者", "bd.booster.d": "為 Discord 伺服器加成的玩家",
+  "soc.title": "社群連結", "soc.hint": "網站上不會顯示這些連結；玩家只能透過短網址 sawsmp.me/discord、/ig、/threads 轉接。關閉時會顯示「尚未開放」。",
+  "soc.discord": "Discord 邀請連結", "soc.discordOpen": "sawsmp.me/discord 轉接", "soc.ig": "Instagram 連結", "soc.igOpen": "sawsmp.me/ig 轉接",
+  "soc.threads": "Threads 連結", "soc.threadsOpen": "sawsmp.me/threads 轉接", "soc.open": "開放轉接", "soc.closed": "關閉（顯示尚未開放）",
+  "go.title": "連結尚未開放", "go.msg": "{name} 的連結目前還沒有開放，請之後再回來看看。", "go.home": "返回主頁",
   "nr.bot": "鋸齒機器人", "nr.title": "通知身分組領取", "nr.desc": "點擊下方按鈕加入或移除對應的通知身分組。", "nr.subs": "已訂閱 {n} 人",
   "nr.on": "已訂閱", "nr.wait": "{n} 秒", "nr.off": "未訂閱", "nr.added": "已加入「{name}」", "nr.removed": "已移除「{name}」",
   "nr.needLogin": "登入 Discord 帳號後就能直接在這裡領取通知身分組。", "nr.notMember": "你還沒加入鋸齒 SMP 的 Discord 伺服器，加入後才能領取身分組。",
@@ -677,6 +681,10 @@ Object.assign(window.I18N.zh, {
 });
 Object.assign(window.I18N.en, {
   "bd.sponsor": "Sponsor", "bd.sponsor.d": "Supports the server", "bd.booster": "Booster", "bd.booster.d": "Boosts the Discord server",
+  "soc.title": "Social links", "soc.hint": "These links are never shown on the site; players can only reach them via sawsmp.me/discord, /ig and /threads. When closed, a \"not open yet\" page is shown.",
+  "soc.discord": "Discord invite", "soc.discordOpen": "sawsmp.me/discord redirect", "soc.ig": "Instagram link", "soc.igOpen": "sawsmp.me/ig redirect",
+  "soc.threads": "Threads link", "soc.threadsOpen": "sawsmp.me/threads redirect", "soc.open": "Open", "soc.closed": "Closed (shows not open)",
+  "go.title": "Link not open yet", "go.msg": "The {name} link isn't open yet. Please check back later.", "go.home": "Back to home",
   "nr.bot": "Saw Bot", "nr.title": "Notification roles", "nr.desc": "Click a button below to add or remove that notification role.", "nr.subs": "{n} subscribed",
   "nr.on": "Subscribed", "nr.wait": "{n}s", "nr.off": "Off", "nr.added": "Added \"{name}\"", "nr.removed": "Removed \"{name}\"",
   "nr.needLogin": "Sign in with Discord to pick your notification roles here.", "nr.notMember": "Join the Saw SMP Discord server first to pick roles.",

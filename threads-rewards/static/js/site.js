@@ -88,7 +88,6 @@
     const tag = $("#status-tag"); tag.className = "tag live " + (on ? "ok" : "err"); tag.textContent = t(on ? "home.online" : "home.offline");
     const pl = $("#st-players"); pl.hidden = !on; pl.textContent = st.max ? `${fmt(st.players)} / ${fmt(st.max)} ${t("home.players")}` : `${fmt(st.players || 0)} ${t("home.players")}`;
     const ver = $("#st-version"); ver.hidden = !st.version; ver.textContent = st.version || "";
-    const dc = $("#discord-btn"); dc.hidden = !server.discord_invite; dc.href = server.discord_invite || "#";
     App.renderBanner(server.announcement);
   }
 

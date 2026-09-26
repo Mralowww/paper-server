@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, maintenance, push, roles, security, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, maintenance, push, roles, security, social, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user, protect_owner, roles_of, save_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -75,6 +75,7 @@ app.include_router(push.router)
 app.include_router(sync.router)
 app.include_router(maintenance.router)
 app.include_router(roles.router)
+app.include_router(social.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
@@ -270,7 +271,7 @@ async def server_info():
     plugin_online = db.one("SELECT COUNT(*) AS n FROM players WHERE online = 1")["n"]
     shown = {**_status_cache["data"], "online": True,
              "players": max(_status_cache["data"].get("players") or 0, plugin_online)}
-    return {"status": shown, "discord_invite": s.get("discord_invite", ""),
+    return {"status": shown,
             "rules": s.get("rules", ""), "announcement": s.get("announcement", "")}
 
 
@@ -458,6 +459,12 @@ async def admin_settings(body: dict, admin: dict = Depends(admin_user)):
             raise HTTPException(400, "結算星期需介於 0–6")
         elif k == "settle_hour" and not (0 <= int(v) <= 23):
             raise HTTPException(400, "結算小時需介於 0–23")
+        elif k in ("discord_invite", "ig_url", "threads_url"):
+            v = str(v or "").strip()
+            if v and (not v.startswith("https://") or any(c in v for c in " \"<>\\")):
+                raise HTTPException(400, "社群連結必須是 https:// 開頭的網址")
+        elif k.startswith("link_open_"):
+            v = "1" if str(v) in ("1", "true", "on") else "0"
         clean[k] = v
     old = db.settings()
     db.set_settings(clean)

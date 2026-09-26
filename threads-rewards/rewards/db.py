@@ -22,7 +22,10 @@ DEFAULT_SETTINGS = {
     "reward_2": "",
     "reward_3": "",
     "server_address": "sawsmp.me",
-    "discord_invite": "",
+    "discord_invite": "https://discord.gg/YEb2EfcsxY",
+    "ig_url": "https://www.instagram.com/sawsmp_official_ig/",
+    "threads_url": "https://www.threads.com/@sawsmp_official",
+    "link_open_discord": "0", "link_open_ig": "0", "link_open_threads": "0",
     "rules": "",
     "warn_threshold": "3",        # 累積幾次有效警告後自動限時封鎖（0 = 關閉）
     "warn_ban_hours": "24",

@@ -368,6 +368,8 @@
       ${grp.items.map(([k, label, type]) => type === "textarea" ? `<div class="field"><label>${t(label)}</label><textarea class="input ${k.includes("tiers") ? "mono" : ""}" name="${k}" rows="6">${esc(s[k] || "")}</textarea></div>`
         : type === "role" || type === "channel" ? `<div class="field"><label>${t(label)}</label><input class="input mono" name="${k}" value="${esc(s[k] || "")}" placeholder="${type === "role" ? t("set.roleId") : t("set.channelId")}"></div>`
         : type === "weekday" ? `<div class="field"><label>${t(label)}</label><select class="enhance" name="${k}">${Array.from({ length: 7 }, (_, i) => `<option value="${i}" ${String(s[k]) === String(i) ? "selected" : ""}>${t("wd." + i)}</option>`).join("")}</select></div>`
+        : type === "onoff" ? `<div class="field"><label>${t(label)}</label><select class="enhance" name="${k}"><option value="0" ${s[k] !== "1" ? "selected" : ""}>${t("soc.closed")}</option><option value="1" ${s[k] === "1" ? "selected" : ""}>${t("soc.open")}</option></select></div>`
+        : type === "url" ? `<div class="field"><label>${t(label)}</label><input class="input mono" type="url" name="${k}" value="${esc(s[k] || "")}" placeholder="https://"></div>`
         : type === "hour" ? `<div class="field"><label>${t(label)}</label><select class="enhance" name="${k}">${Array.from({ length: 24 }, (_, i) => `<option value="${i}" ${String(s[k]) === String(i) ? "selected" : ""}>${String(i).padStart(2, "0")}:00</option>`).join("")}</select></div>`
         : `<div class="field"><label>${t(label)}</label><input class="input ${type === "num" ? "mono" : ""}" ${type === "num" ? 'type="number" step="0.01" min="0"' : ""} name="${k}" value="${esc(s[k] || "")}"></div>`).join("")}
       </div></div>`).join("")}<div style="grid-column:1/-1;display:flex;justify-content:flex-end"><button class="btn gold lg">${t("save")}</button></div></form>`;
@@ -376,7 +378,8 @@
   }
 
   const site = (el) => settingsForm(el, "site", [
-    { title: "admin.server", items: [["server_address", "admin.address"], ["discord_invite", "admin.invite"], ["announcement", "admin.announce", "textarea"]] },
+    { title: "admin.server", items: [["server_address", "admin.address"], ["announcement", "admin.announce", "textarea"]] },
+    { title: "soc.title", hint: "soc.hint", items: [["discord_invite", "soc.discord", "url"], ["link_open_discord", "soc.discordOpen", "onoff"], ["ig_url", "soc.ig", "url"], ["link_open_ig", "soc.igOpen", "onoff"], ["threads_url", "soc.threads", "url"], ["link_open_threads", "soc.threadsOpen", "onoff"]] },
     { title: "admin.rulesEdit", hint: "admin.rulesHint", items: [["rules", "admin.rulesEdit", "textarea"]] },
   ]);
   const settings = (el) => settingsForm(el, "settings", [
