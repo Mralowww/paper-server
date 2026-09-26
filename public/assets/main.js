@@ -189,7 +189,7 @@
         slot.innerHTML = `<a class="btn btn-sm btn-discord" href="${loginUrl()}">${icon.discord}<span>${t('nav.login')}</span></a>`;
         return;
       }
-      const items = [['me', '/me', 'nav.me']];
+      const items = [['me', '/me', 'nav.me'], ['settings', '/settings', 'nav.settings']];
       if (perms.testerPanel) items.push(['tester', '/tester', 'nav.tester']);
       if (perms.viewStaff) items.push(['admin', '/admin', 'nav.admin']);
       if (perms.viewAudit) items.push(['audit', '/audit', 'nav.audit']);
@@ -733,21 +733,7 @@
       load(true);
     },
 
-    async player() {
-      const name = decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || '');
-      const root = $('#profile');
-      try {
-        const p = await api(`/players/${encodeURIComponent(name)}`);
-        document.title = `${p.name} · Mc.Tierlist.Asia`;
-        root.innerHTML = `<div class="modal pcard pcard-page reveal">${playerCardHtml(p)}</div>`;
-        animateCard(root);
-      } catch (err) {
-        root.innerHTML = err.status === 404
-          ? emptyHtml(t('empty.notFoundT'), esc(t('empty.notFoundD', { name })))
-          : emptyHtml(t('empty.errT'), t('empty.errD'));
-      }
-      initReveal();
-    },
+
 
     async me() {
       const root = $('#meRoot');
@@ -759,45 +745,82 @@
       }
       try {
         const d = await request('/api/me/profile');
-        const cd = d.cooldownUntil
-          ? `<div class="num sm">${esc(fmtRelative(d.cooldownUntil))}</div><div class="lbl">${t('me.cooldown')}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(fmtDate(d.cooldownUntil))}</div>`
-          : `<div class="num sm ok">✓</div><div class="lbl">${t('me.ready')}</div>`;
-        const ticket = d.openTicket
-          ? `<div class="num sm">${esc(d.openTicket.mc_name)}</div><div class="lbl">${t('me.openTicket')}</div>${d.guildId ? `<a class="btn btn-sm" style="margin-top:10px" href="${discordLink(d.guildId, d.openTicket.channel_id)}" target="_blank" rel="noopener">${t('me.openInDiscord')} ↗</a>` : ''}`
-          : `<div class="num sm muted">—</div><div class="lbl">${t('me.openTicket')}</div>`;
+        // Your profile is your player page once we know your Minecraft account.
+        const name = d.link?.name || d.player?.name;
+        if (name) return location.replace(`/player/${encodeURIComponent(name)}`);
         root.innerHTML = `
           <div class="me-head reveal">
             <img src="${discordAvatar(user.id, user.avatar)}" alt="">
             <div><h1>${esc(user.username)}</h1><div class="chips-row">${levelChips(user)}</div></div>
+            <a class="btn btn-sm" href="/settings" style="margin-left:auto">${t('nav.settings')}</a>
           </div>
           ${user.inGuild ? '' : `<div class="callout reveal" style="margin-bottom:18px">${t('me.notInGuild')}</div>`}
-          <div class="me-grid">
-            <div class="reveal">${d.player
-              ? `<div class="modal pcard pcard-page">${playerCardHtml(d.player)}</div>`
-              : emptyHtml(t('me.notLinkedT'), t('me.notLinkedD')).replace('reveal', '')}</div>
-            <div class="me-side">
-              ${linkCardHtml(d)}
-              <div class="kv2">
-                <div class="stat spot reveal" style="--d:.05s">${cd}</div>
-                <div class="stat spot reveal" style="--d:.1s">${ticket}</div>
-              </div>
-              <div class="panel-head reveal" style="margin:22px 0 12px"><h2 style="font-size:20px">${t('me.history')}</h2></div>
-              <div class="card reveal">${d.tests.length ? testsTable(d.tests, [
-                ['col.date', (x) => `<span class="muted">${esc(fmtDate(x.created_at))}</span>`],
-                ['col.result', resultCell],
-                ['col.score', scoreCell],
-                ['col.tester', (x) => esc(x.tester_name || '—')],
-              ]) : `<div class="card-pad muted">${t('me.noTests')}</div>`}</div>
-            </div>
+          <div class="me-solo">
+            ${linkCardHtml(d)}
+            <p class="muted reveal" style="font-size:14px">${t('me.linkToProfile')}</p>
+            ${d.tests.length ? `<div class="panel-head reveal" style="margin:22px 0 12px"><h2 style="font-size:20px">${t('me.history')}</h2></div>
+            <div class="card reveal">${testsTable(d.tests, [
+              ['col.date', (x) => `<span class="muted">${esc(fmtDate(x.created_at))}</span>`],
+              ['col.result', resultCell], ['col.score', scoreCell], ['col.tester', (x) => esc(x.tester_name || '—')],
+            ])}</div>` : ''}
           </div>`;
         bindLinkCard(root, () => pages.me());
-        const { permissions: perms } = await session;
-        if (perms.accountKeys) renderKeys(root);
       } catch {
         root.innerHTML = emptyHtml(t('empty.errT'), t('empty.errD'));
       }
       initReveal();
     },
+
+    async settings() {
+      const root = $('#settingsRoot');
+      const { user, permissions: perms } = await session;
+      if (!user) {
+        root.innerHTML = emptyHtml(t('me.loginT'), t('me.loginD'),
+          `<p style="margin-top:20px"><a class="btn btn-discord" href="${loginUrl()}">${icon.discord}${t('nav.loginDiscord')}</a></p>`);
+        return initReveal();
+      }
+      const d = await request('/api/me/profile').catch(() => null);
+      const { LANGS, lang } = window.I18N;
+      root.innerHTML = `
+        <div class="panel-head reveal"><div><div class="kicker">SETTINGS</div><h1 class="set-title">${t('nav.settings')}</h1><p>${t('set.subtitle')}</p></div></div>
+        <div class="set-grid">
+          <nav class="set-nav reveal">
+            <a href="#account">${t('set.account')}</a><a href="#minecraft">${t('link.title')}</a><a href="#language">${t('nav.language')}</a>
+            ${perms.accountKeys ? `<a href="#keys">${t('akey.title')}</a>` : ''}
+          </nav>
+          <div class="set-main">
+            <section id="account" class="card card-pad set-card reveal">
+              <h3>${t('set.account')}</h3>
+              <div class="set-account"><img src="${discordAvatar(user.id, user.avatar)}" alt="">
+                <div><b>${esc(user.username)}</b><div class="mono muted" style="font-size:12px">${esc(user.id)}</div><div class="chips-row" style="margin-top:6px">${levelChips(user)}</div></div>
+                <form method="post" action="/auth/logout" id="logoutForm" style="margin-left:auto"><button class="btn btn-sm">${t('nav.logout')}</button></form></div>
+              ${(d?.link || d?.player) ? `<a class="btn btn-sm" style="margin-top:14px" href="/player/${encodeURIComponent(d.link?.name || d.player.name)}">${t('set.viewProfile')} →</a>` : ''}
+            </section>
+            <section id="minecraft" class="set-section">${d ? linkCardHtml(d) : ''}</section>
+            <section id="language" class="card card-pad set-card reveal">
+              <h3>${t('nav.language')}</h3>
+              <div class="seg">${LANGS.map((l) => `<button data-lang="${l.id}" class="${l.id === lang ? 'active' : ''}">${l.label}</button>`).join('')}</div>
+            </section>
+            <section id="keysWrap"></section>
+          </div>
+        </div>`;
+      bindLinkCard(root, () => pages.settings());
+      $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => window.I18N.setLang(b.dataset.lang)));
+      $('#logoutForm', root).addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await fetch('/auth/logout', { method: 'POST' });
+        location.href = '/';
+      });
+      if (perms.accountKeys) {
+        const wrap = $('#keysWrap', root);
+        wrap.id = 'keys';
+        wrap.className = 'card card-pad set-card reveal';
+        await renderKeys(wrap);
+      }
+      initReveal();
+      if (location.hash) $(location.hash)?.scrollIntoView({ block: 'start' });
+    },
+
 
     async tester() {
       const root = $('#testerRoot');
@@ -978,6 +1001,7 @@
     $, $$, esc, icon, t, tierBadge, regionBadge, badgesHtml, avatarUrl, discordAvatar, toast, countUp, initReveal,
     session, levelChips, loginUrl, emptyHtml, testsTable, resultCell, scoreCell,
     send, giveFormHtml, bindGiveForm, statusPill, catLabel, catIcon, threadHtml, composerHtml, bindComposer, ticketHeadHtml, request,
+    TITLE_STYLE, fallbackImg, discordLink, linkCardHtml, bindLinkCard, renderKeys, regionName,
   };
 
   document.addEventListener('DOMContentLoaded', () => {

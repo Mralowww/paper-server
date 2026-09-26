@@ -152,6 +152,83 @@ CREATE TABLE IF NOT EXISTS link_codes (
   mc_name     TEXT NOT NULL,
   expires_at  INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS gs_players (
+  uuid          TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  kills         INTEGER NOT NULL DEFAULT 0,
+  deaths        INTEGER NOT NULL DEFAULT 0,
+  pvp_deaths    INTEGER NOT NULL DEFAULT 0,
+  crystal_kills INTEGER NOT NULL DEFAULT 0,
+  anchor_kills  INTEGER NOT NULL DEFAULT 0,
+  melee_kills   INTEGER NOT NULL DEFAULT 0,
+  other_kills   INTEGER NOT NULL DEFAULT 0,
+  totem_pops    INTEGER NOT NULL DEFAULT 0,
+  cur_streak    INTEGER NOT NULL DEFAULT 0,
+  best_streak   INTEGER NOT NULL DEFAULT 0,
+  matches       INTEGER NOT NULL DEFAULT 0,
+  match_wins    INTEGER NOT NULL DEFAULT 0,
+  match_losses  INTEGER NOT NULL DEFAULT 0,
+  match_draws   INTEGER NOT NULL DEFAULT 0,
+  playtime_ms   INTEGER NOT NULL DEFAULT 0,
+  online        INTEGER NOT NULL DEFAULT 0,
+  world         TEXT,
+  session_start INTEGER,
+  first_seen    INTEGER NOT NULL,
+  last_seen     INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gs_world_stats (
+  uuid     TEXT NOT NULL,
+  world    TEXT NOT NULL,
+  kills    INTEGER NOT NULL DEFAULT 0,
+  deaths   INTEGER NOT NULL DEFAULT 0,
+  matches  INTEGER NOT NULL DEFAULT 0,
+  wins     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (uuid, world)
+);
+CREATE TABLE IF NOT EXISTS gs_kills (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  killer_uuid   TEXT,
+  killer_name   TEXT,
+  victim_uuid   TEXT NOT NULL,
+  victim_name   TEXT NOT NULL,
+  world         TEXT NOT NULL,
+  cause         TEXT NOT NULL,
+  killer_health REAL,
+  victim_pops   INTEGER NOT NULL DEFAULT 0,
+  match_id      INTEGER,
+  created_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gs_matches (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  p1_uuid     TEXT NOT NULL,
+  p1_name     TEXT NOT NULL,
+  p2_uuid     TEXT NOT NULL,
+  p2_name     TEXT NOT NULL,
+  world       TEXT NOT NULL,
+  p1_score    INTEGER NOT NULL DEFAULT 0,
+  p2_score    INTEGER NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'live',
+  winner_uuid TEXT,
+  end_reason  TEXT,
+  started_at  INTEGER NOT NULL,
+  last_kill_at INTEGER NOT NULL,
+  ended_at    INTEGER
+);
+CREATE TABLE IF NOT EXISTS gs_names (
+  uuid        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  first_seen  INTEGER NOT NULL,
+  last_seen   INTEGER NOT NULL,
+  PRIMARY KEY (uuid, name)
+);
+CREATE TABLE IF NOT EXISTS gs_coreplus (
+  uuid         TEXT PRIMARY KEY,
+  name         TEXT,
+  stats        TEXT NOT NULL DEFAULT '{}',
+  achievements TEXT NOT NULL DEFAULT '[]',
+  login_streak INTEGER NOT NULL DEFAULT 0,
+  synced_at    INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
   key    TEXT PRIMARY KEY,
   value  TEXT
@@ -216,6 +293,12 @@ def init():
         conn.execute("CREATE INDEX IF NOT EXISTS bans_active ON bans (revoked_at, expires_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_user ON support_tickets (user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS support_msg_ticket ON support_messages (ticket_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_kills_killer ON gs_kills (killer_uuid, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_kills_victim ON gs_kills (victim_uuid, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_matches_p1 ON gs_matches (p1_uuid, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_matches_p2 ON gs_matches (p2_uuid, id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_matches_live ON gs_matches (status, last_kill_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS gs_players_name ON gs_players (name COLLATE NOCASE)")
         conn.execute("CREATE INDEX IF NOT EXISTS audit_actor ON audit_log (actor_id, id)")
         conn.execute("CREATE INDEX IF NOT EXISTS audit_action ON audit_log (action, id)")
         conn.execute("CREATE INDEX IF NOT EXISTS audit_target ON audit_log (target_type, target_id)")

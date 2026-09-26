@@ -21,6 +21,7 @@ from . import ddns
 from . import panel as P
 from . import site as S
 from . import links as L
+from . import gamestats as GS
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,16}$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$", re.I)
@@ -957,14 +958,9 @@ LINK_CHAT = "§6[Tierlist] §f你尚未綁定 Discord，驗證碼 §e§l{code}§
 @app.post("/api/server/join")
 def server_join():
     """Called by the Paper plugin before a player joins: ban check, link code, name sync."""
-    allowed, headers = server_limiter.hit(f"ip:{request.remote_addr}")
-    g.extra_headers = headers
-    if not allowed:
-        return error(429, "rate_limited")
-    key = server_key_ok()
-    if not key:
-        return error(401, "invalid_server_key")
-    D.AUDIT_CTX.get().update(source="server", serverKeyId=key["id"])
+    err = server_request()
+    if err:
+        return err
     data = body()
     uuid, name = L.norm_uuid(str(data.get("uuid") or "")), str(data.get("name") or "")
     if not re.fullmatch(r"[0-9a-f]{32}", uuid) or not re.fullmatch(r"[A-Za-z0-9_]{1,16}", name):
@@ -989,6 +985,173 @@ def server_join():
     return jsonify({"allow": False, "reason": "unlinked", "linked": False, "code": code, "expiresAt": expires,
                     "kickMessage": LINK_KICK.format(code=code, host=host),
                     "chatMessage": LINK_CHAT.format(code=code, host=host)})
+
+
+def server_request():
+    """Common checks for plugin → website calls. Returns an error response or None."""
+    allowed, headers = server_limiter.hit(f"ip:{request.remote_addr}")
+    g.extra_headers = headers
+    if not allowed:
+        return error(429, "rate_limited")
+    key = server_key_ok()
+    if not key:
+        return error(401, "invalid_server_key")
+    D.AUDIT_CTX.get().update(source="server", serverKeyId=key["id"])
+    return None
+
+
+def save_worlds(conn, data):
+    """World display names the plugin read from CorePlus (world → {id, display})."""
+    raw = data.get("worlds")
+    if not isinstance(raw, dict):
+        return
+    clean = {}
+    for world, info in list(raw.items())[:50]:
+        if GS.WORLD_RE.match(str(world)) and isinstance(info, dict):
+            clean[str(world)] = {"id": re.sub(r"[^a-z0-9_-]", "", str(info.get("id") or "").lower())[:32],
+                                 "display": str(info.get("display") or world)[:40]}
+    if clean:
+        D.set_setting(conn, "gs_worlds", json.dumps(clean, ensure_ascii=False))
+
+
+@app.post("/api/server/events")
+def server_events():
+    err = server_request()
+    if err:
+        return err
+    events = body().get("events")
+    if not isinstance(events, list):
+        return bad("invalid_events", "events must be a list")
+    conn = db()
+    ok = sum(1 for ev in events[:1000] if isinstance(ev, dict) and GS.handle(conn, ev))
+    GS.sweep(conn)
+    conn.commit()
+    return jsonify({"ok": True, "accepted": ok})
+
+
+@app.post("/api/server/presence")
+def server_presence():
+    err = server_request()
+    if err:
+        return err
+    data = body()
+    players = data.get("players") if isinstance(data.get("players"), list) else []
+    conn = db()
+    save_worlds(conn, data)
+    n = GS.presence(conn, [p for p in players if isinstance(p, dict)], D.now_ms())
+    GS.sweep(conn)
+    conn.commit()
+    return jsonify({"ok": True, "online": n})
+
+
+@app.post("/api/server/coreplus")
+def server_coreplus():
+    err = server_request()
+    if err:
+        return err
+    players = body().get("players")
+    if not isinstance(players, list):
+        return bad("invalid_players", "players must be a list")
+    conn = db()
+    n = GS.save_coreplus(conn, [p for p in players if isinstance(p, dict)], D.now_ms())
+    conn.commit()
+    return jsonify({"ok": True, "saved": n})
+
+
+# ---------------------------------------------------------------- player profile (website)
+def profile_limit():
+    allowed, headers = site_limiter.hit(f"ip:{request.remote_addr}")
+    g.extra_headers = headers
+    return None if allowed else error(429, "rate_limited")
+
+
+def resolve_profile(ident):
+    """(uuid, name) for a player page, from local data or Mojang. None if the account doesn't exist."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,36}", ident):
+        return None
+    conn = db()
+    uuid = GS.find_uuid(conn, ident)
+    if not uuid:
+        from . import heads
+        try:
+            uuid = heads.resolve_uuid(ident)
+        except Exception:
+            uuid = None
+    if not uuid:
+        return None
+    row = (conn.execute("SELECT name FROM gs_players WHERE uuid = ?", (uuid,)).fetchone()
+           or conn.execute("SELECT mc_name AS name FROM mc_links WHERE uuid = ?", (uuid,)).fetchone()
+           or conn.execute("SELECT name FROM players WHERE REPLACE(LOWER(uuid), '-', '') = ?", (uuid,)).fetchone())
+    return uuid, (row["name"] if row else ident)
+
+
+@app.get("/api/profile/<ident>")
+def profile_general(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    uuid, name = found
+    conn = db()
+    user = current_user()
+    player = next((p for p in D.ranked_players(conn) if L.norm_uuid(p["uuid"]) == uuid), None) \
+        or next((p for p in D.ranked_players(conn) if p["name"].lower() == name.lower() and not p["uuid"]), None)
+    link = L.link_by_uuid(conn, uuid)
+    is_me = bool(user and ((link and link["discord_id"] == user["id"]) or (player and player["discord_id"] == user["id"])))
+    out = {
+        "uuid": L.dashed(uuid), "name": name, "isMe": is_me, "loggedIn": bool(user),
+        "player": D.public_player(player, detailed=bool(user)) if player else None,
+        "names": GS.names(conn, uuid) or [{"name": name, "first_seen": None, "last_seen": None}],
+        "known": bool(conn.execute("SELECT 1 FROM gs_players WHERE uuid = ?", (uuid,)).fetchone()),
+        "worlds": GS.worlds(conn),
+    }
+    if user:
+        out["presence"] = GS.presence_of(conn, uuid)
+        did = (link and link["discord_id"]) or (player and player["discord_id"])
+        cond, args = ("(discord_id = ? OR player_id = ?)", [did, player["id"]]) if did and player else \
+            ("discord_id = ?", [did]) if did else ("player_id = ?", [player["id"]]) if player else ("0", [])
+        out["tests"] = [dict(r) for r in conn.execute(
+            f"SELECT id, mc_name, tester_name, prev_tier, new_tier, wins, losses, created_at FROM tests WHERE {cond} "
+            "ORDER BY id DESC LIMIT 10", args).fetchall()]
+    if is_me:
+        ticket = conn.execute("SELECT channel_id, mc_name, kind, created_at FROM tickets WHERE applicant_id = ? AND status = 'open'",
+                              (user["id"],)).fetchone()
+        out["self"] = {"cooldownUntil": D.cooldown_until(conn, user["id"]), "openTicket": dict(ticket) if ticket else None,
+                       "guildId": str(C.GUILD_ID) if C.GUILD_ID else None}
+    return jsonify(out)
+
+
+@route("/api/profile/<ident>/stats")
+def profile_stats(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    conn = db()
+    return jsonify({"stats": GS.stats(conn, found[0]), "worlds": GS.worlds(conn)})
+
+
+@route("/api/profile/<ident>/matches")
+def profile_matches(ident):
+    err = profile_limit()
+    if err:
+        return err
+    found = resolve_profile(ident)
+    if not found:
+        return error(404, "player_not_found")
+    conn = db()
+    items, more = GS.matches(conn, found[0], clamp_int(request.args.get("before"), 0, 10**12, 0) or None,
+                             clamp_int(request.args.get("limit"), 1, 50, 30))
+    return jsonify({"matches": items, "hasMore": more, "worlds": GS.worlds(conn)})
+
+
+@route("/api/profile/match/<int:mid>")
+def profile_match(mid):
+    return jsonify({"kills": GS.match_kills(db(), mid)})
 
 
 @route("/api/admin/links", perm="viewStaff")

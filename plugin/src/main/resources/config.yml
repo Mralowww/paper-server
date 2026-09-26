@@ -27,6 +27,18 @@ timeout-ms: 5000
 # 已綁定的玩家進服時，是否在聊天室顯示綁定的 Discord 名稱
 show-linked-message: false
 
+# 伺服器戰績：記錄擊殺、死亡、對戰、上線時間與所在世界，顯示在網站玩家頁
+stats:
+  enabled: true
+
+# 讀取 CorePlus 的本地資料（成就、水晶／重生錨統計、世界名稱）同步到網站
+coreplus:
+  enabled: true
+  # CorePlus 的資料夾名稱（在 plugins/ 底下）
+  folder: "CorePlus"
+  # 幾分鐘同步一次
+  sync-minutes: 10
+
 messages:
   unavailable: "&c目前無法連線到 Mc.Tierlist.Asia，請稍後再試。"
   linked: "&6[Tierlist] &f已綁定 Discord：&e{discord}"
