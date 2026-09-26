@@ -91,9 +91,9 @@
     App.ctxProviders.push((target) => {
       const r = target.closest("[data-link]"); if (!r) return null;
       const l = data.links.find((x) => String(x.id) === r.dataset.link); if (!l) return null;
-      return [{ head: "@" + l.author }, { icon: "↗", label: t("links.open"), act: () => window.open(l.url, "_blank", "noopener") },
-        { icon: "🔗", label: t("links.copy"), act: () => App.copy(l.url) }, { icon: "⟳", label: t("links.refresh"), act: () => act("refresh", l.id) },
-        ...(l.this_period ? [{ icon: "✕", label: t("links.delete"), danger: true, act: () => act("delete", l.id) }] : [])];
+      return [{ head: "@" + l.author }, { icon: "external", label: t("links.open"), act: () => window.open(l.url, "_blank", "noopener") },
+        { icon: "link", label: t("links.copy"), act: () => App.copy(l.url) }, { icon: "refresh", label: t("links.refresh"), act: () => act("refresh", l.id) },
+        ...(l.this_period ? [{ icon: "trash", label: t("links.delete"), danger: true, act: () => act("delete", l.id) }] : [])];
     });
     load(); setInterval(() => document.visibilityState === "visible" && load(true), 30000);
   });

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, admin_ext, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -36,6 +36,8 @@ async def _backfill_linked_role() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.conn()
+    activity.ensure_schema()
+    activity.prune()
     background = [asyncio.create_task(tasks.scheduler()), asyncio.create_task(bot.start()),
                   asyncio.create_task(_backfill_linked_role())]
     yield
@@ -46,6 +48,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="鋸齒 SMP", lifespan=lifespan)
+# 操作紀錄要在 Session 內側才讀得到登入者，所以先加（越晚加的越外層）
+app.add_middleware(activity.ActivityMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET, max_age=60 * 60 * 24 * 30,
                    same_site="lax", https_only=config.DISCORD_REDIRECT_URI.startswith("https"))
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -57,6 +61,7 @@ app.include_router(account.router)
 app.include_router(stats.router)
 app.include_router(admin_ext.router)
 app.include_router(matchmaking.router)
+app.include_router(activity.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
@@ -99,17 +104,30 @@ async def login(request: Request):
 @app.get("/auth/callback", include_in_schema=False)
 async def callback(request: Request, code: str = "", state: str = "", error: str = ""):
     if error or not code or state != request.session.pop("oauth_state", None):
+        db.audit(None, "auth.login_failed", "OAuth 驗證失敗", meta={"reason": "oauth", "discord_error": error or None})
         return RedirectResponse("/login?error=oauth")
     try:
         user = await discord_api.exchange_code(code)
         status = await discord_api.member_status(user["id"], use_cache=False)
     except Exception:  # noqa: BLE001
         logging.exception("Discord 登入失敗")
+        db.audit(None, "auth.login_failed", "Discord API 錯誤", meta={"reason": "discord"})
         return RedirectResponse("/login?error=discord")
     if config.REQUIRE_GUILD_MEMBER and not status["member"]:
+        db.audit(user, "auth.login_failed", "不是伺服器成員", target=user["id"], meta={"reason": "not_member"})
         return RedirectResponse("/login?error=not_member")
+    old = db.one("SELECT level, last_login, username, global_name, avatar FROM users WHERE id = ?", (user["id"],))
     upsert_user(user, status.get("level", 0))
     request.session["uid"] = user["id"]
+    new = db.one("SELECT level, last_login, username, global_name, avatar FROM users WHERE id = ?", (user["id"],))
+    b, a = activity.diff(old and {k: old[k] for k in ("level", "username", "global_name", "avatar")},
+                         {k: new[k] for k in ("level", "username", "global_name", "avatar")})
+    db.audit(user, "auth.login", f"Discord 登入 · {user.get('global_name') or user['username']}", target=user["id"],
+             before=b or None, after=a or None,
+             meta={"provider": "discord", "first_login": old is None, "previous_login": old and old["last_login"],
+                   "level": status.get("level", 0), "guild_member": status.get("member"), "roles": status.get("roles"),
+                   "username": user.get("username"), "email_verified": user.get("verified"), "locale": user.get("locale"),
+                   "mfa": user.get("mfa_enabled"), "next": request.session.get("next")})
     return RedirectResponse(request.session.pop("next", None) or "/account")
 
 
@@ -125,6 +143,10 @@ async def dev_login(request: Request, id: str = "100000000000000001", name: str 
 
 @app.post("/auth/logout")
 async def logout(request: Request):
+    uid = request.session.get("uid")
+    u = uid and db.one("SELECT * FROM users WHERE id = ?", (uid,))
+    if u:
+        db.audit(u, "auth.logout", "登出", target=uid)
     request.session.clear()
     return {"ok": True}
 
@@ -346,8 +368,9 @@ async def admin_overview(week_offset: int = 0, _: dict = Depends(admin_user)):
 
 
 @app.patch("/api/admin/links/{link_id}")
-async def admin_patch_link(link_id: int, body: LinkPatch, _: dict = Depends(admin_user)):
-    if not db.one("SELECT 1 FROM links WHERE id = ?", (link_id,)):
+async def admin_patch_link(link_id: int, body: LinkPatch, admin: dict = Depends(admin_user)):
+    old = db.one("SELECT * FROM links WHERE id = ?", (link_id,))
+    if not old:
         raise HTTPException(404, "找不到連結")
     if body.views is not None:
         db.execute("UPDATE links SET views = ? WHERE id = ?", (max(0, body.views), link_id))
@@ -355,6 +378,9 @@ async def admin_patch_link(link_id: int, body: LinkPatch, _: dict = Depends(admi
         if body.status not in ("active", "rejected"):
             raise HTTPException(400, "狀態只能是 active 或 rejected")
         db.execute("UPDATE links SET status = ? WHERE id = ?", (body.status, link_id))
+    new = db.one("SELECT * FROM links WHERE id = ?", (link_id,))
+    b, a = activity.diff({k: old[k] for k in ("views", "status")}, {k: new[k] for k in ("views", "status")})
+    db.audit(admin, "threads.link.edit", f"#{link_id} @{old.get('author') or ''}", target=link_id, before=b, after=a)
     return {"ok": True}
 
 
@@ -367,7 +393,9 @@ async def admin_refresh_link(link_id: int, _: dict = Depends(admin_user)):
 
 
 @app.delete("/api/admin/links/{link_id}")
-async def admin_delete_link(link_id: int, _: dict = Depends(admin_user)):
+async def admin_delete_link(link_id: int, admin: dict = Depends(admin_user)):
+    old = db.one("SELECT * FROM links WHERE id = ?", (link_id,))
+    db.audit(admin, "threads.link.delete", f"#{link_id} {old and old.get('url') or ''}", target=link_id, before=old)
     db.execute("DELETE FROM snapshots WHERE link_id = ?", (link_id,))
     db.execute("DELETE FROM links WHERE id = ?", (link_id,))
     return {"ok": True}
@@ -377,12 +405,15 @@ async def admin_delete_link(link_id: int, _: dict = Depends(admin_user)):
 async def admin_patch_user(user_id: str, body: UserPatch, admin: dict = Depends(admin_user)):
     if user_id == admin["id"]:
         raise HTTPException(400, "不能停權自己")
+    old = db.one("SELECT banned, username, global_name FROM users WHERE id = ?", (user_id,))
     db.execute("UPDATE users SET banned = ? WHERE id = ?", (int(body.banned), user_id))
+    db.audit(admin, "user.ban" if body.banned else "user.unban", (old and (old["global_name"] or old["username"])) or user_id,
+             target=user_id, before={"banned": bool(old and old["banned"])}, after={"banned": body.banned})
     return {"ok": True}
 
 
 @app.put("/api/admin/settings")
-async def admin_settings(body: dict, _: dict = Depends(admin_user)):
+async def admin_settings(body: dict, admin: dict = Depends(admin_user)):
     clean = {}
     for k, v in body.items():
         if k.startswith("w_"):
@@ -395,17 +426,23 @@ async def admin_settings(body: dict, _: dict = Depends(admin_user)):
         elif k == "settle_hour" and not (0 <= int(v) <= 23):
             raise HTTPException(400, "結算小時需介於 0–23")
         clean[k] = v
+    old = db.settings()
     db.set_settings(clean)
-    return {"ok": True, "settings": db.settings()}
+    new = db.settings()
+    b, a = activity.diff({k: old.get(k) for k in clean}, {k: new.get(k) for k in clean})
+    if a:
+        db.audit(admin, "settings.update", "、".join(a.keys())[:300], before=b, after=a)
+    return {"ok": True, "settings": new}
 
 
 @app.post("/api/admin/settle")
-async def admin_settle(body: SettleIn, _: dict = Depends(admin_user)):
+async def admin_settle(body: SettleIn, admin: dict = Depends(admin_user)):
     start, end = db.period_bounds()
     start, end = start + timedelta(weeks=body.week_offset), end + timedelta(weeks=body.week_offset)
     db.execute("DELETE FROM settled_periods WHERE period_start = ?", (db.iso(start),))
     db.execute("DELETE FROM weekly_results WHERE period_start = ?", (db.iso(start),))
     winners = await tasks.settle(start, end)
+    db.audit(admin, "threads.settle", f"{db.iso(start)[:10]} ~ {db.iso(end)[:10]}", meta={"week_offset": body.week_offset, "winners": [dict(w) for w in winners]})
     return {"ok": True, "winners": [with_user(dict(w)) for w in winners]}
 
 
@@ -429,19 +466,27 @@ async def admin_add_news(body: NewsIn, admin: dict = Depends(admin_user)):
     nid = db.execute("INSERT INTO news(title, body, tag, pinned, author_id, created_at) VALUES (?,?,?,?,?,?)",
                      (body.title.strip(), body.body.strip(), body.tag, int(body.pinned), admin["id"],
                       db.iso(db.now_utc())))
+    db.audit(admin, "news.create", body.title.strip(), target=nid, after=body.model_dump())
     return {"ok": True, "id": nid}
 
 
 @app.put("/api/admin/news/{news_id}")
-async def admin_edit_news(news_id: int, body: NewsIn, _: dict = Depends(admin_user)):
+async def admin_edit_news(news_id: int, body: NewsIn, admin: dict = Depends(admin_user)):
     _check_news(body)
+    old = db.one("SELECT title, body, tag, pinned FROM news WHERE id = ?", (news_id,))
+    if old:
+        old["pinned"] = bool(old["pinned"])
+    b, a = activity.diff(old, {**body.model_dump(), "title": body.title.strip(), "body": body.body.strip()})
+    db.audit(admin, "news.edit", body.title.strip(), target=news_id, before=b, after=a)
     db.execute("UPDATE news SET title = ?, body = ?, tag = ?, pinned = ? WHERE id = ?",
                (body.title.strip(), body.body.strip(), body.tag, int(body.pinned), news_id))
     return {"ok": True}
 
 
 @app.delete("/api/admin/news/{news_id}")
-async def admin_delete_news(news_id: int, _: dict = Depends(admin_user)):
+async def admin_delete_news(news_id: int, admin: dict = Depends(admin_user)):
+    old = db.one("SELECT * FROM news WHERE id = ?", (news_id,))
+    db.audit(admin, "news.delete", old and old["title"] or f"#{news_id}", target=news_id, before=old)
     db.execute("DELETE FROM news WHERE id = ?", (news_id,))
     return {"ok": True}
 

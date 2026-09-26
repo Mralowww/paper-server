@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from . import config, db
+from . import activity, config, db
 from .deps import MOD, SUPPORT, current_user, display_name, public_user, require, user_level
 
 router = APIRouter()
@@ -210,6 +210,7 @@ async def set_status(ticket_id: int, body: StatusIn, request: Request, user: dic
     t, level = await _load(ticket_id, request, user)
     staff = level >= SUPPORT
     now, notes = now_iso(), []
+    before = {k: t.get(k) for k in ("status", "urgent", "priority", "claimed_by")}
     if body.status is not None:
         if body.status not in STATUSES or (not staff and body.status not in ("closed", "open")):
             raise HTTPException(400, "不允許的狀態")
@@ -231,6 +232,10 @@ async def set_status(ticket_id: int, body: StatusIn, request: Request, user: dic
     for n in notes:
         db.execute("INSERT INTO ticket_messages(ticket_id, author_id, body, system, created_at) VALUES (?,?,?,1,?)",
                    (ticket_id, user["id"], n, now))
+    if notes:
+        after = db.one("SELECT status, urgent, priority, claimed_by FROM tickets WHERE id = ?", (ticket_id,))
+        b, a = activity.diff(before, after)
+        db.audit(user, "ticket.update", f"#{ticket_id} " + "、".join(notes), target=ticket_id, before=b, after=a)
     return {"ok": True}
 
 

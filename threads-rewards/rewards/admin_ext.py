@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import bot, config, db, discord_api
+from . import activity, bot, config, db, discord_api
 from .deps import ADMIN, MOD, SUPPORT, display_name, public_user, require
 from .punish import dashed, expire_old, now_iso, plugin_auth, plugin_last_seen, queue, resolve_player
 
@@ -82,11 +82,13 @@ async def save_nodes(group_key: str, body: NodesIn, admin: dict = Depends(requir
         if not NODE_RE.match(node):
             raise HTTPException(400, f"權限節點格式不正確：{node}")
         clean[node.lower()] = bool(n.get("allow", True)) and not raw.startswith("-")
+    old = {r["node"]: bool(r["allow"]) for r in db.query("SELECT node, allow FROM perm_nodes WHERE group_key = ?", (group_key,))}
     db.execute("DELETE FROM perm_nodes WHERE group_key = ?", (group_key,))
     for node, allow in clean.items():
         db.execute("INSERT INTO perm_nodes(group_key, node, allow) VALUES (?,?,?)", (group_key, node, int(allow)))
     queue("permissions_reload", {"group": group_key})
-    db.audit(admin, "permissions.save", f"{group_key} ({len(clean)})")
+    b, a = activity.diff(old, clean)
+    db.audit(admin, "permissions.save", f"{group_key} ({len(clean)})", target=group_key, before=b, after=a)
     return {"ok": True}
 
 

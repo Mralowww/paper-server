@@ -15,6 +15,7 @@
     { id: "site", icon: "home", min: 3 },
     { id: "apikeys", icon: "key", min: 3 },
     { id: "team", icon: "shield", min: 1 },
+    { id: "activity", icon: "list", min: 3 },
     { id: "settings", icon: "settings", min: 3 },
     { id: "status", icon: "activity", min: 3 },
   ];
@@ -36,7 +37,7 @@
     if (cleanup) { cleanup(); cleanup = null; }
     current = sec.id; renderSide();
     main().innerHTML = `<section></section>`;
-    try { await VIEWS[sec.id]($("section", main())); } catch (e) { main().innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
+    try { const r = await VIEWS[sec.id]($("section", main())); if (typeof r === "function") cleanup = r; } catch (e) { main().innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
     observe(main());
   }
 
@@ -260,7 +261,7 @@
     const TAGS = ["news", "update", "event", "maintenance"];
     el.innerHTML = head("news", `<button class="btn gold" id="nn">${ART.icon("plus", 16)}${t("admin.newNews")}</button>`) + `<div class="card"><div id="nl"></div></div>`;
     let list = [];
-    const load = async () => { list = (await api("/api/news?limit=100", { quiet: true })).news; $("#nl").innerHTML = list.map((n) => `<div class="t-row" style="grid-template-columns:minmax(0,1fr) auto;padding-left:6px" data-n="${n.id}"><div class="t-main"><b>${n.pinned ? "📌 " : ""}${esc(n.title)}</b><small>${t("tag." + n.tag)} · ${date(n.created_at)}</small></div><div class="row" style="gap:6px"><button class="btn sm" data-e>${t("edit")}</button><button class="btn sm icon danger" data-d>✕</button></div></div>`).join("") || `<div class="empty">${t("home.noNews")}</div>`; };
+    const load = async () => { list = (await api("/api/news?limit=100", { quiet: true })).news; $("#nl").innerHTML = list.map((n) => `<div class="t-row" style="grid-template-columns:minmax(0,1fr) auto;padding-left:6px" data-n="${n.id}"><div class="t-main"><b>${n.pinned ? ART.icon("pin", 13) + " " : ""}${esc(n.title)}</b><small>${t("tag." + n.tag)} · ${date(n.created_at)}</small></div><div class="row" style="gap:6px"><button class="btn sm" data-e>${t("edit")}</button><button class="btn sm icon danger" data-d>✕</button></div></div>`).join("") || `<div class="empty">${t("home.noNews")}</div>`; };
     const editor = (n) => {
       const o = App.modal({ title: esc(t(n ? "admin.editNews" : "admin.newNews")), body: `<form id="nf" class="stack" style="gap:12px"><div class="field"><label>${t("admin.newsTitle")}</label><input class="input" name="title" required value="${esc(n ? n.title : "")}"></div>
         <div class="field"><label>${t("admin.newsTag")}</label><select class="enhance" name="tag">${TAGS.map((g) => `<option value="${g}" ${n && n.tag === g ? "selected" : ""}>${t("tag." + g)}</option>`).join("")}</select></div>
@@ -347,7 +348,7 @@
     const key = d.settings.plugin_api_key || "";
     el.innerHTML = head("apikeys") + `<div class="grid grid-2">
       <div class="card"><div class="card-title"><h3>${t("key.plugin")}</h3></div><p class="dim" style="font-size:13.5px;margin-top:-6px">${t("key.plugin.d")}</p>
-        <div class="input-group"><input class="input mono" id="pk" value="${esc(key)}" readonly type="password" placeholder="${t("key.none")}"><button class="btn icon" id="pkv" title="show">👁</button><button class="btn icon" id="pkc">${ART.icon("copy", 16)}</button></div>
+        <div class="input-group"><input class="input mono" id="pk" value="${esc(key)}" readonly type="password" placeholder="${t("key.none")}"><button class="btn icon" id="pkv" title="show">${ART.icon("eye", 16)}</button><button class="btn icon" id="pkc">${ART.icon("copy", 16)}</button></div>
         <button class="btn danger" id="pkr" style="margin-top:12px">${t("key.regen")}</button></div>
       <div class="card"><div class="card-title"><h3>${t("key.dev")}</h3></div><p class="dim" style="font-size:13.5px;margin-top:-6px">${t("key.dev.d")}</p>
         <div class="row"><a class="btn" href="/account#dev">${t("acc.devKeys")}</a><a class="btn" href="/docs">${ART.icon("code", 16)}${t("nav.docs")}</a></div></div></div>`;
@@ -363,7 +364,7 @@
     const d = await api("/api/admin/team");
     el.innerHTML = head("team") + `<div class="grid grid-3">${d.team.map((u) => `<div class="card hover reveal"><div class="row" style="gap:12px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" style="width:48px;height:48px;border-radius:50%" alt=""><div style="min-width:0"><b>${esc(u.name)}</b><div>${lvlTags(u.level)}</div></div></div>
       <div class="kpi-mini" style="margin-top:16px"><div><b>${u.replies}</b><small>${t("team.replies")}</small></div><div><b>${u.punishments}</b><small>${t("team.puns")}</small></div></div>
-      <small class="dim">${u.mc_name ? "⛏ " + esc(u.mc_name) + " · " : ""}${u.last_login ? ago(u.last_login) : ""}</small></div>`).join("") || `<div class="card empty" style="grid-column:1/-1">${t("team.empty")}</div>`}</div>
+      <small class="dim">${u.mc_name ? ART.icon("pickaxe", 12) + " " + esc(u.mc_name) + " · " : ""}${u.last_login ? ago(u.last_login) : ""}</small></div>`).join("") || `<div class="card empty" style="grid-column:1/-1">${t("team.empty")}</div>`}</div>
       <p class="dim" style="margin-top:18px;font-size:13px">${t("team.hint")}</p>`;
   }
 
@@ -391,7 +392,8 @@
     });
   }
 
-  const VIEWS = { overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
+  const activity = (el) => window.ActivityLog.render(el, (extra) => head("activity", extra));
+  const VIEWS = { activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
 
   document.addEventListener("app:ready", async () => {
     if (!App.me) return App.go("/login");

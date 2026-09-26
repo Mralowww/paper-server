@@ -482,8 +482,9 @@
   /* ---------- 導覽列 / 頁尾 ---------- */
   const LOGO = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" style="fill:var(--accent)"/><path d="M6 21 L10 12 L14 21 L18 12 L22 21 L26 12" style="stroke:var(--accent-ink)" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/></svg>`;
   const THEME_ICON = `<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>`;
-  let me = null;
-  const mePromise = api("/api/me", { quiet: true }).then((d) => (me = d.user)).catch(() => null);
+  let me = null; let ambStateFn = null;
+  document.addEventListener("soundchange", () => ambStateFn && ambStateFn());
+  let mePromise = api("/api/me", { quiet: true }).then((d) => (me = d.user)).catch(() => null);
   function renderNav() {
     const nav = $("#nav"); if (!nav) return;
     const path = location.pathname;
@@ -514,10 +515,10 @@
       sound.set("ambient", { on });
       ok(t(on ? "snd.ambOn" : "snd.ambOff"), "", 1200);
     });
-    document.addEventListener("soundchange", ambState); ambState();
+    ambStateFn = ambState; ambState();
     $("[data-lang]", nav).addEventListener("click", (e) => {
       const r = e.currentTarget.getBoundingClientRect();
-      showCtx(r.left, r.bottom + 8, [{ icon: lang === "zh" ? "✓" : "", label: "中文", act: () => setLang("zh") }, { icon: lang === "en" ? "✓" : "", label: "English", act: () => setLang("en") }]);
+      showCtx(r.left, r.bottom + 8, [{ icon: lang === "zh" ? "check" : "", label: "中文", act: () => setLang("zh") }, { icon: lang === "en" ? "check" : "", label: "English", act: () => setLang("en") }]);
       e.stopPropagation();
     });
     const um = $("[data-user-menu]", nav);
@@ -525,14 +526,14 @@
       const r = um.getBoundingClientRect();
       showCtx(r.right - 210, r.bottom + 8, [
         { head: me.name },
-        { icon: "👤", label: t("nav.account"), act: () => go("/account") },
-        { icon: "💬", label: t("nav.support"), act: () => go("/support") },
-        { icon: "🔗", label: t("nav.links"), act: () => go("/links") },
-        ...(me.mc ? [{ icon: "⛏", label: t("nav.myProfile"), act: () => go("/player?name=" + encodeURIComponent(me.mc.name)) }] : []),
-        ...(me.level >= 1 ? [{ icon: "🛡️", label: t("nav.admin"), act: () => go("/admin") }] : []),
-        { icon: "⚙️", label: t("nav.settings"), act: () => go("/settings") },
+        { icon: "user", label: t("nav.account"), act: () => go("/account") },
+        { icon: "message", label: t("nav.support"), act: () => go("/support") },
+        { icon: "link", label: t("nav.links"), act: () => go("/links") },
+        ...(me.mc ? [{ icon: "pickaxe", label: t("nav.myProfile"), act: () => go("/player?name=" + encodeURIComponent(me.mc.name)) }] : []),
+        ...(me.level >= 1 ? [{ icon: "shield", label: t("nav.admin"), act: () => go("/admin") }] : []),
+        { icon: "settings", label: t("nav.settings"), act: () => go("/settings") },
         { sep: true },
-        { icon: "⎋", label: t("nav.logout"), danger: true, act: async () => { await api("/auth/logout", { method: "POST" }); go("/"); } },
+        { icon: "logout", label: t("nav.logout"), danger: true, act: async () => { await api("/auth/logout", { method: "POST" }); go("/", { hard: true }); } },
       ]);
       e.stopPropagation();
     });
@@ -557,18 +558,85 @@
     applyI18n(f);
   }
 
-  /* ---------- 頁面切換 ---------- */
-  function go(href) {
+  /* ---------- 頁面切換（站內換頁不重新載入，背景音樂與音效引擎持續運作） ----------
+     站內連結改成：抓新頁面 HTML → 換掉 body 內容 → 載入該頁專屬腳本 → 觸發 app:ready。
+     各頁腳本在 document / window 上註冊的監聽、計時器與動畫迴圈會記錄下來，換頁時一併清除。 */
+  const COMMON = ["i18n", "art", "core", "fx"];
+  const KEEP = new Set(["topbar", "scrollbar", "curtain"]);
+  let pageScripts = new Set(); let gen = 0; let scoped = []; let navigating = false;
+  const scriptName = (src) => (src.match(/\/static\/js\/([\w-]+)\.js/) || [])[1];
+  const collectPageScripts = (root) => new Set([...root.querySelectorAll("script[src]")].map((x) => scriptName(x.getAttribute("src"))).filter((n) => n && !COMMON.includes(n)));
+  pageScripts = collectPageScripts(document);
+  const fromPage = () => {
+    if (document.readyState === "loading") pageScripts = collectPageScripts(document); // 首次載入時頁面腳本還在解析中
+    const st = new Error().stack || ""; for (const n of pageScripts) if (st.includes(`/static/js/${n}.js`)) return true; return false; };
+  // 攔截「頁面腳本」註冊的全域監聽 / 計時器（核心腳本自己的不受影響）
+  for (const target of [window, document]) {
+    const add = target.addEventListener.bind(target); const rm = target.removeEventListener.bind(target);
+    target.addEventListener = function (type, fn, opts) { if (fn && fromPage()) scoped.push(() => rm(type, fn, opts)); return add(type, fn, opts); };
+  }
+  const _si = window.setInterval.bind(window), _st = window.setTimeout.bind(window), _raf = window.requestAnimationFrame.bind(window);
+  window.setInterval = function (fn, ms, ...a) { const id = _si(fn, ms, ...a); if (fromPage()) scoped.push(() => clearInterval(id)); return id; };
+  window.setTimeout = function (fn, ms, ...a) { if (typeof fn !== "function" || !fromPage()) return _st(fn, ms, ...a); const g = gen; return _st((...x) => g === gen && fn(...x), ms, ...a); };
+  window.requestAnimationFrame = function (fn) { if (!fromPage()) return _raf(fn); const g = gen; return _raf((ts) => g === gen && fn(ts)); };
+  function teardown() { gen++; scoped.splice(0).forEach((f) => { try { f(); } catch { /* 略過 */ } }); overlays.slice().forEach((c) => c(true)); hideCtx && hideCtx(); closeSelect && closeSelect(); }
+  const loadScript = (name) => new Promise((res) => { const el = document.createElement("script"); el.src = `/static/js/${name}.js`; el.onload = el.onerror = res; document.body.appendChild(el); });
+  const PAGE_PATHS = ["/", "/news", "/rules", "/rewards", "/links", "/login", "/admin", "/settings", "/support", "/ticket", "/account", "/bans", "/player", "/rankings", "/docs", "/match"];
+
+  async function navigate(href, { push = true, scroll = null } = {}) {
+    const url = new URL(href, location.href);
+    if (navigating) return; navigating = true;
+    const reduceMotion = document.documentElement.dataset.motion === "reduce";
+    if (!reduceMotion) { sfx("leave"); document.body.classList.add("leaving"); }
+    progress.start();
+    try {
+      const [res] = await Promise.all([fetch(url.pathname + url.search, { credentials: "same-origin", headers: { "X-Requested-With": "nav" } }),
+        new Promise((r) => _st(r, reduceMotion ? 0 : 230))]);
+      const type = res.headers.get("content-type") || "";
+      if (!res.ok || !type.includes("text/html")) throw new Error("not html");
+      const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+      mePromise = api("/api/me", { quiet: true }).then((d) => (me = d.user)).catch(() => me);
+      if (push) { history.replaceState({ ...(history.state || {}), y: scrollY }, ""); history.pushState({ y: 0 }, "", url.pathname + url.search + url.hash); }
+      teardown();
+      document.title = doc.title; document.body.className = doc.body.className;
+      [...document.body.children].forEach((el) => { if (!KEEP.has(el.id)) el.remove(); });
+      const frag = document.createDocumentFragment();
+      [...doc.body.children].forEach((el) => { if (el.tagName !== "SCRIPT" && !KEEP.has(el.id)) frag.appendChild(document.adoptNode(el)); });
+      document.body.insertBefore(frag, document.getElementById("scrollbar") || null);
+      if (document.getElementById("topbar")) document.body.prepend(document.getElementById("topbar"));
+      pageScripts = collectPageScripts(doc);
+      scrollTo({ top: scroll ?? 0, behavior: "instant" });
+      applyI18n(); renderNav(); renderFooter(); observe();
+      for (const n of pageScripts) await loadScript(n);
+      await mePromise; renderNav();
+      document.dispatchEvent(new CustomEvent("app:ready", { detail: { me } }));
+      if (url.hash) document.querySelector(url.hash)?.scrollIntoView();
+    } catch {
+      location.href = url.href; return;
+    } finally {
+      navigating = false; progress.done();
+      document.body.classList.remove("leaving"); document.getElementById("curtain")?.classList.remove("on");
+    }
+  }
+  function go(href, { hard = false } = {}) {
+    const url = new URL(href, location.href);
+    const soft = !hard && url.origin === location.origin && PAGE_PATHS.includes(url.pathname) && window.DOMParser && history.pushState;
+    if (soft) return navigate(url.href);
     if (document.documentElement.dataset.motion === "reduce") { location.href = href; return; }
     sfx("leave"); document.body.classList.add("leaving"); progress.start();
-    setTimeout(() => (location.href = href), 220);
+    _st(() => (location.href = href), 220);
   }
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a[href]");
-    if (!a || e.defaultPrevented || a.target === "_blank" || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    if (!a || e.defaultPrevented || a.target === "_blank" || a.hasAttribute("download") || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
     const url = new URL(a.href, location.href);
-    if (url.origin !== location.origin || url.pathname.startsWith("/auth") || (url.pathname === location.pathname && url.hash)) return;
+    if (url.origin !== location.origin || url.pathname.startsWith("/auth") || url.pathname.startsWith("/api") || (url.pathname === location.pathname && url.search === location.search && url.hash)) return;
     e.preventDefault(); go(url.pathname + url.search + url.hash);
+  });
+  history.scrollRestoration = "manual";
+  window.addEventListener("popstate", (e) => {
+    if (PAGE_PATHS.includes(location.pathname)) navigate(location.href, { push: false, scroll: (e.state && e.state.y) || 0 });
+    else location.reload();
   });
   window.addEventListener("pageshow", () => document.body.classList.remove("leaving"));
 
@@ -580,7 +648,7 @@
     ctxEl = document.createElement("div"); ctxEl.className = "ctx";
     let n = 0;
     ctxEl.innerHTML = items.map((it, i) => it.sep ? `<div class="sep"></div>` : it.head ? `<div class="head">${esc(it.head)}</div>` :
-      `<div class="item ${it.danger ? "danger" : ""}" data-i="${i}" style="animation-delay:${n++ * 30}ms"><span>${it.icon || ""}</span><span>${esc(it.label)}</span>${it.key ? `<span class="k">${it.key}</span>` : ""}</div>`).join("");
+      `<div class="item ${it.danger ? "danger" : ""}" data-i="${i}" style="animation-delay:${n++ * 30}ms"><span class="ic">${/^[a-z]+$/.test(it.icon || "") && window.ART ? ART.icon(it.icon, 16) : esc(it.icon || "")}</span><span>${esc(it.label)}</span>${it.key ? `<span class="k">${it.key}</span>` : ""}</div>`).join("");
     document.body.appendChild(ctxEl);
     const r = ctxEl.getBoundingClientRect();
     ctxEl.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + "px";
@@ -597,29 +665,29 @@
     if (input) {
       const sel = input.value.substring(input.selectionStart, input.selectionEnd);
       items.push(
-        { icon: "📋", label: t("ctx.copy"), key: "Ctrl C", act: () => copy(sel || input.value) },
-        { icon: "✂️", label: t("ctx.cut"), key: "Ctrl X", act: () => { copy(sel || input.value); input.setRangeText("", input.selectionStart, input.selectionEnd); if (!sel) input.value = ""; input.dispatchEvent(new Event("input")); } },
-        { icon: "📥", label: t("ctx.paste"), key: "Ctrl V", act: async () => { try { const txt = await navigator.clipboard.readText(); input.focus(); input.setRangeText(txt, input.selectionStart, input.selectionEnd, "end"); input.dispatchEvent(new Event("input")); } catch { fail("Clipboard"); } } },
-        { icon: "🔠", label: t("ctx.selectAll"), key: "Ctrl A", act: () => { input.focus(); input.select(); } },
-        { sep: true }, { icon: "🧹", label: t("ctx.clear"), danger: true, act: () => { input.value = ""; input.dispatchEvent(new Event("input")); input.focus(); } },
+        { icon: "copy", label: t("ctx.copy"), key: "Ctrl C", act: () => copy(sel || input.value) },
+        { icon: "scissors", label: t("ctx.cut"), key: "Ctrl X", act: () => { copy(sel || input.value); input.setRangeText("", input.selectionStart, input.selectionEnd); if (!sel) input.value = ""; input.dispatchEvent(new Event("input")); } },
+        { icon: "paste", label: t("ctx.paste"), key: "Ctrl V", act: async () => { try { const txt = await navigator.clipboard.readText(); input.focus(); input.setRangeText(txt, input.selectionStart, input.selectionEnd, "end"); input.dispatchEvent(new Event("input")); } catch { fail("Clipboard"); } } },
+        { icon: "selectall", label: t("ctx.selectAll"), key: "Ctrl A", act: () => { input.focus(); input.select(); } },
+        { sep: true }, { icon: "eraser", label: t("ctx.clear"), danger: true, act: () => { input.value = ""; input.dispatchEvent(new Event("input")); input.focus(); } },
       );
     } else if (user) {
       const u = JSON.parse(user.dataset.user);
-      items.push({ head: u.name }, { icon: "📋", label: t("ctx.copyName"), act: () => copy(u.name) }, { icon: "🆔", label: t("ctx.copyId"), act: () => copy(u.id) });
-      if (img) items.push({ icon: "🔍", label: t("ctx.viewImage"), act: () => zoom(img.src) });
+      items.push({ head: u.name }, { icon: "copy", label: t("ctx.copyName"), act: () => copy(u.name) }, { icon: "idcard", label: t("ctx.copyId"), act: () => copy(u.id) });
+      if (img) items.push({ icon: "image", label: t("ctx.viewImage"), act: () => zoom(img.src) });
     } else if (img) {
-      items.push({ icon: "🔍", label: t("ctx.viewImage"), act: () => zoom(img.dataset.zoom || img.src) }, { icon: "🔗", label: t("ctx.copyImage"), act: () => copy(img.src) });
+      items.push({ icon: "image", label: t("ctx.viewImage"), act: () => zoom(img.dataset.zoom || img.src) }, { icon: "link", label: t("ctx.copyImage"), act: () => copy(img.src) });
     } else if (a) {
-      items.push({ icon: "↗", label: t("ctx.openLink"), act: () => window.open(a.href, "_blank", "noopener") }, { icon: "🔗", label: t("ctx.copyLink"), act: () => copy(a.href) });
+      items.push({ icon: "external", label: t("ctx.openLink"), act: () => window.open(a.href, "_blank", "noopener") }, { icon: "link", label: t("ctx.copyLink"), act: () => copy(a.href) });
     }
     if (!input && !user && !img && !a) {
       const sel = String(getSelection());
-      if (sel) items.push({ icon: "📋", label: t("ctx.copy"), act: () => copy(sel) }, { sep: true });
+      if (sel) items.push({ icon: "copy", label: t("ctx.copy"), act: () => copy(sel) }, { sep: true });
       items.push(
-        { icon: "←", label: t("ctx.back"), act: () => history.back() },
+        { icon: "back", label: t("ctx.back"), act: () => history.back() },
         { icon: "⟳", label: t("ctx.reload"), key: "F5", act: () => location.reload() },
-        { icon: "🔍", label: t("ctx.search"), key: "Ctrl K", act: openPalette },
-        { icon: "⇡", label: t("ctx.top"), act: () => scrollTo({ top: 0, behavior: "smooth" }) },
+        { icon: "search", label: t("ctx.search"), key: "Ctrl K", act: openPalette },
+        { icon: "up", label: t("ctx.top"), act: () => scrollTo({ top: 0, behavior: "smooth" }) },
       );
     }
     while (items.length && items[items.length - 1].sep) items.pop();
@@ -634,15 +702,15 @@
   let paletteOpen = false;
   function openPalette() {
     if (paletteOpen) return; paletteOpen = true; sfx("popup");
-    const pages = [["/", "nav.home", "🏠"], ["/rankings", "nav.rankings", "🏆"], ["/match", "nav.match", "⚔️"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/bans", "nav.bans", "⚖️"], ["/support", "nav.support", "💬"], ["/account", "nav.account", "👤"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
-    if (me && me.level >= 1) pages.splice(5, 0, ["/admin", "nav.admin", "🛡️"]);
+    const pages = [["/", "nav.home", "home"], ["/rankings", "nav.rankings", "trophy"], ["/match", "nav.match", "sword"], ["/news", "nav.news", "news"], ["/rules", "nav.rules", "book"], ["/bans", "nav.bans", "scale"], ["/support", "nav.support", "message"], ["/account", "nav.account", "user"], ["/rewards", "nav.rewards", "gift"], ["/links", "nav.links", "link"], ["/settings", "nav.settings", "settings"], ["/login", "nav.login", "login"]];
+    if (me && me.level >= 1) pages.splice(5, 0, ["/admin", "nav.admin", "shield"]);
     const o = openOverlay(`<div class="modal palette"><input class="input" data-i18n-ph="nav.search" autocomplete="off"><div class="palette-results"></div></div>`, { onClose: () => (paletteOpen = false) });
     const input = $("input", o.el); const res = $(".palette-results", o.el);
     let results = []; let sel = 0; let timer;
     const draw = (users = [], links = [], q = "") => {
       const ql = q.toLowerCase();
       const pg = pages.filter(([, k]) => !ql || t(k).toLowerCase().includes(ql));
-      results = [...pg.map(([h, k, ic]) => ({ go: h, html: `<span>${ic}</span><span>${esc(t(k))}</span><small>${h}</small>`, grp: "pages" })),
+      results = [...pg.map(([h, k, ic]) => ({ go: h, html: `<span class="ic">${ART.icon(ic, 16)}</span><span>${esc(t(k))}</span><small>${h}</small>`, grp: "pages" })),
         ...users.map((u) => ({ go: "/player?name=" + encodeURIComponent(u.name), html: `<img src="${mcHead(u.uuid, 32)}" alt="" style="border-radius:5px;image-rendering:pixelated"><span>${esc(u.name)}</span><small>${u.online ? "● " + t("home.online") : ""}</small>`, grp: "users" })),
         ...links.map((l) => ({ open: l.url, html: `${px("heart", 14)}<span>@${esc(l.author)}</span><small>${esc(l.content || l.url)}</small>`, grp: "links" }))];
       sel = Math.min(sel, Math.max(0, results.length - 1));
@@ -718,7 +786,7 @@
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
     fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
-    zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, mePromise,
+    zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, get mePromise() { return mePromise; },
     setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,
   };
 })();

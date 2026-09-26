@@ -9,7 +9,7 @@
     const top = data.leaderboard.slice(0, 3); const order = [1, 0, 2];
     $("#podium").innerHTML = order.map((i) => {
       const u = top[i]; const reward = data.rewards[i];
-      if (!u) return `<div class="card spot p${i + 1} empty reveal-s"><div class="av"><img src="https://cdn.discordapp.com/embed/avatars/${i}.png" alt=""></div><span class="rank-badge">#${i + 1}</span><div class="name dim">${t("home.vacant")}</div>${reward ? `<div class="reward">🎁 ${esc(reward)}</div>` : ""}</div>`;
+      if (!u) return `<div class="card spot p${i + 1} empty reveal-s"><div class="av"><img src="https://cdn.discordapp.com/embed/avatars/${i}.png" alt=""></div><span class="rank-badge">#${i + 1}</span><div class="name dim">${t("home.vacant")}</div>${reward ? `<div class="reward">${ART.icon("gift", 15)} ${esc(reward)}</div>` : ""}</div>`;
       return `<div class="card hover spot p${i + 1} reveal-s" ${userAttr(u)}>
         ${i === 0 ? `<span class="crown">${px("crown", 28)}</span>` : ""}
         <div class="av"><img src="${esc(u.avatar)}" alt="" data-zoom></div>
@@ -17,7 +17,7 @@
         <div class="name">${esc(u.name)}</div>
         <div class="score"><span data-count="${u.score}">0</span> <small class="dim">${t("m.score")}</small></div>
         <div class="row" style="justify-content:center;margin-top:6px">${metricsHTML(u, ["likes", "replies", "reposts"])}</div>
-        ${reward ? `<div class="reward">🎁 ${esc(reward)}</div>` : ""}
+        ${reward ? `<div class="reward">${ART.icon("gift", 15)} ${esc(reward)}</div>` : ""}
       </div>`;
     }).join("");
   }

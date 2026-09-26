@@ -21,7 +21,7 @@ import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
-from . import config, db, discord_api
+from . import activity, config, db, discord_api
 from .deps import ADMIN, MOD, display_name, public_user, require
 
 router = APIRouter()
@@ -406,10 +406,11 @@ async def staff_player(uuid: str, staff: dict = Depends(require(MOD))):
 
 @router.patch("/api/staff/players/{uuid}")
 async def staff_player_notes(uuid: str, body: NotesIn, staff: dict = Depends(require(MOD))):
-    if not db.one("SELECT 1 FROM players WHERE uuid = ?", (uuid,)):
+    old = db.one("SELECT name, notes FROM players WHERE uuid = ?", (uuid,))
+    if not old:
         raise HTTPException(404, "找不到玩家")
     db.execute("UPDATE players SET notes = ? WHERE uuid = ?", (body.notes[:5000], uuid))
-    db.audit(staff, "player.notes", uuid)
+    db.audit(staff, "player.notes", old["name"], target=uuid, before={"notes": old["notes"]}, after={"notes": body.notes[:5000]})
     return {"ok": True}
 
 
@@ -466,8 +467,10 @@ async def staff_edit_punishment(pid: int, body: PunEdit, staff: dict = Depends(r
     elif body.duration:
         db.execute("UPDATE punishments SET expires_at = ? WHERE id = ?",
                    (db.iso(db.now_utc() + timedelta(seconds=body.duration)), pid))
-    db.audit(staff, "punish.edit", f"#{pid}")
-    return {"ok": True, "punishment": db.one("SELECT * FROM punishments WHERE id = ?", (pid,))}
+    new = db.one("SELECT * FROM punishments WHERE id = ?", (pid,))
+    b, a = activity.diff({k: p[k] for k in ("reason", "expires_at")}, {k: new[k] for k in ("reason", "expires_at")})
+    db.audit(staff, "punish.edit", f"#{pid} {p['name']}", target=pid, before=b, after=a)
+    return {"ok": True, "punishment": new}
 
 
 @router.get("/api/staff/audit")
@@ -533,13 +536,19 @@ async def plugin_login(body: PluginLogin):
     block = ban or ipban
     if block:
         db.execute("UPDATE players SET online = 0 WHERE uuid = ?", (uuid,))
+        db.audit({"name": body.name}, "game.join_blocked", body.name, target=uuid, category="game",
+                 meta={"player": body.name, "uuid": uuid, "player_ip": body.ip, "punishment_id": block["id"], "type": block["type"]})
         return {"allowed": False, "message": kick_message(block), "punishment_id": block["id"]}
     mute = active_of(uuid, "mute")
+    db.audit({"name": body.name}, "game.join", body.name, target=uuid, category="game",
+             meta={"player": body.name, "uuid": uuid, "player_ip": body.ip, "muted": bool(mute)})
     return {"allowed": True, "mute": mute and {"id": mute["id"], "reason": mute["reason"], "expires_at": mute["expires_at"]}}
 
 
 @router.post("/api/plugin/quit", dependencies=[Depends(plugin_auth)])
 async def plugin_quit(body: dict):
+    q = db.one("SELECT name FROM players WHERE uuid = ?", (dashed(str(body.get("uuid", "0" * 32))),))
+    db.audit({"name": q and q["name"]}, "game.quit", q and q["name"] or str(body.get("uuid")), target=dashed(str(body.get("uuid", "0" * 32))), category="game")
     db.execute("UPDATE players SET online = 0, last_seen = ? WHERE uuid = ?", (now_iso(), dashed(str(body.get("uuid", "0" * 32)))))
     return {"ok": True}
 

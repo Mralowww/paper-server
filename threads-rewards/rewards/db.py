@@ -261,10 +261,10 @@ def _migrate(c: sqlite3.Connection) -> None:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
-def audit(actor: dict | None, action: str, detail: str) -> None:
-    execute("INSERT INTO audit_log(actor_id, actor_name, action, detail, created_at) VALUES (?,?,?,?,?)",
-            (actor and actor.get("id"), actor and (actor.get("global_name") or actor.get("username")) or "system",
-             action, detail, iso(now_utc())))
+def audit(actor: dict | None, action: str, detail: str, **extra) -> int:
+    """寫入操作紀錄；extra 可帶 target / before / after / meta / category（詳見 activity.write）。"""
+    from . import activity
+    return activity.write(actor, action, detail, **extra)
 
 
 def now_utc() -> datetime:
