@@ -2,7 +2,7 @@
 
 插件回報：
   POST /api/plugin/kill   {killer:{uuid,name}, victim:{uuid,name}, method}
-      method 建議值：crystal / anchor / melee / bow / mace / tnt / fall / other
+      method 建議值：crystal / anchor / sword / axe / spear / mace / trident / melee / bow / tnt / fall / other
   POST /api/plugin/match  {winner:{uuid,name}, loser:{uuid,name}, winner_score, loser_score, world, method}
   遊玩時間由 /api/plugin/heartbeat 自動累計。
 

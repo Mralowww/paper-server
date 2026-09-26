@@ -64,7 +64,15 @@
     anchor: [["................", ".aaaaaaaaaaaaaa.", ".abbbbbbbbbbbba.", ".ab.cc.cc.cc.ba.", ".abccccccccccba.", ".ab.cc.dd.cc.ba.", ".abcccddddcccba.", ".abccddeeddccba.", ".abccddeeddccba.", ".abcccddddcccba.", ".ab.cc.dd.cc.ba.", ".abccccccccccba.", ".ab.cc.cc.cc.ba.", ".abbbbbbbbbbbba.", ".aaaaaaaaaaaaaa.", "................"],
       { a: "#120b1c", b: "#2a1d3d", c: "#3d2a57", d: "#8a3ed6", e: "#e7b8ff" }],
     melee: [["...........aa...", "..........abba..", ".........abcba..", "........abcba...", ".......abcba....", "......abcba.....", ".....abcba......", "..d.abcba.......", "..ddbcba........", "...ddda.........", "...edd..........", "..eeddd.........", ".ee..dd.........", "ee..............", "e...............", "................"],
+      { a: "#34383b", b: "#9aa3a8", c: "#e3e7e9", d: "#5a3d22", e: "#8a6238" }],
+    sword: [["...........aa...", "..........abba..", ".........abcba..", "........abcba...", ".......abcba....", "......abcba.....", ".....abcba......", "..d.abcba.......", "..ddbcba........", "...ddda.........", "...edd..........", "..eeddd.........", ".ee..dd.........", "ee..............", "e...............", "................"],
       { a: "#1c3b3a", b: "#5fd6cf", c: "#c8fffb", d: "#5a3d22", e: "#8a6238" }],
+    axe: [["................", "........aa......", ".......abba.....", "......abbbba....", ".....cbbbbbad...", ".....cbbbbdd....", "......cbbdd.....", ".......cde......", ".......dd.......", "......ed........", ".....dd.........", "....de..........", "...dd...........", "..ed............", ".dd.............", "................"],
+      {"a": "#2f3a3d", "b": "#b9c3c7", "c": "#f4fbfc", "d": "#6b4a2a", "e": "#8a6238"}],
+    spear: [["..............cc", ".............cbc", "............cbba", "...........cbba.", "..........fbaa..", ".........ff.....", "........de......", ".......dd.......", "......de........", ".....dd.........", "....de..........", "...dd...........", "..de............", ".dd.............", "de..............", "................"],
+      {"a": "#5a6468", "b": "#c9d2d6", "c": "#ffffff", "d": "#6b4a2a", "e": "#8a6238", "f": "#3a3f42"}],
+    trident: [["...........c...c", "..........b...b.", ".........b...b..", "........a...b...", ".........a.b...c", "..........ab..b.", ".........aba.b..", "........ab..a...", ".......ab.......", "......ab........", ".....ab.........", "....ab..........", "...ab...........", "..ab............", ".ab.............", "................"],
+      {"a": "#1f5e5a", "b": "#4fb8a8", "c": "#c8fff5"}],
     bow: [["......aaa.......", ".....a...bb.....", "....a......b....", "...a........b...", "...a.........b..", "..a...........b.", "..a...cc......b.", "..a..cdddddddcb.", "..a...cc......b.", "..a...........b.", "...a.........b..", "...a........b...", "....a......b....", ".....a...bb.....", "......aaa.......", "................"],
       { a: "#8a6238", b: "#dcdcdc", c: "#9aa3a8", d: "#5a3d22" }],
     mace: [["................", ".....aaaaaa.....", "....abbbbbba....", "...abbccccbba...", "...abccccccba...", "...abccccccba...", "...abbccccbba...", "....abbbbbba....", ".....aaaaaa.....", ".......dd.......", ".......dd.......", ".......dd.......", ".......dd.......", ".......ee.......", ".......ee.......", "................"],
@@ -76,7 +84,7 @@
     other: [["................", "....aaaaaaaa....", "...abbbbbbbbba..", "..abbbbbbbbbbba.", "..abccbbbbccbba.", "..abccbbbbccbba.", "..abbbbbbbbbbba.", "..abbbbddbbbbba.", "...abbbbbbbbba..", "....abcbcbcba...", "....abbbbbbba...", ".....aaaaaaa....", "................", "................", "................", "................"],
       { a: "#3a3d40", b: "#d7d9d4", c: "#1c1c1c", d: "#8b8f92" }],
   };
-  const KILL_NAMES = { crystal: "kill.crystal", anchor: "kill.anchor", melee: "kill.melee", bow: "kill.bow", mace: "kill.mace", tnt: "kill.tnt", fall: "kill.fall", other: "kill.other" };
+  const KILL_NAMES = { crystal: "kill.crystal", anchor: "kill.anchor", melee: "kill.melee", sword: "kill.sword", axe: "kill.axe", spear: "kill.spear", trident: "kill.trident", bow: "kill.bow", mace: "kill.mace", tnt: "kill.tnt", fall: "kill.fall", other: "kill.other" };
   const killIcon = (m, size = 20) => { const k = KILL[m] || KILL.other; return pixel(k[0], k[1], size); };
 
   /* 像素世界縮圖（32×20） */

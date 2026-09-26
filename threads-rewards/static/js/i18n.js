@@ -432,3 +432,45 @@ Object.assign(window.I18N.en, {
   "snd.ambOn": "Ambient music on", "snd.ambOff": "Ambient music off",
   "set.soundd": "Every sound is synthesized live in your browser.",
 });
+Object.assign(window.I18N.zh, { "kill.melee": "空手 / 其他近戰", "kill.sword": "劍", "kill.axe": "斧頭", "kill.spear": "長矛", "kill.trident": "三叉戟" });
+Object.assign(window.I18N.en, { "kill.melee": "Fist / other melee", "kill.sword": "Sword", "kill.axe": "Axe", "kill.spear": "Spear", "kill.trident": "Trident" });
+Object.assign(window.I18N.zh, {
+  "rb.back": "返回主頁", "rb.title": "伺服器規則", "rb.sub": "加入鋸齒 SMP 前請完整閱讀。開始遊玩即代表你同意以下所有規則。",
+  "rb.toc": "目錄", "rb.chapters": "個章節", "rb.sections": "個小節", "rb.latest": "最新版規則",
+  "rb.violation": "違規項目", "rb.penalty": "懲處", "rb.zhOnly": "",
+  "rb.medal.chapter": "使用 Medal 保障權益",
+  "rb.medal.title": "用 Medal 錄下證據，保障自己的權益",
+  "rb.medal.lead": "Medal 是免費的遊戲錄影軟體，會在背景保留最近的遊戲畫面，一鍵就能把剛剛發生的事存成片段。遇到爭議時，影片是最有力的證據。",
+  "rb.medal.when": "什麼時候特別有用",
+  "rb.medal.w1": "懷疑被外掛擊殺，需要檢舉對方",
+  "rb.medal.w2": "被指控使用外掛，需要證明自己清白",
+  "rb.medal.w3": "戰鬥登出、斷線掉裝等需要還原經過的狀況",
+  "rb.medal.w4": "遭到恐嚇、騷擾或違規言論",
+  "rb.medal.s1": "安裝並開啟背景錄影", "rb.medal.s1d": "到 medal.tv 下載，啟用自動錄影（Clip）並選擇 Minecraft。",
+  "rb.medal.s2": "設定剪輯快捷鍵", "rb.medal.s2d": "建議保留前 1–2 分鐘，事情一發生就按下快捷鍵。",
+  "rb.medal.s3": "分享片段連結", "rb.medal.s3d": "在 Medal 中把片段設為可分享，複製連結。",
+  "rb.medal.s4": "開客服單附上連結", "rb.medal.s4d": "檢舉或申訴時貼上連結，管理員能更快、更公正地處理。",
+  "rb.medal.warn": "請保留原始片段，不要剪接、加速或刪減關鍵畫面；經過編輯的影片可能不會被採納。",
+  "rb.medal.get": "下載 Medal", "rb.medal.ticket": "開客服單",
+});
+Object.assign(window.I18N.en, {
+  "rb.back": "Back to home", "rb.title": "Server rules", "rb.sub": "Read these before joining Saw SMP. Playing on the server means you agree to all of them.",
+  "rb.toc": "Contents", "rb.chapters": "chapters", "rb.sections": "sections", "rb.latest": "Latest version",
+  "rb.violation": "Violation", "rb.penalty": "Penalty", "rb.zhOnly": "The official rules are written in Traditional Chinese.",
+  "rb.medal.chapter": "Protect yourself with Medal",
+  "rb.medal.title": "Record evidence with Medal to protect yourself",
+  "rb.medal.lead": "Medal is a free game recorder that keeps your latest gameplay in the background, so one key saves what just happened. In a dispute, video is the strongest evidence.",
+  "rb.medal.when": "When it helps most",
+  "rb.medal.w1": "You think a cheater killed you and want to report them",
+  "rb.medal.w2": "You are accused of cheating and need to prove you are clean",
+  "rb.medal.w3": "Combat logging, disconnects or lost gear that need to be reconstructed",
+  "rb.medal.w4": "Threats, harassment or abusive chat",
+  "rb.medal.s1": "Install and enable background recording", "rb.medal.s1d": "Get it from medal.tv, turn on Clips and select Minecraft.",
+  "rb.medal.s2": "Set a clip hotkey", "rb.medal.s2d": "Keep the last 1–2 minutes and press the hotkey as soon as something happens.",
+  "rb.medal.s3": "Share the clip link", "rb.medal.s3d": "Make the clip shareable in Medal and copy its link.",
+  "rb.medal.s4": "Attach it to a ticket", "rb.medal.s4d": "Paste the link when reporting or appealing so staff can act faster and fairly.",
+  "rb.medal.warn": "Keep the original clip. Don't cut, speed up or trim key moments; edited videos may not be accepted.",
+  "rb.medal.get": "Get Medal", "rb.medal.ticket": "Open a ticket",
+});
+Object.assign(window.I18N.zh, { "admin.rulesHint": "留空＝使用內建最新版規則。格式：# 章節、## 小節、- 標籤：內容、> 公告、| 違規 | 懲處、=> 條件 | 結果（警告階梯）、* 備註、! 同意聲明、::: medal；用 `文字` 標示重點。" });
+Object.assign(window.I18N.en, { "admin.rulesHint": "Blank = built-in latest rules. Format: # chapter, ## section, - label: text, > notice, | violation | penalty, => condition | result, * note, ! agreement, ::: medal; wrap highlights in `backticks`." });

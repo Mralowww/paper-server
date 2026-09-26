@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * PVP 戰績：記錄每位玩家最後一次被哪個玩家、用什麼方式傷害，死亡時回報擊殺。
- * 擊殺方式：crystal（末地水晶）、anchor（重生錨 / 床爆炸）、melee、mace、bow、tnt、fall、other。
+ * 擊殺方式：crystal（末地水晶）、anchor（重生錨 / 床爆炸）、sword、axe、spear（長矛）、mace、trident、melee（空手 / 其他）、bow、tnt、fall、other。
  */
 public final class StatsListener implements Listener {
     private record Hit(UUID attacker, String name, String method, long at) {}
@@ -82,9 +82,9 @@ public final class StatsListener implements Listener {
         if (src == null || src.equals(victim)) return;
         String method;
         if (d instanceof TNTPrimed) method = "tnt";
-        else if (d instanceof Trident || d instanceof Projectile) method = "bow";
-        else if (src.getInventory().getItemInMainHand().getType() == Material.MACE) method = "mace";
-        else method = "melee";
+        else if (d instanceof Trident) method = "trident";
+        else if (d instanceof Projectile) method = "bow";
+        else method = weapon(src.getInventory().getItemInMainHand().getType());
         record(victim, src.getUniqueId(), src.getName(), method);
     }
 
@@ -99,6 +99,17 @@ public final class StatsListener implements Listener {
             if (t.loc().distanceSquared(vl) <= 144 && (best == null || t.at() > best.at())) best = t;
         }
         if (best != null && !best.player().equals(victim.getUniqueId())) record(victim, best.player(), best.name(), "anchor");
+    }
+
+    /** 依手上武器分類近戰擊殺（以名稱判斷，未來新增的材質等級也適用）。 */
+    static String weapon(Material m) {
+        if (m == Material.MACE) return "mace";
+        if (m == Material.TRIDENT) return "trident";
+        String n = m.name();
+        if (n.endsWith("_SPEAR")) return "spear";
+        if (n.endsWith("_SWORD")) return "sword";
+        if (n.endsWith("_AXE")) return "axe";
+        return "melee";
     }
 
     private void record(Player victim, UUID attacker, String name, String method) {
@@ -116,7 +127,8 @@ public final class StatsListener implements Listener {
             EntityDamageEvent last = victim.getLastDamageCause();
             if (last != null && last.getCause() == EntityDamageEvent.DamageCause.FALL && !"crystal".equals(method) && !"anchor".equals(method)) method = "fall";
         } else if (victim.getKiller() != null && !victim.getKiller().equals(victim)) {
-            killer = victim.getKiller().getUniqueId(); killerName = victim.getKiller().getName(); method = "melee";
+            killer = victim.getKiller().getUniqueId(); killerName = victim.getKiller().getName();
+            method = weapon(victim.getKiller().getInventory().getItemInMainHand().getType());
         }
         // 順便清除過期的觸發紀錄
         crystalOwner.values().removeIf(t -> now - t.at() > 30000);
