@@ -3,6 +3,12 @@
   const name = new URLSearchParams(location.search).get("name") || "";
   let d = null; let tab = store.get("pp.tab", "stats");
 
+  function titlesCard() {
+    const all = d.stats.titles || []; const got = all.filter((x) => x.earned);
+    return `<div class="card reveal section tight"><div class="card-title"><h3>${t("ttl.title")}</h3><span class="right dim mono">${got.length} / ${all.length}</span><button class="tier-help sm" data-titles type="button" title="${t("ttl.title")}">${ART.icon("sparkle", 13)}</button></div>
+      <div class="ttl-grid">${all.map((x) => `<div class="ttl-item ${x.earned ? "on" : ""}" style="${x.color === "rainbow" ? "" : `--tc:${esc(x.color)}`}">
+        ${App.titleTag(x, { dim: !x.earned })}<small>${esc(x.desc || "")}</small>${x.earned ? "" : `<div class="progress" style="height:4px"><i style="width:${Math.round(x.progress * 100)}%"></i></div>`}</div>`).join("")}</div></div>`;
+  }
   function overview() {
     const p = d.player, s = d.stats;
     return `<div class="card reveal"><div class="card-title"><h3>${t("pp.overview")}</h3>${p.online ? `<span class="right tag ok live">${t("home.online")}</span>` : ""}</div>
@@ -16,6 +22,7 @@
       </div>
       ${s.tier.next ? `<div style="margin-top:18px"><div class="row" style="justify-content:space-between;font-size:13px"><span class="muted">${t("pp.nextTier")}：${App.tierTag(s.tier.next)}</span><span class="mono">${s.kills} / ${s.tier.next.kills}</span></div><div class="progress tier-prog" style="height:6px;${s.tier.color === "rainbow" ? "" : `--tc:${esc(s.tier.next.color === "rainbow" ? "#fbbf24" : s.tier.next.color)}`}"><i style="width:${Math.min(100, (s.kills / s.tier.next.kills) * 100)}%"></i></div></div>` : ""}
     </div>
+    ${titlesCard()}
     <div class="card reveal section tight"><div class="card-title"><h3>${t("pp.history")}</h3></div>
       ${d.punishments.length ? d.punishments.map((x) => `<div class="pun-item ${x.active ? "" : "off"}" data-pt="${x.type}"><span class="bar"></span><div class="desc"><div class="row" style="gap:6px">${ptTag(x.type, !!x.active)}<span class="dim mono" style="font-size:12px">#${x.id}</span></div><p>${esc(x.reason)}</p><small>${date(x.created_at)} · ${x.active ? t("pl.remaining") + " " + remaining(x.expires_at) : t("pl.expired")}</small></div></div>`).join("") : `<div class="empty">${t("pp.clean")}</div>`}
     </div>`;
@@ -80,6 +87,9 @@
     const tb = $("#tier"); tb.querySelector("span:last-child").textContent = d.stats.tier.name;
     tb.classList.toggle("rainbow", d.stats.tier.color === "rainbow"); if (d.stats.tier.color !== "rainbow") tb.style.setProperty("--accent", d.stats.tier.color);
     tb.dataset.tiers = d.stats.tier.level; tb.title = t("tier.title"); tb.style.cursor = "pointer";
+    const earned = (d.stats.titles || []).filter((x) => x.earned);
+    let tt = document.getElementById("ptitles"); if (!tt) { tt = document.createElement("div"); tt.id = "ptitles"; tt.className = "ptitles"; tb.after(tt); }
+    tt.innerHTML = earned.slice().reverse().map((x) => App.titleTag(x)).join("");
     $("#namemc").href = `https://namemc.com/profile/${p.uuid}`;
     render();
     $("#ptabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (!b) return; tab = b.dataset.tab; store.set("pp.tab", tab); sfx("switch"); render(); });

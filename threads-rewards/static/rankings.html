@@ -21,12 +21,13 @@
 <main class="page grid-bg">
   <div class="container">
     <div class="section-head reveal">
-      <div><span class="eyebrow-text">Leaderboard</span><h1 class="pixel-title rk-h1" style="font-size:clamp(24px,5vw,44px)"><span data-i18n="rk.title"></span><button class="tier-help" id="tier-help" data-tiers="" type="button" data-i18n-title="tier.title"></button></h1><p class="muted" data-i18n="rk.sub"></p></div>
+      <div><span class="eyebrow-text">Leaderboard</span><h1 class="pixel-title rk-h1" style="font-size:clamp(24px,5vw,44px)"><span data-i18n="rk.title"></span><button class="tier-help" id="tier-help" data-tiers="" type="button" data-i18n-title="tier.title"></button><button class="tier-help" id="title-help" data-titles type="button" data-i18n-title="ttl.title"></button></h1><p class="muted" data-i18n="rk.sub"></p></div>
       <div class="kpi-mini" id="totals"></div>
     </div>
+    <div class="week-banner" id="week-banner" hidden></div>
     <div class="sortbar reveal" id="sorts"></div>
     <div class="podium3" id="podium"></div>
-    <div class="row" style="justify-content:space-between;margin-bottom:12px"><input class="input" id="q" data-i18n-ph="bans.search" style="max-width:280px"></div>
+    <div class="row rk-tools"><input class="input" id="q" data-i18n-ph="bans.search" style="max-width:280px"><div class="rk-period"><span class="dim" data-i18n="wk.period"></span><select class="enhance" id="period"></select></div></div>
     <div class="rank-head" id="rank-head"></div>
     <div class="rank-table" id="list"><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div><div class="skeleton sk-row"></div></div>
   </div>

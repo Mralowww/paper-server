@@ -838,12 +838,30 @@
     const me = o.el.querySelector(".tier-item.me"); if (me) me.scrollIntoView({ block: "center" });
     return o;
   }
+  const PIXEL_ICONS = ["crystal", "anchor", "mace", "spear", "axe", "trident", "bow", "tnt"];
+  const titleIcon = (n, size) => PIXEL_ICONS.includes(n) && ART.killIcon ? ART.killIcon(n, size) : ART.icon(n || "gem", size);
+  function titleTag(x, { dim = false } = {}) {
+    if (!x) return "";
+    const rb = x.color === "rainbow";
+    return `<span class="title-chip ${rb ? "rainbow" : ""} ${dim ? "dim" : ""}" ${rb ? "" : `style="--tc:${esc(x.color)}"`} title="${esc(x.desc || "")}">${titleIcon(x.icon, 12)}${esc(x.name)}</span>`;
+  }
+  async function titlesInfo() {
+    const d = await api("/api/titles", { quiet: true });
+    return modal({ title: esc(t("ttl.title")), body: `<p class="dim" style="margin:0 0 14px">${t("ttl.desc")}</p><div class="tier-list">${d.titles.map((x, i) => {
+      const rb = x.color === "rainbow";
+      return `<div class="tier-item" style="--i:${i};${rb ? "" : `--tc:${esc(x.color)}`}">
+        <span class="tier-gem ${rb ? "rainbow" : ""}">${titleIcon(x.icon, 20)}</span>
+        <div class="tier-body">${titleTag(x)}<p>${esc(x.desc || "")}</p></div>
+        <div class="tier-need"><b>${fmt(x.players)}</b><small>${t("ttl.holders")}</small><small class="dim">${d.total ? ((x.players / d.total) * 100).toFixed(1) : 0}%</small></div></div>`;
+    }).join("")}</div>` });
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-titles]"); if (b) { e.preventDefault(); titlesInfo().catch((err) => fail(err.message)); } });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-tiers]"); if (b) { e.preventDefault(); tiersInfo(b.dataset.tiers === "" ? -1 : +b.dataset.tiers).catch((err) => fail(err.message)); } });
 
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
     holdHeight, badges, fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, get mePromise() { return mePromise; },
-    setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining, tierTag, tiersInfo,
+    setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining, tierTag, tiersInfo, titleTag, titlesInfo,
   };
 })();

@@ -3,7 +3,7 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from . import config, db, scraper
+from . import config, db, scraper, weekly
 
 log = logging.getLogger("rewards.tasks")
 announce_hook = None  # bot.py 啟動後會設定為 async 函式 (period_start, period_end, winners)
@@ -73,6 +73,10 @@ async def scheduler() -> None:
                 else:
                     db.execute("INSERT OR IGNORE INTO settled_periods VALUES (?, ?)",
                                (db.iso(prev_start), db.iso(db.now_utc())))
+            try:
+                weekly.tick()
+            except Exception:  # noqa: BLE001
+                log.exception("每週排行封存失敗")
             if loop.time() - last_refresh >= config.SCRAPE_INTERVAL_MIN * 60:
                 last_refresh = loop.time()
                 await refresh_period(start, end)

@@ -15,7 +15,7 @@ import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
-from . import db
+from . import db, titles, weekly
 from .deps import current_user
 from .punish import dashed, expire_old, now_iso, plugin_auth, pun_public, upsert_player
 
@@ -72,6 +72,7 @@ def tier_of_index(ts: list[dict], kills: int) -> int:
 
 def _stat_row(uuid: str) -> dict:
     db.execute("INSERT OR IGNORE INTO player_stats(uuid, updated_at) VALUES (?, ?)", (uuid, now_iso()))
+    weekly.ensure_base(uuid)
     return db.one("SELECT * FROM player_stats WHERE uuid = ?", (uuid,))
 
 
@@ -149,9 +150,11 @@ async def plugin_stats(body: StatsSyncIn):
     for p in body.players[:500]:
         u = dashed(p.uuid)
         upsert_player(u, p.name)
-        _stat_row(u)
         vals = {f: max(0, int(getattr(p, f))) for f in ("kills", "deaths", "playtime", "wins", "losses", "best_streak")
                 if getattr(p, f) is not None}
+        if not db.one("SELECT 1 FROM player_stats WHERE uuid = ?", (u,)):
+            weekly.ensure_base(u, vals)  # 第一次看到的玩家：原本的紀錄不算進本週
+        _stat_row(u)
         if not vals:
             continue
         sets = ", ".join(f"{f} = ?" for f in vals)
@@ -185,11 +188,50 @@ def leaderboard_rows(sort: str, limit: int, q: str = "") -> list[dict]:
         where.append("p.name LIKE ?"); params.append(f"%{q}%")
     rows = db.query(f"""SELECT s.*, p.name, p.online FROM player_stats s JOIN players p ON p.uuid = s.uuid
                         WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?""", (*params, min(max(limit, 1), 200)))
-    return [enrich(r) for r in rows]
+    return with_titles([enrich(r) for r in rows])
+
+
+def with_titles(rows: list[dict], full: bool = False) -> list[dict]:
+    defs = titles.definitions()
+    ms = titles.methods_for([r["uuid"] for r in rows])
+    champ = weekly.champion_counts()
+    for r in rows:
+        r["titles"] = titles.evaluate(titles.values(r, ms.get(r["uuid"]), champ.get(r["uuid"], 0)), defs, full)
+    return rows
+
+
+WEEK_SORTS = {"kills": lambda r: (r["kills"], r["kdr"]), "kdr": lambda r: (r["kdr"], r["kills"]), "wins": lambda r: (r["wins"], r["winrate"]),
+              "winrate": lambda r: (r["winrate"], r["wins"]), "playtime": lambda r: (r["playtime"], r["kills"]), "deaths": lambda r: (r["deaths"], 0)}
+
+
+def weekly_rows(week: str | None, sort: str, limit: int, q: str = "") -> list[dict]:
+    rows = [r for r in weekly.rows(week) if any(r[f] for f in weekly.FIELDS)]
+    if q:
+        rows = [r for r in rows if q.lower() in r["name"].lower()]
+    for r in rows:
+        r["kdr"] = round(r["kills"] / max(r["deaths"], 1), 2)
+        total = r["wins"] + r["losses"]
+        r["matches"], r["winrate"] = total, round(r["wins"] / total * 100, 1) if total else 0
+    rows.sort(key=WEEK_SORTS.get(sort, WEEK_SORTS["kills"]), reverse=True)
+    rows = rows[:min(max(limit, 1), 200)]
+    tot = {r["uuid"]: r for r in db.query(f"SELECT uuid, kills FROM player_stats WHERE uuid IN ({','.join('?' * len(rows))})", tuple(r["uuid"] for r in rows))} if rows else {}
+    for r in rows:
+        r["tier"] = tier_of((tot.get(r["uuid"]) or {}).get("kills", 0))
+        r["best_streak"] = 0
+    return rows
 
 
 @router.get("/api/leaderboard")
-async def leaderboard(sort: str = "kills", limit: int = 100, q: str = ""):
+async def leaderboard(sort: str = "kills", limit: int = 100, q: str = "", week: str = ""):
+    if week:
+        wk = None if week == "current" else week
+        if wk and not (len(wk) == 10 and wk[4] == "-" and wk[7] == "-"):
+            raise HTTPException(400, "週次格式錯誤")
+        rows = weekly_rows(wk, sort, limit, q)
+        info = weekly.week_range(wk or weekly.week_of())
+        return {"sort": sort if sort in WEEK_SORTS else "kills", "players": rows, "week": dict(info, current=wk is None),
+                "totals": {"players": len(rows), "kills": sum(r["kills"] for r in rows), "playtime": sum(r["playtime"] for r in rows),
+                           "matches": sum(r["wins"] for r in rows), "online": db.one("SELECT COUNT(*) AS c FROM players WHERE online = 1")["c"]}}
     rows = leaderboard_rows(sort, limit, q)
     totals = db.one("""SELECT COUNT(*) AS players, COALESCE(SUM(kills),0) AS kills, COALESCE(SUM(playtime),0) AS playtime
                        FROM player_stats""")
@@ -207,6 +249,8 @@ def profile(name: str, match_limit: int = 50) -> dict:
     uuid = p["uuid"]
     stats = enrich(db.one("SELECT * FROM player_stats WHERE uuid = ?", (uuid,)) or
                    {"kills": 0, "deaths": 0, "streak": 0, "best_streak": 0, "wins": 0, "losses": 0, "playtime": 0})
+    stats["uuid"] = uuid
+    with_titles([stats], full=True)
     rank = None
     if stats["kills"]:
         rank = db.one("SELECT COUNT(*) + 1 AS r FROM player_stats WHERE kills > ?", (stats["kills"],))["r"]
@@ -232,6 +276,26 @@ def profile(name: str, match_limit: int = 50) -> dict:
         "stats": stats, "rank": rank, "methods": methods, "matches": matches, "rivals": rivals,
         "punishments": [pun_public(x) for x in puns],
     }
+
+
+@router.get("/api/weeks")
+async def list_weeks():
+    return {"weeks": weekly.weeks(), "now": now_iso()}
+
+
+@router.get("/api/titles")
+async def list_titles():
+    defs = titles.definitions()
+    rows = db.query("SELECT * FROM player_stats")
+    ms = titles.methods_for([r["uuid"] for r in rows])
+    champ = weekly.champion_counts()
+    counts = [0] * len(defs)
+    for r in rows:
+        got = {t["id"] for t in titles.evaluate(titles.values(r, ms.get(r["uuid"]), champ.get(r["uuid"], 0)), defs)}
+        for i, t in enumerate(defs):
+            counts[i] += t["id"] in got
+    return {"titles": [dict({k: t[k] for k in ("id", "name", "color", "icon", "desc")}, players=counts[i]) for i, t in enumerate(defs)],
+            "total": len(rows)}
 
 
 @router.get("/api/players")
