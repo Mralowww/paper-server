@@ -22,6 +22,13 @@ DEFAULT_NOTIFY = [
 ]
 _counts = {"at": 0.0, "data": {}, "total": 0}
 _lock = asyncio.Lock()
+COOLDOWN = 10  # 同一個身分組切換後的冷卻秒數
+_cool: dict[tuple[str, str], float] = {}
+
+
+def _cooldowns(uid: str) -> dict[str, int]:
+    now = time.time()
+    return {rid: int(t - now) + 1 for (u, rid), t in list(_cool.items()) if u == uid and t > now}
 
 
 def notify_roles() -> list[dict]:
@@ -96,7 +103,8 @@ async def _payload(user: dict | None) -> dict:
             member = None
     return {"roles": [dict(r, count=c["data"].get(r["id"], 0), on=r["id"] in mine) for r in notify_roles()],
             "members": c["total"], "member": member, "logged_in": bool(user),
-            "badges": {k: c["data"].get(v, 0) for k, v in badge_roles().items()}}
+            "badges": {k: c["data"].get(v, 0) for k, v in badge_roles().items()},
+            "cooldown": COOLDOWN, "cooldowns": _cooldowns(user["id"]) if user else {}}
 
 
 @router.get("/api/notify-roles/me")
@@ -110,10 +118,18 @@ class ToggleIn(BaseModel):
 
 @router.post("/api/notify-roles/{role_id}")
 async def toggle(role_id: str, body: ToggleIn, user: dict = Depends(current_user)):
-    security.ratelimit(f"nrole:{user['id']}", 15, 60)
     role = next((r for r in notify_roles() if r["id"] == role_id), None)
     if not role:
         raise HTTPException(404, "找不到這個通知身分組")
+    now = time.time()
+    left = _cool.get((user["id"], role_id), 0) - now
+    if left > 0:
+        raise HTTPException(429, f"冷卻中，請 {int(left) + 1} 秒後再切換「{role['name']}」", headers={"Retry-After": str(int(left) + 1)})
+    security.ratelimit(f"nrole:{user['id']}", 6, 60, "切換太頻繁，請一分鐘後再試")
+    _cool[(user["id"], role_id)] = now + COOLDOWN
+    if len(_cool) > 5000:
+        for k in [k for k, t in _cool.items() if t < now]:
+            _cool.pop(k, None)
     st = await discord_api.member_status(user["id"])
     if not st.get("member"):
         raise HTTPException(400, "請先加入鋸齒 SMP 的 Discord 伺服器")
@@ -124,4 +140,4 @@ async def toggle(role_id: str, body: ToggleIn, user: dict = Depends(current_user
         _counts["data"][role_id] = max(0, _counts["data"].get(role_id, 0) + (1 if body.on else -1))
     discord_api._admin_cache.pop(user["id"], None)
     activity.write(user, "notify.role.add" if body.on else "notify.role.remove", role["name"], category="account", target=role_id)
-    return {"ok": True, "on": body.on, "count": _counts["data"].get(role_id, 0)}
+    return {"ok": True, "on": body.on, "count": _counts["data"].get(role_id, 0), "cooldown": COOLDOWN}

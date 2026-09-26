@@ -1630,6 +1630,7 @@ body.standalone:has(.desk) { overflow: hidden; }
 .nr-btn.on { border-color: color-mix(in srgb, #5865f2 60%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, #5865f2 12%, var(--surface)), var(--surface)); }
 .nr-btn.on .nr-ic { background: #5865f2; color: #fff; } .nr-btn.on .nr-sw { background: #5865f2; } .nr-btn.on .nr-sw em { transform: translateX(16px); } .nr-btn.on .nr-state small { color: #8b93ff; }
 .nr-btn.busy { pointer-events: none; } .nr-btn.busy .nr-sw em { animation: nrPulse .8s infinite alternate; } @keyframes nrPulse { to { opacity: .4; } }
+.nr-btn.cool { cursor: wait; } .nr-btn.cool .nr-sw { opacity: .5; } .nr-btn.cool .nr-state small { font-family: var(--font-mono); color: var(--warn, #e0a340); }
 .nr-foot { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; text-align: center; color: var(--text-2); font-size: 13.5px; }
 @media (max-width: 560px) { .nr-grid { grid-template-columns: minmax(0, 1fr); } }
 
