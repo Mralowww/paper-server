@@ -1,6 +1,8 @@
 # SawSMP 插件
 
-鋸齒 SMP 的核心插件，負責遊戲與網站之間的同步。支援 Paper 與 Folia 1.21.x，需要 Java 21。
+鋸齒 SMP 的核心插件，負責遊戲與網站之間的同步。
+
+適用 **CanvasMC 26.2**（Folia 分支），也可在 Paper / Folia 26.x 上使用。建置時使用 `canvas-api 26.2`，需要 **Java 25**。
 
 ## 功能
 
@@ -19,7 +21,7 @@
 
 ## 安裝
 
-1. `gradle build`，把 `build/libs/SawSMP-1.0.0.jar` 放進伺服器的 `plugins/`
+1. `gradle build`（需要 JDK 25），把 `build/libs/SawSMP-1.0.0.jar` 放進伺服器的 `plugins/`
 2. 啟動一次產生 `plugins/SawSMP/config.yml`
 3. 到網站「後台 → API Keys」產生插件金鑰，填入 `api.key`，並確認 `api.url` 是網站網址
 4. 執行 `/sawsmp reload`，再用 `/sawsmp status` 確認連線正常

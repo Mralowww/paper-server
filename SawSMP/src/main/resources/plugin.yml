@@ -1,7 +1,7 @@
 name: SawSMP
 version: '${version}'
 main: dev.sawsmp.core.SawSMPPlugin
-api-version: '1.21'
+api-version: '26.2'
 folia-supported: true
 author: opopjjjidj
 website: https://sawsmp.me
