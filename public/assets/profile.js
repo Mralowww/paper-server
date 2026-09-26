@@ -35,7 +35,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
     sword: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>',
   };
-  const CAUSE = { crystal: '💎', anchor: '⚓', melee: '⚔', projectile: '🏹', explosion: '💥', other: '•' };
+  const CAUSES = ['crystal', 'anchor', 'melee', 'projectile', 'explosion', 'other'];
+  const causeIcon = (c) => `<img class="mc-ico" src="/assets/icons/${CAUSES.includes(c) ? c : 'other'}.svg" alt="">`;
   const WORLD_ART = ['plains', 'desert', 'badlands', 'mushroom', 'snow', 'nether', 'end'];
   let worldMap = g.worlds || {};
   const worldInfo = (w) => {
@@ -190,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="pf-cols">
         <div class="pf-card"><h3>${t('pf.killTypes')}</h3>
-          <div class="pf-bars">${types.map(([k, n]) => `<div class="pf-bar"><span>${CAUSE[k]} ${t(`pf.cause.${k}`)}</span><i style="--w:${(n / maxType) * 100}%"></i><b>${n}</b></div>`).join('')}</div>
+          <div class="pf-bars">${types.map(([k, n]) => `<div class="pf-bar"><span>${causeIcon(k)} ${t(`pf.cause.${k}`)}</span><i style="--w:${(n / maxType) * 100}%"></i><b>${n}</b></div>`).join('')}</div>
         </div>
         <div class="pf-card"><h3>${t('pf.rivals')}</h3>
           ${s.rivals.length ? `<div class="pf-rivals">${s.rivals.map(rivalHtml).join('')}</div>${moreBtn('rivals', s.rivalCount)}` : `<p class="muted">${t('pf.none')}</p>`}
@@ -227,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const logRow = (k, i = 0) => `<div class="pf-logrow ${k.role}" style="--i:${i}">
     <span class="pf-log-badge">${t(k.role === 'kill' ? 'pf.kill' : 'pf.death')}</span>
     <span class="pf-log-main">${k.opponent ? `<span>${t(k.role === 'kill' ? 'pf.killed' : 'pf.killedBy')} <a href="/player/${encodeURIComponent(k.opponent.name)}">${esc(k.opponent.name)}</a></span>` : `<span class="muted">${t('pf.selfDeath')}</span>`}
-      <small class="muted">${CAUSE[k.cause] || '•'} ${t(`pf.cause.${k.cause}`)}${k.killerHealth != null ? ` · ❤ ${k.killerHealth}` : ''}${k.victimPops ? ` · ${t('pf.pops', { n: k.victimPops })}` : ''}</small></span>
+      <small class="muted">${causeIcon(k.cause)} ${t(`pf.cause.${k.cause}`)}${k.killerHealth != null ? ` · ❤ ${k.killerHealth}` : ''}${k.victimPops ? ` · ${t('pf.pops', { n: k.victimPops })}` : ''}</small></span>
     <span class="pf-log-world">${worldThumb(k.world, 'xs')}<span>${esc(worldInfo(k.world).name)}</span></span>
     <span class="pf-log-time mono muted" title="${esc(fmtDate(k.at))}">${esc(fmtRelative(k.at))}</span>
   </div>`;
@@ -286,7 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     body.innerHTML = `
       <div class="pfx-filters">
         <div class="seg" data-f="type">${['all', 'kills', 'deaths'].map((x) => `<button data-v="${x}" class="${x === 'all' ? 'active' : ''}">${t(`pf.f.${x}`)}</button>`).join('')}</div>
-        <div class="seg" data-f="cause">${['', 'crystal', 'anchor', 'melee', 'other'].map((x) => `<button data-v="${x}" class="${x === '' ? 'active' : ''}">${x ? `${CAUSE[x]} ${t(`pf.cause.${x}`)}` : t('pf.f.anyCause')}</button>`).join('')}</div>
+        <div class="seg" data-f="cause">${['', 'crystal', 'anchor', 'melee', 'other'].map((x) => `<button data-v="${x}" class="${x === '' ? 'active' : ''}">${x ? `${causeIcon(x)} ${t(`pf.cause.${x}`)}` : t('pf.f.anyCause')}</button>`).join('')}</div>
         <div class="pfx-row">
           <select class="input" data-f="world"><option value="">${t('pf.f.anyWorld')}</option>${worldOpts.map((w) => `<option value="${esc(w)}">${esc(worldInfo(w).name)}</option>`).join('')}</select>
           <input class="input" data-f="opp" maxlength="16" placeholder="${t('pf.f.opp')}">
@@ -403,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       panel.innerHTML = '<div class="skeleton" style="height:60px;border-radius:10px"></div>';
       const { kills } = await request(`/api/profile/match/${b.dataset.match}`);
       panel.innerHTML = kills.map((k) => `<div class="pf-kill"><span class="mono muted">${esc(fmtTime(k.created_at))}</span>
-        <span>${CAUSE[k.cause] || '•'}</span><b class="${k.killer_name === g.name ? 'win' : 'loss'}">${esc(k.killer_name || '?')}</b>
+        <span>${causeIcon(k.cause)}</span><b class="${k.killer_name === g.name ? 'win' : 'loss'}">${esc(k.killer_name || '?')}</b>
         <span class="muted">→</span><span>${esc(k.victim_name)}</span>
         <span class="muted pf-kill-meta">${t(`pf.cause.${k.cause}`)}${k.killer_health != null ? ` · ❤ ${k.killer_health}` : ''}${k.victim_pops ? ` · ${t('pf.pops', { n: k.victim_pops })}` : ''}</span></div>`).join('');
     });

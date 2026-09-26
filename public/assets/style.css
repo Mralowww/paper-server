@@ -1534,3 +1534,7 @@ body.pfx-open { overflow: hidden; }
 .ctx-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 4px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--gold-2); }
 .ctx-head img { width: 18px; height: 18px; border-radius: 4px; image-rendering: pixelated; }
 @media (prefers-reduced-motion: reduce) { .ctx, .ctx-item, .ctx.in .ctx-item { transition: none; animation: none; opacity: 1; transform: none; } }
+.mc-ico { width: 16px; height: 16px; image-rendering: pixelated; vertical-align: -3px; flex: none; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5)); }
+.pf-bar > span { display: flex; align-items: center; gap: 7px; }
+.pfx-filters .seg button { display: inline-flex; align-items: center; gap: 6px; }
+.pf-log-main small, .pf-kill { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
