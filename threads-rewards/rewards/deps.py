@@ -34,14 +34,37 @@ async def current_user(request: Request) -> dict:
 async def user_level(request: Request, user: dict) -> int:
     """重新向 Discord 確認權限（快取 60 秒），並同步回資料庫。"""
     if user["id"] == config.SUPER_OWNER:
+        try:
+            save_roles(user, await discord_api.member_status(user["id"]))
+        except Exception:  # noqa: BLE001
+            pass
         return ADMIN
     if config.DEV_LOGIN and request.session.get("dev_level") is not None:
         return int(request.session["dev_level"])
     status = await discord_api.member_status(user["id"])
     level = status.get("level", 0)
+    save_roles(user, status)
     if level != user.get("level") or int(level >= ADMIN) != user["is_admin"]:
         db.execute("UPDATE users SET level = ?, is_admin = ? WHERE id = ?", (level, int(level >= ADMIN), user["id"]))
     return level
+
+
+def save_roles(user: dict, status: dict) -> None:
+    """記錄使用者目前的 Discord 身分組（名稱與顏色，依高到低），網站顯示身分用。"""
+    if "role_info" not in status:
+        return  # 沒查到 Discord（例如未設定機器人）就保留原本的紀錄
+    import json
+    v = json.dumps(status.get("role_info") or [], ensure_ascii=False)
+    if v != user.get("discord_roles"):
+        db.execute("UPDATE users SET discord_roles = ? WHERE id = ?", (v, user["id"]))
+
+
+def roles_of(u: dict) -> list:
+    import json
+    try:
+        return json.loads(u.get("discord_roles") or "[]")
+    except ValueError:
+        return []
 
 
 def require(min_level: int):

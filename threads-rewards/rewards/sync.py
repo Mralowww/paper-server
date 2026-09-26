@@ -12,7 +12,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 
 from . import account, activity, config, db, discord_api
-from .deps import ADMIN, require
+from .deps import ADMIN, require, save_roles
 from .punish import expire_old, kick_message, now_iso, plugin_auth, plugin_last_seen, queue
 
 log = logging.getLogger("rewards.sync")
@@ -52,6 +52,7 @@ async def _discord() -> None:
     for i, u in enumerate(users):
         try:
             st = await discord_api.member_status(u["id"], use_cache=False)
+            save_roles(db.one("SELECT * FROM users WHERE id = ?", (u["id"],)), st)
             if not st.get("member"):
                 left += 1
             lvl = st.get("level", 0)

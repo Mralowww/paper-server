@@ -63,10 +63,9 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
     等級：3 超級管理員（擁有者、Administrator / Manage Server 權限、ADMIN_ROLE_IDS）、
     2 管理員（MOD_ROLE_IDS）、1 客服（SUPPORT_ROLE_IDS）、0 一般成員。結果快取 60 秒。
     """
-    if user_id in config.OWNER_IDS:
-        return {"member": True, "level": 3, "admin": True, "roles": ["Owner"]}
+    owner = user_id in config.OWNER_IDS
     if not config.DISCORD_BOT_TOKEN or not config.DISCORD_GUILD_ID:
-        return {"member": True, "level": 0, "admin": False, "roles": []}
+        return {"member": True, "level": 3 if owner else 0, "admin": owner, "roles": []}  # 沒有機器人：不回傳身分組，避免覆蓋既有紀錄
     cached = _admin_cache.get(user_id)
     if use_cache and cached and time.time() - cached[0] < 60:
         return cached[1]
@@ -75,7 +74,7 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
         resp = await client.get(f"{API}/guilds/{config.DISCORD_GUILD_ID}/members/{user_id}",
                                 headers=_bot_headers())
         if resp.status_code == 404:
-            status = {"member": False, "level": 0, "admin": False, "roles": []}
+            status = {"member": False, "level": 0, "admin": False, "roles": [], "role_info": []}
         else:
             resp.raise_for_status()
             member = resp.json()
@@ -92,8 +91,12 @@ async def member_status(user_id: str, use_cache: bool = True) -> dict:
                 or (not config.ROLE_IDS_ONLY and bool(perms & (ADMINISTRATOR | MANAGE_GUILD)))
             )
             level = 3 if admin else 2 if role_ids & config.MOD_ROLE_IDS else 1 if role_ids & config.SUPPORT_ROLE_IDS else 0
-            names = [guild["roles"][r]["name"] for r in member.get("roles", []) if r in guild["roles"]]
-            status = {"member": True, "level": level, "admin": admin, "roles": names}
+            mine = sorted((guild["roles"][r] for r in member.get("roles", []) if r in guild["roles"]), key=lambda r: -int(r.get("position", 0)))
+            names = [r["name"] for r in mine]
+            info = [{"id": r["id"], "name": r["name"], "color": f"#{int(r.get('color') or 0):06x}" if r.get("color") else None} for r in mine]
+            status = {"member": True, "level": level, "admin": admin, "roles": names, "role_info": info}
+    if owner:  # 最高擁有者永遠是最高權限（顯示的身分仍以 Discord 身分組為準）
+        status = {**status, "member": True, "level": 3, "admin": True}
     _admin_cache[user_id] = (time.time(), status)
     return status
 

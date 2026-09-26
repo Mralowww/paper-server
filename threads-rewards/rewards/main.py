@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import account, activity, admin_ext, importer, maintenance, push, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
-from .deps import admin_user, current_user, public_user, with_user, protect_owner
+from .deps import admin_user, current_user, public_user, with_user, protect_owner, roles_of, save_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -132,6 +132,7 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     old = db.one("SELECT level, last_login, username, global_name, avatar FROM users WHERE id = ?", (user["id"],))
     upsert_user(user, status.get("level", 0))
     request.session["uid"] = user["id"]
+    save_roles(db.one("SELECT * FROM users WHERE id = ?", (user["id"],)), status)
     new = db.one("SELECT level, last_login, username, global_name, avatar FROM users WHERE id = ?", (user["id"],))
     b, a = activity.diff(old and {k: old[k] for k in ("level", "username", "global_name", "avatar")},
                          {k: new[k] for k in ("level", "username", "global_name", "avatar")})
@@ -176,7 +177,7 @@ async def me(request: Request):
         else user.get("level") or 0
     if user["id"] == config.SUPER_OWNER:
         level = 3
-    return {"user": {**public_user(user), "level": level, "owner": user["id"] == config.SUPER_OWNER, "admin": level >= 3, "banned": bool(user["banned"]),
+    return {"user": {**public_user(user), "level": level, "owner": user["id"] == config.SUPER_OWNER, "roles": roles_of(user), "admin": level >= 3, "banned": bool(user["banned"]),
                      "mc": {"uuid": user["mc_uuid"], "name": user["mc_name"]} if user.get("mc_uuid") else None}}
 
 

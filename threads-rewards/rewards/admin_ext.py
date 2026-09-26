@@ -1,3 +1,4 @@
+import asyncio
 """後台擴充：總覽、遊戲權限節點、帳號綁定管理、團隊、網站狀態、插件金鑰。"""
 import os
 import platform
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from . import activity, bot, config, db, discord_api
-from .deps import ADMIN, MOD, SUPPORT, display_name, public_user, require
+from .deps import ADMIN, MOD, SUPPORT, display_name, public_user, require, roles_of, save_roles
 from .punish import dashed, expire_old, now_iso, plugin_auth, plugin_last_seen, queue, resolve_player
 
 router = APIRouter()
@@ -149,7 +150,7 @@ async def links(q: str = "", _: dict = Depends(require(MOD))):
         params = (f"%{q}%", f"%{q}%", f"%{q}%", q)
     rows = db.query(f"SELECT * FROM users WHERE 1=1 {where} ORDER BY mc_uuid IS NULL, linked_at DESC, last_login DESC LIMIT 200", params)
     return {"users": [dict(public_user(u), mc_uuid=u["mc_uuid"], mc_name=u["mc_name"], linked_at=u["linked_at"],
-                           level=u.get("level") or 0, ticket_banned=bool(u.get("ticket_banned"))) for u in rows]}
+                           level=3 if u["id"] == config.SUPER_OWNER else u.get("level") or 0, roles=roles_of(u), ticket_banned=bool(u.get("ticket_banned"))) for u in rows]}
 
 
 @router.post("/api/admin/links")
@@ -179,10 +180,18 @@ async def manual_unlink(user_id: str, staff: dict = Depends(require(MOD))):
 
 @router.get("/api/admin/team")
 async def team(_: dict = Depends(require(SUPPORT))):
-    rows = db.query("SELECT * FROM users WHERE level >= 1 ORDER BY level DESC, last_login DESC")
+    rows = db.query("SELECT * FROM users WHERE level >= 1 OR id = ? ORDER BY level DESC, last_login DESC", (config.SUPER_OWNER,))
+    # 順便更新每位成員的 Discord 身分組（有 60 秒快取）
+    async def refresh(u):
+        try:
+            st = await discord_api.member_status(u["id"])
+            save_roles(u, st); u["discord_roles"] = db.one("SELECT discord_roles FROM users WHERE id = ?", (u["id"],))["discord_roles"]
+        except Exception:  # noqa: BLE001
+            pass
+    await asyncio.gather(*(refresh(u) for u in rows))
     stats = {r["staff_id"]: r["c"] for r in db.query("SELECT staff_id, COUNT(*) AS c FROM punishments WHERE staff_id IS NOT NULL GROUP BY staff_id")}
     replies = {r["author_id"]: r["c"] for r in db.query("SELECT author_id, COUNT(*) AS c FROM ticket_messages WHERE staff = 1 GROUP BY author_id")}
-    return {"team": [dict(public_user(u), level=u["level"], last_login=u["last_login"], mc_name=u["mc_name"],
+    return {"team": [dict(public_user(u), level=3 if u["id"] == config.SUPER_OWNER else u["level"], roles=roles_of(u), last_login=u["last_login"], mc_name=u["mc_name"],
                           punishments=stats.get(u["id"], 0), replies=replies.get(u["id"], 0)) for u in rows],
             "roles": {"support": sorted(config.SUPPORT_ROLE_IDS), "mod": sorted(config.MOD_ROLE_IDS), "admin": sorted(config.ADMIN_ROLE_IDS)}}
 

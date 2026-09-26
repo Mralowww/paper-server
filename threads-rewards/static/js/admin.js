@@ -26,7 +26,9 @@
   const lvlTagsBase = (l) => (l >= 3 ? `<span class="lvl-tag lvl-3">${t("lv.3")}</span>` : "") + (l === 2 ? `<span class="lvl-tag lvl-2">${t("lv.2")}</span>` : "") + (l === 1 ? `<span class="lvl-tag lvl-1">${t("lv.1")}</span>` : "");
 
   // 側欄只建立一次，之後只更新目前頁面與徽章（避免重建造成捲動位置跳動）
-  const lvlTags = (l, owner = App.me && App.me.owner) => owner ? `<span class="lvl-tag lvl-owner">${t("lv.owner")}</span>` : lvlTagsBase(l);
+  // 身分以 Discord 身分組為準：顯示最高的身分組（原色），旁邊再標網站權限等級
+  const roleChips = (roles, max = 2) => (roles || []).slice(0, max).map((r, i) => `<span class="dc-role ${i ? "sub" : ""}" style="--rc:${r.color || "var(--text-3)"}"><i></i>${esc(r.name)}</span>`).join("");
+  const lvlTags = (l, roles) => (roles && roles.length ? roleChips(roles) : "") + lvlTagsBase(l);
 
   /* ---------- 維修模式 ---------- */
   async function maintenance(el) {
@@ -79,8 +81,8 @@
 
   function renderSide() {
     const me = App.me; const card = $("#me-card"); const side = $("#side");
-    const cardSig = me.avatar + me.name + level + App.lang;
-    if (card.dataset.sig !== cardSig) { card.dataset.sig = cardSig; card.innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)}</b>${lvlTags(level)}</div>`; }
+    const cardSig = me.avatar + me.name + level + App.lang + JSON.stringify(me.roles || []);
+    if (card.dataset.sig !== cardSig) { card.dataset.sig = cardSig; card.innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)}</b><div class="role-line">${lvlTags(level, me.roles)}</div></div>`; }
     const sig = level + App.lang;
     if (side.dataset.sig !== sig) {
       side.dataset.sig = sig;
@@ -272,7 +274,7 @@
       const d = await api(`/api/admin/links?q=${encodeURIComponent($("#lq").value.trim())}`, { quiet: true });
       $("#lb").innerHTML = d.users.map((u) => `<tr data-uid="${u.id}" style="cursor:pointer"><td data-label="Discord"><span class="cell-user"><img src="${esc(u.avatar)}" alt="">${esc(u.name)} <span class="dim mono" style="font-size:11px">${u.id}</span></span></td>
         <td data-label="Minecraft">${u.mc_uuid ? `<span class="cell-user"><img src="${mcHead(u.mc_uuid, 24)}" alt="" style="border-radius:4px">${esc(u.mc_name)}</span>` : `<span class="dim">${t("acc.notLinked")}</span>`}</td>
-        <td data-label="${t("adm.linkedAt")}" class="dim">${u.linked_at ? date(u.linked_at) : "—"}</td><td data-label="${t("admin.role")}">${lvlTags(u.level) || `<span class="dim">—</span>`}</td>
+        <td data-label="${t("adm.linkedAt")}" class="dim">${u.linked_at ? date(u.linked_at) : "—"}</td><td data-label="${t("admin.role")}">${lvlTags(u.level, u.roles) || `<span class="dim">—</span>`}</td>
         <td data-label="">${u.mc_uuid ? `<button class="btn sm danger" data-unlink>${t("acc.unlink")}</button>` : `<button class="btn sm" data-link>${t("adm.manualLink")}</button>`}</td></tr>`).join("");
     };
     el.addEventListener("click", async (e) => {
@@ -442,7 +444,7 @@
   /* ---------- 團隊 ---------- */
   async function team(el) {
     const d = await api("/api/admin/team");
-    el.innerHTML = head("team") + `<div class="grid grid-3">${d.team.map((u) => `<div class="card hover reveal"><div class="row" style="gap:12px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" style="width:48px;height:48px;border-radius:50%" alt=""><div style="min-width:0"><b>${esc(u.name)}</b><div>${lvlTags(u.level)}</div></div></div>
+    el.innerHTML = head("team") + `<div class="grid grid-3">${d.team.map((u) => `<div class="card hover reveal"><div class="row" style="gap:12px;flex-wrap:nowrap"><img src="${esc(u.avatar)}" style="width:48px;height:48px;border-radius:50%" alt=""><div style="min-width:0"><b>${esc(u.name)}</b><div class="role-line">${lvlTags(u.level, u.roles)}</div></div></div>
       <div class="kpi-mini" style="margin-top:16px"><div><b>${u.replies}</b><small>${t("team.replies")}</small></div><div><b>${u.punishments}</b><small>${t("team.puns")}</small></div></div>
       <small class="dim">${u.mc_name ? ART.icon("pickaxe", 12) + " " + esc(u.mc_name) + " · " : ""}${u.last_login ? ago(u.last_login) : ""}</small></div>`).join("") || `<div class="card empty" style="grid-column:1/-1">${t("team.empty")}</div>`}</div>
       <p class="dim" style="margin-top:18px;font-size:13px">${t("team.hint")}</p>`;

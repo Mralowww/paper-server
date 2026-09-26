@@ -250,7 +250,7 @@ def _migrate(c: sqlite3.Connection) -> None:
         if name not in cols:
             c.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_mc ON users(mc_uuid) WHERE mc_uuid IS NOT NULL")
-    extra = {"users": [("ticket_banned", "INTEGER NOT NULL DEFAULT 0")],
+    extra = {"users": [("discord_roles", "TEXT"), ("ticket_banned", "INTEGER NOT NULL DEFAULT 0")],
              "punishments": [("silent", "INTEGER NOT NULL DEFAULT 0"), ("discord_sync", "INTEGER NOT NULL DEFAULT 0")],
              "tickets": [("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("fields", "TEXT NOT NULL DEFAULT '{}'")],
              "matches": [("status", "TEXT NOT NULL DEFAULT 'finished'"), ("reason", "TEXT"), ("draw", "INTEGER NOT NULL DEFAULT 0"),
