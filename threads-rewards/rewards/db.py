@@ -19,6 +19,9 @@ DEFAULT_SETTINGS = {
     "reward_1": "",
     "reward_2": "",
     "reward_3": "",
+    "server_address": "sawsmp.me",
+    "discord_invite": "",
+    "rules": "",
 }
 
 SCHEMA = """
@@ -64,6 +67,15 @@ CREATE TABLE IF NOT EXISTS weekly_results (
     score REAL NOT NULL,
     link_count INTEGER NOT NULL,
     PRIMARY KEY (period_start, rank)
+);
+CREATE TABLE IF NOT EXISTS news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    tag TEXT NOT NULL DEFAULT 'news',
+    pinned INTEGER NOT NULL DEFAULT 0,
+    author_id TEXT,
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS settled_periods (period_start TEXT PRIMARY KEY, settled_at TEXT NOT NULL);
 """

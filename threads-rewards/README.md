@@ -1,10 +1,10 @@
-# Threads 獎勵計畫
+# 鋸齒 SMP 官方網站
 
 用 Discord 登入、上傳 Threads 貼文連結，系統自動抓取按讚／回覆／轉發數，每週結算前三名並由 Discord 機器人公告。
 
 - 後端：FastAPI + SQLite + discord.py（同一個程序）
-- 前端：原生 HTML / CSS / JS，黑金電競風，中英雙語，音效全部即時合成
-- 頁面：`/` 主頁、`/links` 我的連結、`/login` 登入、`/admin` 管理後台、`/settings` 設定
+- 前端：原生 HTML / CSS / JS，淺色極簡風格，中英雙語，音效全部即時合成
+- 頁面：`/` 首頁（伺服器狀態、最新公告）、`/news` 公告、`/rules` 規則、`/rewards` Threads 獎勵排行、`/links` 我的連結、`/login` 登入、`/admin` 管理後台（排行、連結、用戶、權重、公告、網站設定）、`/settings` 設定
 
 ## 數據來源
 

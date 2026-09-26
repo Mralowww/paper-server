@@ -1,5 +1,7 @@
 import asyncio
 import logging
+
+import httpx
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -16,8 +18,8 @@ from . import bot, config, db, discord_api, scraper, tasks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 STATIC = Path(__file__).resolve().parent.parent / "static"
-PAGES = {"/": "index.html", "/links": "links.html", "/login": "login.html",
-         "/admin": "admin.html", "/settings": "settings.html"}
+PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
+         "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html"}
 
 
 @asynccontextmanager
@@ -204,6 +206,40 @@ async def search(q: str = ""):
     return {"users": users, "links": links}
 
 
+_status_cache: dict = {"at": 0.0, "data": None}
+
+
+@app.get("/api/server")
+async def server_info():
+    """伺服器位址、Discord 邀請、規則，以及透過 mcsrvstat.us 查詢的即時狀態（快取 60 秒）。"""
+    s = db.settings()
+    address = s.get("server_address") or "sawsmp.me"
+    if time.time() - _status_cache["at"] > 60 or (_status_cache["data"] or {}).get("address") != address:
+        status = {"address": address, "online": False}
+        try:
+            async with httpx.AsyncClient(timeout=8, headers={"User-Agent": "SawSMP-Website/1.0"}) as client:
+                d = (await client.get(f"https://api.mcsrvstat.us/3/{address}")).json()
+            status.update(online=bool(d.get("online")), players=d.get("players", {}).get("online", 0),
+                          max=d.get("players", {}).get("max", 0), version=d.get("version", ""),
+                          motd=" ".join(d.get("motd", {}).get("clean", [])))
+        except Exception:  # noqa: BLE001
+            logging.warning("查詢伺服器狀態失敗", exc_info=True)
+        _status_cache.update(at=time.time(), data=status)
+    return {"status": _status_cache["data"], "discord_invite": s.get("discord_invite", ""),
+            "rules": s.get("rules", ""), "announcement": s.get("announcement", "")}
+
+
+@app.get("/api/news")
+async def news(limit: int = 20):
+    rows = db.query("""SELECT n.*, u.username, u.global_name, u.avatar FROM news n
+                       LEFT JOIN users u ON u.id = n.author_id
+                       ORDER BY n.pinned DESC, n.created_at DESC LIMIT ?""", (min(limit, 100),))
+    for r in rows:
+        r["author"] = public_user({"id": r["author_id"], "username": r["username"], "global_name": r["global_name"],
+                                   "avatar": r["avatar"]}) if r["author_id"] and r["username"] else None
+    return {"news": rows}
+
+
 # ---------- my links ----------
 
 class LinkIn(BaseModel):
@@ -377,6 +413,43 @@ async def admin_settle(body: SettleIn, _: dict = Depends(admin_user)):
     db.execute("DELETE FROM weekly_results WHERE period_start = ?", (db.iso(start),))
     winners = await tasks.settle(start, end)
     return {"ok": True, "winners": [with_user(dict(w)) for w in winners]}
+
+
+class NewsIn(BaseModel):
+    title: str
+    body: str
+    tag: str = "news"
+    pinned: bool = False
+
+
+def _check_news(body: NewsIn) -> None:
+    if not body.title.strip() or not body.body.strip():
+        raise HTTPException(400, "標題與內容不可為空")
+    if body.tag not in ("news", "update", "event", "maintenance"):
+        raise HTTPException(400, "不支援的分類")
+
+
+@app.post("/api/admin/news")
+async def admin_add_news(body: NewsIn, admin: dict = Depends(admin_user)):
+    _check_news(body)
+    nid = db.execute("INSERT INTO news(title, body, tag, pinned, author_id, created_at) VALUES (?,?,?,?,?,?)",
+                     (body.title.strip(), body.body.strip(), body.tag, int(body.pinned), admin["id"],
+                      db.iso(db.now_utc())))
+    return {"ok": True, "id": nid}
+
+
+@app.put("/api/admin/news/{news_id}")
+async def admin_edit_news(news_id: int, body: NewsIn, _: dict = Depends(admin_user)):
+    _check_news(body)
+    db.execute("UPDATE news SET title = ?, body = ?, tag = ?, pinned = ? WHERE id = ?",
+               (body.title.strip(), body.body.strip(), body.tag, int(body.pinned), news_id))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/news/{news_id}")
+async def admin_delete_news(news_id: int, _: dict = Depends(admin_user)):
+    db.execute("DELETE FROM news WHERE id = ?", (news_id,))
+    return {"ok": True}
 
 
 @app.post("/api/admin/refresh-all")

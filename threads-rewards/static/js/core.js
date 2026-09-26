@@ -22,6 +22,7 @@
   const applyI18n = (root = document) => {
     $$("[data-i18n]", root).forEach((el) => { el.textContent = t(el.dataset.i18n); });
     $$("[data-i18n-ph]", root).forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+    $$("[data-i18n-html]", root).forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
     $$("[data-i18n-title]", root).forEach((el) => { el.title = t(el.dataset.i18nTitle); });
     document.documentElement.lang = { zh: "zh-Hant", en: "en" }[lang];
   };
@@ -128,20 +129,19 @@
     user: ["................", "......####......", ".....######.....", "....########....", "....########....", "....########....", ".....######.....", "......####......", "................", "...##########...", "..############..", ".##############.", ".##############.", ".##############.", "................", "................"],
     chart: ["................", "................", "................", "............##..", "............##..", "............##..", "........##..##..", "........##..##..", "........##..##..", "....##..##..##..", "....##..##..##..", "....##..##..##..", "....##..##..##..", "..############..", "................", "................"],
   };
-  const PX_COLOR = { heart: "var(--c-likes)", reply: "var(--c-replies)", repost: "var(--c-reposts)", eye: "var(--c-views)", trophy: "gold", crown: "gold", star: "gold", user: "var(--text-2)", chart: "gold" };
-  let pxId = 0;
-  function px(name, size = 16, color) {
+  const PX_COLOR = { heart: "var(--c-likes)", reply: "var(--c-replies)", repost: "var(--c-reposts)", eye: "var(--c-views)", trophy: "gold", crown: "gold", star: "var(--accent)", user: "var(--text-2)", chart: "var(--text)" };
+    function px(name, size = 16, color) {
     const grid = PX[name]; if (!grid) return "";
     color = color || PX_COLOR[name] || "currentColor";
     let defs = ""; let fill = color;
-    if (color === "gold") { const id = "pxg" + ++pxId; defs = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1b8"/><stop offset=".45" stop-color="#f5c542"/><stop offset="1" stop-color="#e08a1e"/></linearGradient></defs>`; fill = `url(#${id})`; }
+    if (color === "gold") fill = "#b08a2e";
     let rects = "";
     grid.forEach((row, y) => {
       let x = 0;
       while (x < 16) {
         const c = row[x]; if (c === ".") { x++; continue; }
         let w = 1; while (row[x + w] === c) w++;
-        rects += `<rect x="${x}" y="${y}" width="${w}" height="1" fill="${c === "+" ? "rgba(255,255,255,.85)" : fill}"/>`;
+        rects += `<rect x="${x}" y="${y}" width="${w}" height="1" fill="${c === "+" ? "rgba(255,255,255,.9)" : fill}"/>`;
         x += w;
       }
     });
@@ -279,7 +279,7 @@
   /* ---------- 彩帶 ---------- */
   function confetti(n = 80) {
     if (document.documentElement.dataset.motion === "reduce") return;
-    const colors = ["#fff1b8", "#f5c542", "#e08a1e", "#ffffff", "#ff5c7a", "#35d07f"];
+    const colors = ["#161616", "#b4532a", "#b08a2e", "#d4d0c6", "#2e8656", "#8a9098"];
     for (let i = 0; i < n; i++) {
       const c = document.createElement("i"); c.className = "confetti";
       c.style.left = Math.random() * 100 + "vw"; c.style.background = colors[i % colors.length];
@@ -290,6 +290,7 @@
   }
 
   /* ---------- 導覽列 / 頁尾 ---------- */
+  const LOGO = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="currentColor"/><path d="M6 21 L10 12 L14 21 L18 12 L22 21 L26 12" stroke="#f6f5f1" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/></svg>`;
   let me = null;
   const mePromise = api("/api/me", { quiet: true }).then((d) => (me = d.user)).catch(() => null);
   function renderNav() {
@@ -298,8 +299,8 @@
     const link = (href, key) => `<a href="${href}" class="${path === href ? "active" : ""}" data-i18n="${key}"></a>`;
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
-      <a href="/" class="brand"><span class="brand-logo">TR</span><span class="brand-name">Threads <span class="gold-text">Rewards</span></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/links", "nav.links")}${me && me.admin ? link("/admin", "nav.admin") : ""}${link("/settings", "nav.settings")}</nav>
+      <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-name">${t("brand")}<small>SMP</small></span></a>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/news", "nav.news")}${link("/rules", "nav.rules")}${link("/rewards", "nav.rewards")}${me ? link("/links", "nav.links") : ""}${me && me.admin ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="search-trigger" data-search>🔍 <span class="txt" data-i18n="nav.search"></span><span class="kbd">Ctrl K</span></button>
         ${me ? `<button class="user-chip" data-user-menu data-user='${esc(JSON.stringify({ id: me.id, name: me.name }))}'><span class="avatar-wrap"><img src="${esc(me.avatar)}" alt=""><span class="online-dot"></span></span><span class="nm">${esc(me.name)}</span></button>`
@@ -326,13 +327,19 @@
   function renderBanner(text) {
     if (!text || store.get("banner.hidden") === text || $(".banner")) return;
     const b = document.createElement("div"); b.className = "banner";
-    b.innerHTML = `<div class="container"><span class="tag gold live">NEWS</span><span>${esc(text)}</span><button class="btn icon ghost sm x" aria-label="close">✕</button></div>`;
+    b.innerHTML = `<div class="container"><span class="tag live">NEWS</span><span>${esc(text)}</span><button class="btn icon ghost sm x" aria-label="close">✕</button></div>`;
     $("#nav").after(b);
     $(".x", b).addEventListener("click", () => { store.set("banner.hidden", text); b.style.animation = "bannerIn .3s reverse forwards"; setTimeout(() => b.remove(), 300); sfx("close"); });
   }
   function renderFooter() {
     const f = $("#footer"); if (!f) return;
-    f.innerHTML = `<div class="container"><span data-i18n="footer"></span><span class="mono">© ${new Date().getFullYear()}</span></div>`;
+    f.innerHTML = `<div class="container">
+      <div class="foot-brand"><a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-name">${t("brand")}<small>SMP</small></span></a><span>${t("footer.tag")}</span><span class="mono">sawsmp.me</span></div>
+      <div class="foot-links">
+        <div><b>${t("footer.server")}</b><a href="/news">${t("nav.news")}</a><a href="/rules">${t("nav.rules")}</a><a href="/#join">${t("home.join.title")}</a></div>
+        <div><b>${t("footer.community")}</b><a href="/rewards">${t("nav.rewards")}</a><a href="/links">${t("nav.links")}</a><a href="/settings">${t("nav.settings")}</a></div>
+      </div>
+      <div class="copy"><span>© ${new Date().getFullYear()} ${t("brand")} SMP · ${t("footer")}</span><span class="mono">sawsmp.me</span></div></div>`;
     applyI18n(f);
   }
 
@@ -410,8 +417,8 @@
   let paletteOpen = false;
   function openPalette() {
     if (paletteOpen) return; paletteOpen = true; sfx("popup");
-    const pages = [["/", "nav.home", "🏠"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
-    if (me && me.admin) pages.splice(2, 0, ["/admin", "nav.admin", "🛡️"]);
+    const pages = [["/", "nav.home", "🏠"], ["/news", "nav.news", "📰"], ["/rules", "nav.rules", "📜"], ["/rewards", "nav.rewards", "🏆"], ["/links", "nav.links", "🔗"], ["/settings", "nav.settings", "⚙️"], ["/login", "nav.login", "🔑"]];
+    if (me && me.admin) pages.splice(5, 0, ["/admin", "nav.admin", "🛡️"]);
     const o = openOverlay(`<div class="modal palette"><input class="input" data-i18n-ph="nav.search" autocomplete="off"><div class="palette-results"></div></div>`, { onClose: () => (paletteOpen = false) });
     const input = $("input", o.el); const res = $(".palette-results", o.el);
     let results = []; let sel = 0; let timer;

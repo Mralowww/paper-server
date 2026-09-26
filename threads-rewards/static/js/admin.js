@@ -55,9 +55,42 @@
   }
 
   function renderSettings() {
-    const f = $("#settings-form"); const s = data.settings;
-    for (const [k, v] of Object.entries(s)) { const el = f.elements[k]; if (el) el.value = v; }
-    $$("select.enhance", f).forEach((s) => s._sync && s._sync());
+    $$("form[data-settings]").forEach((f) => {
+      for (const [k, v] of Object.entries(data.settings)) { const el = f.elements[k]; if (el && document.activeElement !== el) el.value = v; }
+      $$("select.enhance", f).forEach((s) => s._sync && s._sync());
+    });
+  }
+
+  /* ---------- 公告管理 ---------- */
+  let news = [];
+  const TAGS = ["news", "update", "event", "maintenance"];
+  async function loadNews() {
+    news = (await api("/api/news?limit=100", { quiet: true })).news;
+    $("#news-list").innerHTML = news.length ? news.map((n) => `
+      <div class="board-row" style="grid-template-columns:minmax(0,1fr) auto" data-news="${n.id}">
+        <div class="who"><div class="row" style="gap:8px"><span class="tag">${t("tag." + n.tag)}</span>${n.pinned ? `<span class="tag">📌</span>` : ""}<span class="dim mono" style="font-size:12px">${date(n.created_at)}</span></div><b style="margin-top:4px">${esc(n.title)}</b></div>
+        <div class="row" style="gap:6px"><button class="btn sm" data-nact="edit">${t("edit")}</button><button class="btn sm icon danger" data-nact="delete">✕</button></div>
+      </div>`).join("") : `<div class="empty">${t("home.noNews")}</div>`;
+  }
+  function newsEditor(n) {
+    const o = App.modal({
+      title: esc(t(n ? "admin.editNews" : "admin.newNews")),
+      body: `<form id="news-form" class="stack" style="gap:12px">
+        <div class="field"><label>${t("admin.newsTitle")}</label><input class="input" name="title" required value="${esc(n ? n.title : "")}"></div>
+        <div class="field"><label>${t("admin.newsTag")}</label><select class="enhance" name="tag">${TAGS.map((g) => `<option value="${g}" ${n && n.tag === g ? "selected" : ""}>${t("tag." + g)}</option>`).join("")}</select></div>
+        <div class="field"><label>${t("admin.newsBody")}</label><textarea class="input" name="body" rows="8" required>${esc(n ? n.body : "")}</textarea></div>
+        <label class="check"><input type="checkbox" name="pinned" ${n && n.pinned ? "checked" : ""}>${t("admin.pin")}</label>
+      </form>`,
+      foot: `<button class="btn" data-close>${t("cancel")}</button><button class="btn gold" form="news-form" type="submit">${t("save")}</button>`,
+    });
+    $("#news-form", o.el).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target; const body = { title: f.title.value, body: f.body.value, tag: f.tag.value, pinned: f.pinned.checked };
+      try {
+        await api(n ? `/api/admin/news/${n.id}` : "/api/admin/news", { method: n ? "PUT" : "POST", body });
+        o.close(true); App.ok(t("saved")); loadNews();
+      } catch (err) { App.fail(err.message); }
+    });
   }
 
   function render() {
@@ -95,11 +128,20 @@
       try { await api(`/api/admin/users/${b.closest("[data-uid]").dataset.uid}`, { method: "PATCH", body: { banned: b.dataset.ban === "1" } }); sfx("toggleOff"); load(); }
       catch (err) { App.fail(err.message); }
     });
-    $("#settings-form").addEventListener("submit", async (e) => {
+    $("#add-news").addEventListener("click", () => newsEditor(null));
+    $("#news-list").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-nact]"); if (!b) return;
+      const n = news.find((x) => String(x.id) === b.closest("[data-news]").dataset.news);
+      if (b.dataset.nact === "edit") return newsEditor(n);
+      if (!(await App.confirm(t("admin.confirmDeleteNews"), { danger: true }))) return;
+      try { await api(`/api/admin/news/${n.id}`, { method: "DELETE" }); sfx("delete"); loadNews(); } catch (err) { App.fail(err.message); }
+    });
+    loadNews().catch(() => {});
+    $$("form[data-settings]").forEach((form) => form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const body = Object.fromEntries(new FormData(e.target).entries());
       try { await api("/api/admin/settings", { method: "PUT", body }); App.ok(t("saved")); load(); } catch (err) { App.fail(err.message); }
-    });
+    }));
     $("#settle").addEventListener("click", async () => {
       if (!(await App.confirm(t("admin.confirmSettle")))) return;
       const b = $("#settle"); b.classList.add("loading");
@@ -110,5 +152,5 @@
     load();
     setInterval(() => document.visibilityState === "visible" && !document.activeElement.matches("input, textarea") && api(`/api/admin/overview?week_offset=${offset}`, { quiet: true }).then((d) => { const changed = JSON.stringify(d.links.map((l) => [l.id, l.likes, l.views])) !== JSON.stringify(data.links.map((l) => [l.id, l.likes, l.views])); data = d; if (changed) { sfx("receive"); render(); } }).catch(() => {}), 30000);
   });
-  document.addEventListener("langchange", () => { fillWeekSelect(); data && render(); });
+  document.addEventListener("langchange", () => { fillWeekSelect(); data && render(); loadNews().catch(() => {}); });
 })();

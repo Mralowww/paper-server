@@ -38,7 +38,7 @@ class RewardsBot(discord.Client):
         s = db.settings()
         tz = config.TIMEZONE
         embed = discord.Embed(
-            title="🏆 本週 Threads 推廣前三名",
+            title="🏆 鋸齒SMP · 本週 Threads 推廣前三名",
             description=f"統計期間：{start.astimezone(tz):%m/%d %H:%M} – {end.astimezone(tz):%m/%d %H:%M}",
             color=GOLD,
         )
