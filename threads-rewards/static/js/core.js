@@ -451,10 +451,18 @@
   addEventListener("scroll", (e) => { if (openSelect && !(e.target instanceof Element && e.target.closest(".select-list"))) openSelect.place(); }, true);
 
   /* ---------- 分頁標籤 ---------- */
+  /** 切換內容時先鎖住高度，避免內容短暫清空讓頁面被拉回頂端；內容載入後再放開。 */
+  function holdHeight(el, ms = 700) {
+    if (!el) return () => {};
+    const h = el.offsetHeight; el.style.minHeight = h + "px";
+    let done = false; const release = () => { if (done) return; done = true; el.style.minHeight = ""; };
+    setTimeout(release, ms); return release;
+  }
   function tabs(container, onChange) {
     const btns = $$("button[data-tab]", container);
     let ind = $(".indicator", container); if (!ind) { ind = document.createElement("span"); ind.className = "indicator"; container.prepend(ind); }
     const activate = (btn, silent) => {
+      if (!silent) { const panel = $$("[data-panel]")[0]; holdHeight(panel && panel.parentElement, 900); }
       btns.forEach((b) => b.classList.toggle("active", b === btn));
       ind.style.left = btn.offsetLeft + "px"; ind.style.width = btn.offsetWidth + "px";
       $$("[data-panel]").forEach((p) => { const on = p.dataset.panel === btn.dataset.tab; if (on && p.hidden) { p.hidden = false; p.classList.remove("tab-panel"); void p.offsetWidth; p.classList.add("tab-panel"); } else if (!on) p.hidden = true; });
@@ -609,6 +617,7 @@
       document.body.insertBefore(frag, document.getElementById("scrollbar") || null);
       if (document.getElementById("topbar")) document.body.prepend(document.getElementById("topbar"));
       pageScripts = collectPageScripts(doc);
+      loadedPage = url.pathname + url.search;
       scrollTo({ top: scroll ?? 0, behavior: "instant" });
       applyI18n(); renderNav(); renderFooter(); observe();
       for (const n of pageScripts) await loadScript(n);
@@ -638,7 +647,10 @@
     e.preventDefault(); go(url.pathname + url.search + url.hash);
   });
   history.scrollRestoration = "manual";
+  let loadedPage = location.pathname + location.search;
   window.addEventListener("popstate", (e) => {
+    // 只有 #錨點 改變（例如後台子分頁）→ 同一頁，交給頁面自己處理，不重新載入也不捲動
+    if (location.pathname + location.search === loadedPage) return;
     if (PAGE_PATHS.includes(location.pathname)) navigate(location.href, { push: false, scroll: (e.state && e.state.y) || 0 });
     else location.reload();
   });
@@ -808,7 +820,7 @@
 
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
-    fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
+    holdHeight, fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, get mePromise() { return mePromise; },
     setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,
   };

@@ -63,6 +63,8 @@
   }
 
   function render() {
+    // 切換分頁時保留目前高度（取看過的最大值），頁面不會因內容變短而被拉回上面
+    const pb = $("#pbody"); pb.style.minHeight = Math.max(pb.offsetHeight, parseFloat(pb.style.minHeight) || 0) + "px";
     $$("#ptabs [data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     $("#pbody").innerHTML = `<div class="tab-panel">${{ overview, stats, matches }[tab]()}</div>`;
     observe($("#pbody"));

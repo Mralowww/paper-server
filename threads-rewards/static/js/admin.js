@@ -108,9 +108,12 @@
     const sec = SECTIONS.find((s) => s.id === id && level >= s.min) || SECTIONS.find((s) => s.id && level >= s.min);
     if (cleanup) { cleanup(); cleanup = null; }
     current = sec.id; renderSide();
+    // 保持捲動位置：先鎖住高度再換內容，載入完才放開（不會被拉回頂端）
+    const release = App.holdHeight(main(), 4000);
     main().innerHTML = `<section></section>`;
     try { const r = await VIEWS[sec.id]($("section", main())); if (typeof r === "function") cleanup = r; } catch (e) { main().innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
     observe(main());
+    requestAnimationFrame(() => setTimeout(release, 250));
   }
 
   /* ---------- 總覽 ---------- */
