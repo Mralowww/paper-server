@@ -45,7 +45,7 @@
   async function overview(el) {
     const d = await api("/api/staff/overview");
     const tk = d.tickets; const pn = d.punishments;
-    el.innerHTML = head("overview") + `
+    el.innerHTML = head("overview", `${level >= 3 ? `<button class="btn gold" data-sync>${ART.icon("refresh", 16)}${t("sy.btn")}</button>` : ""}`) + `
       <div class="grid grid-4">
         ${[["adm.k.open", (tk.open || 0), "message", "var(--blue)"], ["adm.k.urgent", d.urgent, "alert", "var(--red)"], ["adm.k.online", d.players.online, "users", "var(--green)"], ["adm.k.activeBans", (pn.ban || 0) + (pn.ipban || 0), "ban", "var(--red)"]]
           .map(([k, v, ic, c]) => `<div class="card hover stat reveal"><span class="label"><span style="color:${c}">${ART.icon(ic, 18)}</span>${t(k)}</span><span class="value" data-count="${v}">0</span></div>`).join("")}
@@ -374,7 +374,7 @@
     const mb = (b) => (b / 1048576).toFixed(2) + " MB";
     const up = `${Math.floor(d.uptime / 86400)}d ${Math.floor((d.uptime % 86400) / 3600)}h ${Math.floor((d.uptime % 3600) / 60)}m`;
     const lamp = (on, txt) => `<span class="lamp ${on ? "on" : "off"}"></span><b>${txt}</b>`;
-    el.innerHTML = head("status", `<button class="btn" id="rl">${ART.icon("refresh", 16)}</button>`) + `<div class="status-grid">
+    el.innerHTML = head("status", `${level >= 3 ? `<button class="btn gold" data-sync>${ART.icon("refresh", 16)}${t("sy.btn")}</button>` : ""}<button class="btn" id="rl">${ART.icon("refresh", 16)}</button>`) + `<div class="status-grid">
       <div class="card status-card">${lamp(true, t("st.web"))}<small class="dim">${up}</small></div>
       <div class="card status-card">${lamp(d.bot.ready, "Discord Bot")}<small class="dim">${d.bot.ready ? esc(d.bot.name) + " · " + d.bot.latency_ms + "ms" : d.bot.configured ? t("st.connecting") : t("st.notSet")}</small></div>
       <div class="card status-card">${lamp(d.oauth, "Discord OAuth")}<small class="dim">${d.oauth ? "OK" : t("st.notSet")}</small></div>
@@ -393,6 +393,42 @@
   }
 
   const activity = (el) => window.ActivityLog.render(el, (extra) => head("activity", extra));
+  /* ---------- 資料同步（Minecraft ⇄ 網站 ⇄ Discord） ---------- */
+  const SY_PARTS = [["mc", "pickaxe", "Minecraft"], ["web", "globe", "sy.web"], ["discord", "message", "Discord"]];
+  const SY_STEPS = { web: ["expire", "stats"], discord: ["levels", "linked", "roles"], mc: ["queued", "plugin"] };
+  function syStep(part, key, st) {
+    const s = st || { status: "pending" }; const n = (k) => fmt(s[k] || 0);
+    const detail = {
+      "web.expire": () => t("sy.d.expire", { n: n("n") }),
+      "web.stats": () => t("sy.d.stats", { u: n("users"), l: n("linked"), p: n("players"), a: n("active") }),
+      "discord.levels": () => s.total ? t("sy.d.levels", { n: n("n"), total: n("total"), c: n("changed"), left: n("left") }) : "",
+      "discord.linked": () => t("sy.d.linked", { a: n("added"), r: n("removed") }),
+      "discord.roles": () => s.fixed != null ? t("sy.d.roles", { n: n("fixed") }) : "",
+      "mc.queued": () => t("sy.d.queued", { b: n("banned"), l: n("lifted") }),
+      "mc.plugin": () => s.kicked != null ? t("sy.d.plugin", { k: n("kicked"), p: n("pardoned"), o: n("online") }) + (s.advancedban ? " · AdvancedBan ✓" : "") : "",
+    }[`${part}.${key}`];
+    const pct = key === "levels" && s.total ? Math.round((s.n / s.total) * 100) : null;
+    return `<div class="sy-step ${s.status}"><i class="sy-dot"></i><div><b>${t(`sy.s.${part}.${key}`)}</b>
+      <small>${esc(s.detail || (detail && detail()) || t("sy.st." + s.status))}</small>
+      ${pct != null && s.status === "running" ? `<span class="sy-bar"><i style="width:${pct}%"></i></span>` : ""}</div></div>`;
+  }
+  async function openSync() {
+    const o = App.modal({ wide: true, title: `${ART.icon("refresh", 18)} ${t("sy.title")}`, body: `<p class="muted" style="margin-top:0">${t("sy.desc")}</p><div class="sy-grid" id="sy"></div><div class="sy-foot" id="syf"></div>` });
+    const draw = (st) => {
+      $("#sy", o.el).innerHTML = SY_PARTS.map(([k, ic, name]) => { const p = (st.parts || {})[k] || { status: "pending", steps: {} };
+        return `<div class="sy-card ${p.status}"><div class="sy-head"><span class="sy-ic">${ART.icon(ic, 20)}</span><b>${name.includes(".") ? t(name) : name}</b><span class="sy-badge">${t("sy.st." + p.status)}</span></div>
+          ${p.status === "skipped" && p.detail ? `<small class="dim">${esc(p.detail)}</small>` : SY_STEPS[k].map((s) => syStep(k, s, p.steps[s])).join("")}</div>`; }).join("");
+      $("#syf", o.el).innerHTML = st.running ? `<span class="sy-spin"></span>${t("sy.running")}` : st.finished_at ? `${ART.icon("check", 16)} ${t("sy.done", { s: st.duration })}${st.error ? ` · <span style="color:var(--red)">${esc(st.error)}</span>` : ""}` : "";
+    };
+    let st = (await api("/api/admin/sync", { method: "POST" })).state; draw(st); sfx("launch");
+    while (st.running && document.body.contains(o.el)) {
+      await new Promise((r) => setTimeout(r, 900));
+      st = (await api("/api/admin/sync", { quiet: true })).state; draw(st);
+    }
+    if (document.body.contains(o.el)) sfx(Object.values(st.parts || {}).some((p) => p.status === "warn") ? "toggleOff" : "success");
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-sync]")) openSync().catch((err) => App.fail(err.message)); });
+
   const VIEWS = { activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
 
   document.addEventListener("app:ready", async () => {

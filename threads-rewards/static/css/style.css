@@ -1443,3 +1443,25 @@ body.standalone:has(.desk) { overflow: hidden; }
   .desk-list { display: none; } .desk-body:not(:has(.chat)) .desk-list { display: grid; } .desk-body:not(:has(.chat)) .desk-main { display: none; }
   .desk-stats { display: none; } .desk-main { padding: 8px; }
 }
+
+/* ================= 資料同步 ================= */
+.sy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sy-card { padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--sunken); display: grid; gap: 10px; align-content: start; transition: border-color .3s; }
+.sy-card.running { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); } .sy-card.done { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+.sy-card.warn { border-color: color-mix(in srgb, var(--orange) 50%, var(--border)); }
+.sy-head { display: flex; align-items: center; gap: 8px; } .sy-head b { font-size: 15px; }
+.sy-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.sy-badge { margin-left: auto; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--surface); color: var(--text-3); }
+.sy-card.done .sy-badge { color: var(--green); } .sy-card.running .sy-badge { color: var(--accent); } .sy-card.warn .sy-badge, .sy-card.skipped .sy-badge { color: var(--orange); }
+.sy-step { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: start; }
+.sy-step b { font-size: 13.5px; font-weight: 600; } .sy-step small { display: block; color: var(--text-3); font-size: 12.5px; line-height: 1.5; margin-top: 2px; }
+.sy-dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--border-strong); }
+.sy-step.running .sy-dot { background: var(--accent); box-shadow: 0 0 0 0 var(--accent); animation: alPulse 1.2s infinite; }
+.sy-step.done .sy-dot { background: var(--green); } .sy-step.warn .sy-dot { background: var(--orange); } .sy-step.skipped .sy-dot { background: var(--text-3); }
+.sy-step.warn small { color: var(--orange); }
+.sy-bar { display: block; height: 4px; margin-top: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+.sy-bar i { display: block; height: 100%; background: var(--accent); transition: width .5s var(--ease-out); }
+.sy-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: var(--text-2); font-size: 13.5px; }
+.sy-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .sy-grid { grid-template-columns: minmax(0, 1fr); } }

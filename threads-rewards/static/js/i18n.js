@@ -580,3 +580,25 @@ Object.assign(window.I18N.en, {
 });
 Object.assign(window.I18N.zh, { "nt.timeout": "連不上瀏覽器的推播服務，請稍後再試（部分瀏覽器或網路環境不支援）" });
 Object.assign(window.I18N.en, { "nt.timeout": "Couldn't reach the browser's push service. Try again later." });
+Object.assign(window.I18N.zh, {
+  "sy.btn": "資料同步", "sy.title": "資料同步", "sy.desc": "一次對齊 Minecraft、網站與 Discord：處理到期懲處、更新管理權限與身分組、踢出仍被封禁的玩家，並清除原版 / AdvancedBan 裡已在網站解除的封禁與禁言。",
+  "sy.web": "網站", "sy.running": "同步中，可以關閉視窗，會在背景繼續…", "sy.done": "同步完成（{s} 秒）",
+  "sy.st.pending": "等待中", "sy.st.running": "進行中", "sy.st.done": "完成", "sy.st.warn": "需注意", "sy.st.skipped": "略過",
+  "sy.s.web.expire": "處理到期懲處", "sy.s.web.stats": "資料統計", "sy.s.discord.levels": "管理等級與成員狀態", "sy.s.discord.linked": "linked 身分組", "sy.s.discord.roles": "封禁 / 禁言身分組",
+  "sy.s.mc.queued": "準備同步清單", "sy.s.mc.plugin": "插件執行",
+  "sy.d.expire": "{n} 筆懲處已到期", "sy.d.stats": "{u} 個帳號 · {l} 個已綁定 · {p} 位玩家 · {a} 筆生效懲處",
+  "sy.d.levels": "{n} / {total} · {c} 人權限變更 · {left} 人已不在群組", "sy.d.linked": "補上 {a} · 移除 {r}", "sy.d.roles": "修正 {n} 筆",
+  "sy.d.queued": "{b} 筆生效封禁 · {l} 筆已解除待清除", "sy.d.plugin": "踢出 {k} 人 · 清除 {p} 筆 · 線上 {o} 人",
+  "act.sync.run": "資料同步完成", "act.sync.start": "開始資料同步",
+});
+Object.assign(window.I18N.en, {
+  "sy.btn": "Sync data", "sy.title": "Data sync", "sy.desc": "Align Minecraft, the website and Discord: expire punishments, refresh staff levels and roles, kick players who are still banned, and clear vanilla / AdvancedBan entries that were lifted on the website.",
+  "sy.web": "Website", "sy.running": "Syncing — you can close this, it keeps running…", "sy.done": "Sync finished ({s}s)",
+  "sy.st.pending": "Waiting", "sy.st.running": "Running", "sy.st.done": "Done", "sy.st.warn": "Attention", "sy.st.skipped": "Skipped",
+  "sy.s.web.expire": "Expire punishments", "sy.s.web.stats": "Totals", "sy.s.discord.levels": "Staff levels & membership", "sy.s.discord.linked": "Linked role", "sy.s.discord.roles": "Ban / mute roles",
+  "sy.s.mc.queued": "Build sync list", "sy.s.mc.plugin": "Plugin run",
+  "sy.d.expire": "{n} punishments expired", "sy.d.stats": "{u} accounts · {l} linked · {p} players · {a} active punishments",
+  "sy.d.levels": "{n} / {total} · {c} level changes · {left} left the server", "sy.d.linked": "added {a} · removed {r}", "sy.d.roles": "fixed {n}",
+  "sy.d.queued": "{b} active bans · {l} lifted to clear", "sy.d.plugin": "kicked {k} · cleared {p} · {o} online",
+  "act.sync.run": "Data sync finished", "act.sync.start": "Started data sync",
+});

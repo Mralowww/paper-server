@@ -119,6 +119,13 @@ public final class SawSMPPlugin extends JavaPlugin {
         switch (action) {
             case "kick", "mute", "unmute", "warn", "pardon" -> punish.handleAction(action, payload);
             case "permissions_reload" -> perms.refreshAll();
+            case "full_sync" -> {
+                JsonObject rep = punish.fullSync(payload);
+                perms.refreshAll();
+                if (papi != null && papi.active()) papi.syncAll();
+                rep.add("sync_id", payload.get("sync_id"));
+                api.post("/api/plugin/sync-report", rep);
+            }
             case "match_start" -> Sched.global(() -> matches.start(payload));
             default -> getLogger().fine("未知的動作：" + action);
         }

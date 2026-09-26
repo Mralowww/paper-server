@@ -120,6 +120,31 @@ public final class PunishService implements Listener {
         }
     }
 
+    /** 網站「資料同步」：踢出仍被封禁的線上玩家、清除已在網站解除的原版 / AdvancedBan 紀錄。 */
+    public JsonObject fullSync(JsonObject p) {
+        int kicked = 0, pardoned = 0;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        if (p.has("lifted")) for (var el : p.getAsJsonArray("lifted")) {
+            JsonObject l = el.getAsJsonObject();
+            String key = ApiClient.str(l, "type") + ":" + ApiClient.str(l, "name") + ":" + ApiClient.str(l, "ip");
+            if (!seen.add(key)) continue;
+            pardonElsewhere(ApiClient.str(l, "type"), ApiClient.str(l, "name"), ApiClient.str(l, "ip"));
+            pardoned++;
+        }
+        if (p.has("banned")) for (var el : p.getAsJsonArray("banned")) {
+            JsonObject b = el.getAsJsonObject();
+            String uuid = ApiClient.str(b, "uuid"), ip = ApiClient.str(b, "ip");
+            Component msg = Component.text(ApiClient.str(b, "message") == null ? "你已被封禁" : ApiClient.str(b, "message"));
+            for (Player o : Bukkit.getOnlinePlayers()) {
+                boolean hit = uuid != null && o.getUniqueId().toString().equalsIgnoreCase(uuid)
+                        || "ipban".equals(ApiClient.str(b, "type")) && ip != null && o.getAddress() != null && ip.equals(o.getAddress().getAddress().getHostAddress());
+                if (hit) { kicked++; Sched.entity(o, () -> o.kick(msg)); }
+            }
+        }
+        return ApiClient.obj("kicked", kicked, "pardoned", pardoned, "online", Bukkit.getOnlinePlayers().size(),
+                "advancedban", Bukkit.getPluginManager().isPluginEnabled("AdvancedBan"));
+    }
+
     /** 清掉遊戲內其他來源（原版、AdvancedBan）的同一筆封禁 / 禁言。 */
     public void pardonElsewhere(String type, String name, String ip) {
         Sched.global(() -> {
