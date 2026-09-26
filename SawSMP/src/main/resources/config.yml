@@ -1,7 +1,7 @@
 # 鋸齒 SMP 核心插件設定
 api:
   # 網站網址（不要以 / 結尾）
-  url: "http://tw4.shdctw.com:25463"
+  url: "https://www.sawsmp.me"
   # 網站後台 → API Keys → Minecraft 插件金鑰
   key: ""
   # 連線逾時（秒）

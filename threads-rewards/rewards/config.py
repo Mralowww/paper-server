@@ -27,7 +27,7 @@ OWNER_IDS = _ids(os.getenv("OWNER_IDS", ""))
 # 新支援單通知頻道
 TICKET_CHANNEL_ID = os.getenv("TICKET_CHANNEL_ID", "")
 # 網站公開網址（用於 Discord 通知中的連結）
-PUBLIC_URL = os.getenv("PUBLIC_URL", "http://tw4.shdctw.com:25463").rstrip("/")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://www.sawsmp.me").rstrip("/")
 # Minecraft 插件呼叫 /api/plugin/* 時使用的金鑰（Header: X-API-Key）
 PLUGIN_API_KEY = os.getenv("PLUGIN_API_KEY", "")
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/uploads")
