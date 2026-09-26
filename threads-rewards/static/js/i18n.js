@@ -602,3 +602,5 @@ Object.assign(window.I18N.en, {
   "sy.d.queued": "{b} active bans · {l} lifted to clear", "sy.d.plugin": "kicked {k} · cleared {p} · {o} online",
   "act.sync.run": "Data sync finished", "act.sync.start": "Started data sync",
 });
+Object.assign(window.I18N.zh, { "adm.menu": "後台選單" });
+Object.assign(window.I18N.en, { "adm.menu": "Admin menu" });

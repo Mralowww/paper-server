@@ -24,11 +24,31 @@
   const head = (id, extra = "") => `<div class="admin-title"><div><h2>${t("adm." + id)}</h2><p>${t("adm." + id + ".d")}</p></div><div class="row">${extra}</div></div>`;
   const lvlTags = (l) => (l >= 3 ? `<span class="lvl-tag lvl-3">${t("lv.3")}</span>` : "") + (l === 2 ? `<span class="lvl-tag lvl-2">${t("lv.2")}</span>` : "") + (l === 1 ? `<span class="lvl-tag lvl-1">${t("lv.1")}</span>` : "");
 
+  // 側欄只建立一次，之後只更新目前頁面與徽章（避免重建造成捲動位置跳動）
   function renderSide() {
-    const me = App.me;
-    $("#me-card").innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)}</b>${lvlTags(level)}</div>`;
-    $("#side").innerHTML = SECTIONS.filter((s) => s.grp || level >= s.min).map((s) => s.grp ? `<div class="grp">${t(s.grp)}</div>`
-      : `<a href="#${s.id}" class="${current === s.id ? "active" : ""}">${ART.icon(s.icon, 19)}<span>${t("adm." + s.id)}</span>${s.id === "tickets" && openTickets ? `<span class="badge">${openTickets}</span>` : ""}</a>`).join("");
+    const me = App.me; const card = $("#me-card"); const side = $("#side");
+    const cardSig = me.avatar + me.name + level + App.lang;
+    if (card.dataset.sig !== cardSig) { card.dataset.sig = cardSig; card.innerHTML = `<img src="${esc(me.avatar)}" alt=""><div style="min-width:0"><b>${esc(me.name)}</b>${lvlTags(level)}</div>`; }
+    const sig = level + App.lang;
+    if (side.dataset.sig !== sig) {
+      side.dataset.sig = sig;
+      side.innerHTML = SECTIONS.filter((s) => s.grp || level >= s.min).map((s) => s.grp ? `<div class="grp">${t(s.grp)}</div>`
+        : `<a href="#${s.id}" data-sec="${s.id}">${ART.icon(s.icon, 19)}<span>${t("adm." + s.id)}</span></a>`).join("");
+    }
+    $$("a[data-sec]", side).forEach((a, i) => { a.classList.toggle("active", a.dataset.sec === current); a.style.setProperty("--i", i); });
+    const tk = $('a[data-sec="tickets"]', side);
+    if (tk) { let b = $(".badge", tk); if (openTickets) { if (!b) tk.insertAdjacentHTML("beforeend", `<span class="badge"></span>`); $(".badge", tk).textContent = openTickets; } else if (b) b.remove(); }
+    // 窄螢幕：用下拉選單顯示目前頁面
+    let tg = $("#side-toggle");
+    if (!tg) {
+      tg = document.createElement("button"); tg.id = "side-toggle"; tg.type = "button"; tg.className = "side-toggle"; side.before(tg);
+      tg.addEventListener("click", (e) => { e.stopPropagation(); const open = !side.closest(".admin-side").classList.contains("open"); side.closest(".admin-side").classList.toggle("open", open); sfx(open ? "menu" : "close"); });
+      side.addEventListener("click", (e) => { if (e.target.closest("a")) side.closest(".admin-side").classList.remove("open"); });
+      document.addEventListener("click", (e) => { if (!e.target.closest(".admin-side")) $(".admin-side")?.classList.remove("open"); });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") $(".admin-side")?.classList.remove("open"); });
+    }
+    const sec = SECTIONS.find((s) => s.id === current);
+    if (sec) tg.innerHTML = `<span class="st-ic">${ART.icon(sec.icon, 18)}</span><span class="st-lbl"><small>${t("adm.menu")}</small><b>${t("adm." + sec.id)}</b></span>${openTickets && current !== "tickets" ? `<span class="badge">${openTickets}</span>` : ""}<span class="st-chev">${ART.icon("chevron", 18)}</span>`;
   }
 
   async function route() {

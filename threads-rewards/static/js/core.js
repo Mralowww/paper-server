@@ -488,7 +488,9 @@
   function renderNav() {
     const nav = $("#nav"); if (!nav) return;
     const path = location.pathname;
-    const link = (href, key) => `<a href="${href}" class="${path === href ? "active" : ""}" data-i18n="${key}"></a>`;
+    const NL_IC = { "/": "home", "/rankings": "trophy", "/match": "sword", "/support": "message", "/rewards": "gift", "/admin": "shield" };
+    let li = 0;
+    const link = (href, key) => `<a href="${href}" class="${path === href ? "active" : ""}" style="--i:${li++}">${window.ART ? `<span class="nl-ic">${ART.icon(NL_IC[href] || "dots", 17)}</span>` : ""}<span data-i18n="${key}"></span></a>`;
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
       <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
@@ -503,7 +505,8 @@
             : `<a class="btn sm btn-discord" href="/login" data-i18n="nav.login"></a>`}
         <button class="btn icon ghost menu-btn" aria-label="menu">${window.ART ? ART.icon("menu", 18) : "☰"}</button>
       </div></div>`;
-    $(".menu-btn", nav).addEventListener("click", () => { nav.classList.toggle("open"); sfx("menu"); });
+    $(".menu-btn", nav).addEventListener("click", (e) => { e.stopPropagation(); const o = nav.classList.toggle("open"); sfx(o ? "menu" : "close"); });
+    $(".nav-links", nav).addEventListener("click", (e) => { if (e.target.closest("a")) nav.classList.remove("open"); });
     $("[data-search]", nav).addEventListener("click", openPalette);
     $("[data-theme-toggle]", nav).addEventListener("click", () => setTheme(theme === "light" ? "dark" : "light"));
     $("[data-copy-ip]", nav).addEventListener("click", () => copy("sawsmp.me"));
@@ -639,6 +642,10 @@
     else location.reload();
   });
   window.addEventListener("pageshow", () => document.body.classList.remove("leaving"));
+
+  // 點選單外面或按 Esc 關閉導覽下拉選單
+  document.addEventListener("click", (e) => { const n = $("#nav.open"); if (n && !e.target.closest(".nav-links, .menu-btn")) n.classList.remove("open"); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#nav.open")?.classList.remove("open"); });
 
   /* ---------- 自訂右鍵選單 ---------- */
   let ctxEl = null;
