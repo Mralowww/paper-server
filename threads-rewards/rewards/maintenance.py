@@ -19,14 +19,14 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 # 分頁（路徑 → 代碼）
 PAGES = {"/": "home", "/rankings": "rankings", "/player": "rankings", "/match": "match", "/support": "support", "/ticket": "support",
          "/rewards": "rewards", "/links": "rewards", "/account": "account", "/bans": "bans", "/news": "news", "/rules": "rules",
-         "/docs": "docs", "/settings": "settings"}
-PAGE_KEYS = ["home", "rankings", "match", "support", "rewards", "account", "bans", "news", "rules", "docs", "settings"]
+         "/docs": "docs", "/settings": "settings", "/redeem": "redeem"}
+PAGE_KEYS = ["home", "rankings", "match", "support", "rewards", "redeem", "account", "bans", "news", "rules", "docs", "settings"]
 # 功能（API 路徑前綴 → 代碼）
 FEATURES = [("/api/tickets", "tickets"), ("/api/upload", "tickets"), ("/api/match", "match"), ("/api/my/links", "rewards"),
             ("/api/history", "rewards"), ("/api/account", "linking"), ("/api/leaderboard", "stats"), ("/api/players", "stats"),
             ("/api/profile", "stats"), ("/api/punishments", "punish_public"), ("/api/mc/", "punish_public"),
-            ("/api/me/keys", "devapi"), ("/api/v1/", "devapi"), ("/api/push/", "notify")]
-FEATURE_KEYS = ["tickets", "match", "rewards", "linking", "stats", "punish_public", "devapi", "notify"]
+            ("/api/me/keys", "devapi"), ("/api/v1/", "devapi"), ("/api/push/", "notify"), ("/api/redeem", "redeem")]
+FEATURE_KEYS = ["tickets", "match", "rewards", "linking", "stats", "punish_public", "devapi", "notify", "redeem"]
 # 永遠放行
 ALWAYS = ("/static/", "/uploads/", "/auth/", "/api/plugin/", "/api/admin/", "/api/staff/", "/api/me", "/api/maintenance",
           "/api/server", "/api/rules", "/sw.js", "/login", "/admin", "/desk", "/favicon")

@@ -127,8 +127,40 @@ public final class SawSMPPlugin extends JavaPlugin {
                 api.post("/api/plugin/sync-report", rep);
             }
             case "match_start" -> Sched.global(() -> matches.start(payload));
+            case "redeem" -> redeem(payload);
             default -> getLogger().fine("未知的動作：" + action);
         }
+    }
+
+    /** 網站兌換碼：確認玩家在線上後，以主控台身分執行管理員設定的發獎指令，並回報結果。 */
+    private void redeem(JsonObject p) {
+        long logId = p.get("log_id").getAsLong();
+        String uuid = ApiClient.str(p, "uuid");
+        Player player = null;
+        try { player = uuid == null ? null : Bukkit.getPlayer(java.util.UUID.fromString(uuid)); } catch (IllegalArgumentException ignored) { }
+        if (player == null || !player.isOnline()) {
+            api.post("/api/plugin/redeem-result", ApiClient.obj("log_id", logId, "ok", false, "reason", "offline"));
+            return;
+        }
+        final Player target = player;
+        final String name = target.getName();
+        java.util.List<String> cmds = new java.util.ArrayList<>();
+        if (p.has("commands")) for (JsonElement el : p.getAsJsonArray("commands")) cmds.add(el.getAsString());
+        Sched.global(() -> {
+            int ok = 0;
+            for (String raw : cmds) {
+                String cmd = raw.replace("{player}", name).replace("{uuid}", uuid);
+                if (cmd.startsWith("/")) cmd = cmd.substring(1);
+                try { if (Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd)) ok++; }
+                catch (Exception ex) { getLogger().warning("兌換指令執行失敗「" + cmd + "」：" + ex.getMessage()); }
+            }
+            getLogger().info(name + " 兌換「" + ApiClient.str(p, "reward") + "」，執行 " + ok + "/" + cmds.size() + " 個指令");
+            String msg = ApiClient.str(p, "message");
+            String reward = ApiClient.str(p, "reward");
+            Sched.entity(target, () -> Msg.send(target, msg != null && !msg.isBlank() ? "<green>{m}</green>" : "<green>你已成功兌換「{r}」！</green>",
+                    "m", msg, "r", reward == null ? "" : reward));
+            api.post("/api/plugin/redeem-result", ApiClient.obj("log_id", logId, "ok", true, "executed", ok));
+        });
     }
 
     public ApiClient api() { return api; }

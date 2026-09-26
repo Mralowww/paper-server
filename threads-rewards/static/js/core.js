@@ -499,13 +499,13 @@
   function renderNav() {
     const nav = $("#nav"); if (!nav) return;
     const path = location.pathname;
-    const NL_IC = { "/": "home", "/rankings": "trophy", "/match": "sword", "/support": "message", "/rewards": "gift", "/admin": "shield" };
+    const NL_IC = { "/": "home", "/rankings": "trophy", "/match": "sword", "/support": "message", "/rewards": "gift", "/redeem": "key", "/admin": "shield" };
     let li = 0;
     const link = (href, key) => `<a href="${href}" class="${path === href ? "active" : ""}" style="--i:${li++}">${window.ART ? `<span class="nl-ic">${ART.icon(NL_IC[href] || "dots", 17)}</span>` : ""}<span data-i18n="${key}"></span></a>`;
     nav.className = "nav";
     nav.innerHTML = `<div class="container">
       <a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-text"><b>鋸齒</b><small>SAW · SMP</small></span></a>
-      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
+      <nav class="nav-links">${link("/", "nav.home")}${link("/rankings", "nav.rankings")}${link("/match", "nav.match")}${link("/support", "nav.support")}${link("/rewards", "nav.rewards")}${link("/redeem", "nav.redeem")}${me && me.level >= 1 ? link("/admin", "nav.admin") : ""}</nav>
       <div class="nav-right">
         <button class="ip-chip" data-copy-ip title="${t("home.copyIp")}">${window.ART ? ART.icon("server", 15) : ""}<span>sawsmp.me</span></button>
         <button class="btn icon ghost amb-btn" data-ambient aria-label="ambient" title="${t("snd.ambient")}"><span class="eq"><i></i><i></i><i></i><i></i></span></button>
@@ -566,7 +566,7 @@
       <div class="foot-brand"><a href="/" class="brand"><span class="brand-logo">${LOGO}</span><span class="brand-name">${t("brand")}<small>SMP</small></span></a><span>${t("footer.tag")}</span><span class="mono">sawsmp.me</span></div>
       <div class="foot-links">
         <div><b>${t("footer.server")}</b><a href="/news">${t("nav.news")}</a><a href="/rules">${t("nav.rules")}</a><a href="/bans">${t("nav.bans")}</a><a href="/#join">${t("home.join.title")}</a></div>
-        <div><b>${t("footer.community")}</b><a href="/support">${t("nav.support")}</a><a href="/rewards">${t("nav.rewards")}</a><a href="/account">${t("nav.account")}</a><a href="/settings">${t("nav.settings")}</a></div>
+        <div><b>${t("footer.community")}</b><a href="/support">${t("nav.support")}</a><a href="/rewards">${t("nav.rewards")}</a><a href="/redeem">${t("nav.redeem")}</a><a href="/account">${t("nav.account")}</a><a href="/settings">${t("nav.settings")}</a></div>
       </div>
       <div class="copy"><span>© ${new Date().getFullYear()} ${t("brand")} SMP · ${t("footer")}</span><span class="mono">sawsmp.me</span></div></div>`;
     applyI18n(f);
@@ -595,7 +595,7 @@
   window.requestAnimationFrame = function (fn) { if (!fromPage()) return _raf(fn); const g = gen; return _raf((ts) => g === gen && fn(ts)); };
   function teardown() { gen++; scoped.splice(0).forEach((f) => { try { f(); } catch { /* 略過 */ } }); overlays.slice().forEach((c) => c(true)); hideCtx && hideCtx(); closeSelect && closeSelect(); }
   const loadScript = (name) => new Promise((res) => { const el = document.createElement("script"); el.src = `/static/js/${name}.js`; el.onload = el.onerror = res; document.body.appendChild(el); });
-  const PAGE_PATHS = ["/", "/news", "/rules", "/rewards", "/links", "/login", "/admin", "/settings", "/support", "/ticket", "/account", "/bans", "/player", "/rankings", "/docs", "/match", "/desk"];
+  const PAGE_PATHS = ["/", "/news", "/rules", "/rewards", "/links", "/login", "/admin", "/settings", "/support", "/ticket", "/account", "/bans", "/player", "/rankings", "/docs", "/match", "/desk", "/redeem"];
 
   async function navigate(href, { push = true, scroll = null } = {}) {
     const url = new URL(href, location.href);
@@ -724,7 +724,7 @@
   let paletteOpen = false;
   function openPalette() {
     if (paletteOpen) return; paletteOpen = true; sfx("popup");
-    const pages = [["/", "nav.home", "home"], ["/rankings", "nav.rankings", "trophy"], ["/match", "nav.match", "sword"], ["/news", "nav.news", "news"], ["/rules", "nav.rules", "book"], ["/bans", "nav.bans", "scale"], ["/support", "nav.support", "message"], ["/account", "nav.account", "user"], ["/rewards", "nav.rewards", "gift"], ["/links", "nav.links", "link"], ["/settings", "nav.settings", "settings"], ["/login", "nav.login", "login"]];
+    const pages = [["/", "nav.home", "home"], ["/rankings", "nav.rankings", "trophy"], ["/match", "nav.match", "sword"], ["/news", "nav.news", "news"], ["/rules", "nav.rules", "book"], ["/bans", "nav.bans", "scale"], ["/support", "nav.support", "message"], ["/account", "nav.account", "user"], ["/rewards", "nav.rewards", "gift"], ["/redeem", "nav.redeem", "key"], ["/links", "nav.links", "link"], ["/settings", "nav.settings", "settings"], ["/login", "nav.login", "login"]];
     if (me && me.level >= 1) pages.splice(5, 0, ["/admin", "nav.admin", "shield"]);
     const o = openOverlay(`<div class="modal palette"><input class="input" data-i18n-ph="nav.search" autocomplete="off"><div class="palette-results"></div></div>`, { onClose: () => (paletteOpen = false) });
     const input = $("input", o.el); const res = $(".palette-results", o.el);

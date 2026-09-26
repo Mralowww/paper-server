@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, maintenance, push, roles, security, social, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, maintenance, push, redeem, roles, security, social, sync, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user, protect_owner, roles_of, save_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,7 +23,7 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
          "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html",
          "/support": "support.html", "/ticket": "ticket.html", "/account": "account.html",
-         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html", "/desk": "desk.html", "/notify-roles": "notify-roles.html"}
+         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html", "/desk": "desk.html", "/notify-roles": "notify-roles.html", "/redeem": "redeem.html"}
 
 
 async def _backfill_linked_role() -> None:
@@ -76,6 +76,7 @@ app.include_router(sync.router)
 app.include_router(maintenance.router)
 app.include_router(roles.router)
 app.include_router(social.router)
+app.include_router(redeem.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 

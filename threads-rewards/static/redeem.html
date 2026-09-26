@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>兌換碼 · 鋸齒 SMP</title>
+<meta name="description" content="輸入鋸齒 SMP 兌換碼，獎品會直接發送到你的遊戲帳號">
+<meta property="og:title" content="兌換碼 · 鋸齒 SMP">
+<meta property="og:description" content="輸入鋸齒 SMP 兌換碼，獎品會直接發送到你的遊戲帳號">
+<meta property="og:site_name" content="鋸齒 SMP">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tr.theme")||'"dark"');if(JSON.parse(localStorage.getItem("tr.motion")||"false"))document.documentElement.dataset.motion="reduce"}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<meta name="theme-color" content="#0c0f11">
+<link rel="icon" type="image/png" sizes="64x64" href="/static/img/icon-64.png">
+<link rel="apple-touch-icon" href="/static/img/icon-256.png">
+<meta property="og:image" content="https://www.sawsmp.me/static/img/icon-512.png">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="topbar"></div>
+<header id="nav"></header>
+<main class="page grid-bg">
+  <div class="container rd-wrap">
+    <div class="section-head reveal">
+      <div><span class="eyebrow-text" style="color:var(--accent)">REDEEM</span><h1 class="pixel-title" style="font-size:clamp(24px,5vw,44px)" data-i18n="rd.title"></h1><p class="muted" data-i18n="rd.sub"></p></div>
+    </div>
+    <div class="rd-grid">
+      <div class="card rd-card reveal">
+        <form id="rd-form" autocomplete="off">
+          <label class="rd-label" for="rd-code" data-i18n="rd.label"></label>
+          <div class="rd-input"><span class="rd-ic" data-ico="key"></span><input id="rd-code" class="input mono" maxlength="40" spellcheck="false" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX"><button class="btn gold lg" id="rd-go" type="submit" data-i18n="rd.go"></button></div>
+        </form>
+        <div class="rd-checks" id="rd-checks"></div>
+        <div class="rd-result" id="rd-result" hidden></div>
+      </div>
+      <div class="card rd-side reveal">
+        <div class="card-title"><h3 data-i18n="rd.how"></h3></div>
+        <ol class="rd-steps"><li data-i18n="rd.s1"></li><li data-i18n="rd.s2"></li><li data-i18n="rd.s3"></li><li data-i18n="rd.s4"></li></ol>
+      </div>
+    </div>
+    <div class="card reveal section tight"><div class="card-title"><h3 data-i18n="rd.history"></h3></div><div id="rd-hist"></div></div>
+  </div>
+</main>
+<footer id="footer"></footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/art.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/fx.js"></script>
+<script src="/static/js/redeem.js"></script>
+</body>
+</html>

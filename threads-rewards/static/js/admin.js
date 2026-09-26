@@ -12,6 +12,7 @@
     { grp: "adm.grp.site" },
     { id: "news", icon: "news", min: 3 },
     { id: "rewards", icon: "trophy", min: 3 },
+    { id: "redeem", icon: "gift", min: 3 },
     { id: "site", icon: "home", min: 3 },
     { id: "apikeys", icon: "key", min: 3 },
     { id: "team", icon: "shield", min: 1 },
@@ -514,7 +515,8 @@
   }
   document.addEventListener("click", (e) => { if (e.target.closest("[data-sync]")) openSync().catch((err) => App.fail(err.message)); });
 
-  const VIEWS = { maintenance, activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
+  const redeem = (el) => window.RedeemAdmin(el, { head });
+  const VIEWS = { redeem, maintenance, activity, overview, players, punishments, permissions, tickets, links, news, rewards, site, apikeys, team, settings, status };
 
   document.addEventListener("app:ready", async () => {
     if (!App.me) return App.go("/login");
