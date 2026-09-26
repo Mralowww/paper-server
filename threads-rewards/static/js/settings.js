@@ -50,6 +50,30 @@
       const b = $('[data-snd-test="ambient"]'); if (b) b.textContent = sound.playing ? t("snd.playing") : t("set.test");
     });
 
+    // 桌面通知
+    const P = window.PushNotify; const on = $("#nt-on"); const kindBoxes = [...document.querySelectorAll("[data-kind]")];
+    $("#nt-k-tickets").hidden = !(App.me && App.me.level >= 1);
+    async function ntRender() {
+      const st = await P.state(); const k = P.kinds();
+      on.checked = st === "on"; on.disabled = st === "unsupported" || st === "denied";
+      kindBoxes.forEach((b) => { b.checked = k.includes(b.dataset.kind); b.disabled = st !== "on"; });
+      $("#nt-test").disabled = st !== "on";
+      $("#nt-state").className = "nt-state " + st; $("#nt-state").textContent = App.t("nt.st." + st);
+      $("#nt-help").textContent = App.t(!App.me ? "nt.needLogin" : st === "denied" ? "nt.deniedHelp" : st === "unsupported" ? "nt.unsupportedHelp" : "nt.help");
+      if (!App.me) on.disabled = true;
+    }
+    on.addEventListener("change", async () => {
+      try { if (on.checked) { await P.enable(P.kinds()); sfx("toggleOn"); App.ok(App.t("nt.onOk"), "", 1400); } else { await P.disable(); sfx("toggleOff"); } }
+      catch (e) { App.fail(e.message); }
+      ntRender();
+    });
+    kindBoxes.forEach((b) => b.addEventListener("change", async () => {
+      const k = kindBoxes.filter((x) => x.checked).map((x) => x.dataset.kind);
+      try { await P.enable(k); sfx(b.checked ? "toggleOn" : "toggleOff"); } catch (e) { App.fail(e.message); } ntRender();
+    }));
+    $("#nt-test").addEventListener("click", async () => { try { await P.test(); App.ok(App.t("nt.sent"), "", 1400); } catch (e) { App.fail(e.message); } });
+    ntRender(); P.refresh();
+
     const th = $("#theme"); th.value = App.theme; th._sync && th._sync();
     th.addEventListener("change", () => App.setTheme(th.value));
     document.addEventListener("themechange", () => { th.value = App.theme; th._sync && th._sync(); });

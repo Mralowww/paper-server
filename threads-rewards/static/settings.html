@@ -44,6 +44,23 @@
         <label class="switch"><input type="checkbox" id="motion"><span></span></label>
       </div>
     </div>
+    <div class="card reveal section" id="nt-card">
+      <div class="card-title"><h3 data-i18n="nt.title"></h3><span class="nt-state" id="nt-state"></span></div>
+      <p class="muted" style="margin:0 0 6px" data-i18n="nt.desc"></p>
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="nt.enable"></b><small data-i18n="nt.enabled"></small></div>
+        <label class="switch"><input type="checkbox" id="nt-on" data-snd-cat="x"><span></span></label>
+      </div>
+      <div class="setting-row" id="nt-k-tickets" hidden>
+        <div class="txt"><b data-i18n="nt.k.tickets"></b><small data-i18n="nt.k.ticketsd"></small></div>
+        <label class="switch"><input type="checkbox" data-kind="tickets" data-snd-cat="x"><span></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="txt"><b data-i18n="nt.k.replies"></b><small data-i18n="nt.k.repliesd"></small></div>
+        <label class="switch"><input type="checkbox" data-kind="replies" data-snd-cat="x"><span></span></label>
+      </div>
+      <div class="setting-row"><div class="txt"><small class="dim" id="nt-help"></small></div><button class="btn sm" id="nt-test" data-i18n="nt.test"></button></div>
+    </div>
     <div class="card reveal section">
       <div class="card-title"><h3 data-i18n="set.shortcuts"></h3></div>
       <div class="setting-row"><div class="txt" data-i18n="sc.search"></div><span class="kbd">Ctrl K</span></div>
@@ -57,6 +74,7 @@
 <script src="/static/js/art.js"></script>
 <script src="/static/js/core.js"></script>
 <script src="/static/js/fx.js"></script>
+<script src="/static/js/notify.js"></script>
 <script src="/static/js/settings.js"></script>
 </body>
 </html>

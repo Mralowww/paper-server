@@ -581,7 +581,7 @@
   window.requestAnimationFrame = function (fn) { if (!fromPage()) return _raf(fn); const g = gen; return _raf((ts) => g === gen && fn(ts)); };
   function teardown() { gen++; scoped.splice(0).forEach((f) => { try { f(); } catch { /* 略過 */ } }); overlays.slice().forEach((c) => c(true)); hideCtx && hideCtx(); closeSelect && closeSelect(); }
   const loadScript = (name) => new Promise((res) => { const el = document.createElement("script"); el.src = `/static/js/${name}.js`; el.onload = el.onerror = res; document.body.appendChild(el); });
-  const PAGE_PATHS = ["/", "/news", "/rules", "/rewards", "/links", "/login", "/admin", "/settings", "/support", "/ticket", "/account", "/bans", "/player", "/rankings", "/docs", "/match"];
+  const PAGE_PATHS = ["/", "/news", "/rules", "/rewards", "/links", "/login", "/admin", "/settings", "/support", "/ticket", "/account", "/bans", "/player", "/rankings", "/docs", "/match", "/desk"];
 
   async function navigate(href, { push = true, scroll = null } = {}) {
     const url = new URL(href, location.href);

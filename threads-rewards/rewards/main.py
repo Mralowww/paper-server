@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import account, activity, admin_ext, importer, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
+from . import account, activity, admin_ext, importer, push, bot, matchmaking, config, db, discord_api, punish, scraper, stats, tasks, tickets
 from .deps import admin_user, current_user, public_user, with_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,7 +22,7 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 PAGES = {"/": "index.html", "/news": "news.html", "/rules": "rules.html", "/rewards": "rewards.html",
          "/links": "links.html", "/login": "login.html", "/admin": "admin.html", "/settings": "settings.html",
          "/support": "support.html", "/ticket": "ticket.html", "/account": "account.html",
-         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html"}
+         "/bans": "bans.html", "/player": "player.html", "/rankings": "rankings.html", "/docs": "docs.html", "/match": "match.html", "/desk": "desk.html"}
 
 
 async def _backfill_linked_role() -> None:
@@ -37,6 +37,8 @@ async def _backfill_linked_role() -> None:
 async def lifespan(_: FastAPI):
     db.conn()
     activity.ensure_schema()
+    push.ensure_schema()
+    tickets.ensure_schema()
     activity.prune()
     try:
         importer.run()
@@ -66,9 +68,12 @@ app.include_router(stats.router)
 app.include_router(admin_ext.router)
 app.include_router(matchmaking.router)
 app.include_router(activity.router)
+app.include_router(push.router)
 app.add_api_route("/staff", lambda: RedirectResponse("/admin#tickets"), include_in_schema=False)
 
 
+app.add_api_route("/sw.js", lambda: FileResponse(STATIC / "sw.js", media_type="application/javascript",
+                                                  headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"}), include_in_schema=False)
 for route, file in PAGES.items():
     app.add_api_route(route, lambda f=file: FileResponse(STATIC / f), include_in_schema=False)
 

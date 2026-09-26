@@ -146,7 +146,7 @@
   /* ---------- 客服單（左列表、右對話） ---------- */
   async function tickets(el) {
     let filter = "all"; let q = ""; let selected = +(location.hash.split("/")[1] || 0); let view = null; let timer;
-    el.innerHTML = head("tickets", `<button class="btn" id="bans">${t("adm.ticketBans")}</button>`) + `<div class="tk-split">
+    el.innerHTML = head("tickets", `<a class="btn gold" href="/desk" target="sawsmp-desk" id="desk-open">${ART.icon("external", 16)}${t("adm.desk")}</a><button class="btn" id="bans">${t("adm.ticketBans")}</button>`) + `<div class="tk-split">
       <div><input class="input" id="tq" placeholder="${t("staff.searchT")}"><div class="tk-filter" id="tf"></div><div id="tl"></div></div>
       <div id="tv"><div class="card empty">${t("adm.pickTicket")}</div></div></div>`;
     const load = async () => {

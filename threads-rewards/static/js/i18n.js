@@ -534,3 +534,49 @@ Object.assign(window.I18N.en, {
 });
 Object.assign(window.I18N.zh, { "act.punish.import": "匯入舊懲處紀錄" });
 Object.assign(window.I18N.en, { "act.punish.import": "Imported punishment history" });
+Object.assign(window.I18N.zh, {
+  "tk.reply": "回覆", "tk.replying": "回覆 {name}", "tk.forward": "轉發到其他客服單", "tk.deleteMsg": "刪除訊息", "tk.markRead": "標示為已讀", "tk.markUnread": "從這裡標示未讀",
+  "tk.markedRead": "已標示為已讀", "tk.markedUnread": "已標示為未讀", "tk.confirmDelMsg": "確定要刪除這則訊息？客服仍可在紀錄中看到原文。",
+  "tk.deletedMsg": "此訊息已被刪除", "tk.deletedBy": "已由 {name} 刪除", "tk.fwdFrom": "轉發自 #{id} · {name}", "tk.fwdSearch": "搜尋客服單編號或標題…",
+  "tk.fwdNote": "附註（選填）", "tk.fwdVisible": "讓該客服單的玩家也看得到（預設為內部備註）", "tk.forwarded": "已轉發到 #{id}",
+  "tk.closeBtn": "關閉客服單", "tk.closeTitle": "關閉客服單 #{id}", "tk.closeReason": "關閉原因", "tk.closeHint": "關閉後仍可重新開啟。",
+  "tk.closeHintStaff": "關閉後會保存完整對話紀錄，並透過 Discord 私訊通知玩家已關單與原因（不會附上紀錄）。",
+  "tk.cr.solved": "問題已解決", "tk.cr.noReply": "玩家長時間未回覆", "tk.cr.dup": "重複的客服單", "tk.cr.invalid": "無效或與伺服器無關",
+  "tk.closed": "客服單已關閉", "tk.closedDm": "已保存紀錄並私訊通知玩家", "tk.logs": "關單紀錄", "tk.logTitle": "客服單 #{id} 關單紀錄",
+  "tk.closedBy": "關閉者", "tk.closedAt": "關閉時間", "tk.msgCount": "訊息數", "tk.popout": "在工作台開啟", "tk.internalTag": "內部",
+  "dk.title": "客服工作台", "dk.sub": "專門處理客服單的大視窗", "dk.pick": "選一張客服單開始處理", "dk.pickHint": "左側清單點選，或用 J / K 上下切換",
+  "dk.unread": "未讀", "dk.logs": "關單紀錄", "dk.noLogs": "還沒有關單紀錄", "dk.open": "開啟", "dk.hint": "右鍵清單或訊息可快速操作 · J / K 切換",
+  "dk.f.active": "處理中", "dk.f.open": "待回覆", "dk.f.answered": "已回覆", "dk.f.mine": "我負責的", "dk.f.closed": "已關閉", "adm.desk": "開啟客服工作台",
+  "nt.title": "桌面通知", "nt.desc": "開啟後，就算網頁關著，有新的客服單或回覆也會在電腦 / 手機跳出通知。",
+  "nt.enable": "開啟桌面通知", "nt.enabled": "需要允許瀏覽器通知權限", "nt.k.tickets": "新客服單與玩家回覆", "nt.k.ticketsd": "客服人員：有人開單或回覆時通知",
+  "nt.k.replies": "我的客服單有回覆", "nt.k.repliesd": "客服回覆或關閉你的客服單時通知", "nt.test": "傳送測試通知", "nt.sent": "已送出測試通知",
+  "nt.onOk": "桌面通知已開啟", "nt.st.on": "已開啟", "nt.st.off": "未開啟", "nt.st.denied": "已被封鎖", "nt.st.unsupported": "不支援",
+  "nt.help": "通知會送到這台裝置的這個瀏覽器；其他裝置需各自開啟。", "nt.needLogin": "請先登入才能開啟通知。",
+  "nt.denied": "瀏覽器拒絕了通知權限", "nt.deniedHelp": "通知權限已被封鎖：請點網址列左側的鎖頭圖示，把「通知」改為允許後重新整理。",
+  "nt.unsupported": "這個瀏覽器不支援推播通知", "nt.unsupportedHelp": "這個瀏覽器不支援推播。iPhone 請先把網站「加入主畫面」再從主畫面開啟。",
+  "act.ticket.close": "關閉客服單", "act.ticket.message.delete": "刪除客服單訊息", "act.ticket.message.forward": "轉發客服單訊息",
+});
+Object.assign(window.I18N.en, {
+  "tk.reply": "Reply", "tk.replying": "Replying to {name}", "tk.forward": "Forward to another ticket", "tk.deleteMsg": "Delete message", "tk.markRead": "Mark as read", "tk.markUnread": "Mark unread from here",
+  "tk.markedRead": "Marked as read", "tk.markedUnread": "Marked as unread", "tk.confirmDelMsg": "Delete this message? Staff can still see the original in the log.",
+  "tk.deletedMsg": "This message was deleted", "tk.deletedBy": "Deleted by {name}", "tk.fwdFrom": "Forwarded from #{id} · {name}", "tk.fwdSearch": "Search ticket number or subject…",
+  "tk.fwdNote": "Note (optional)", "tk.fwdVisible": "Visible to that ticket's player (default is an internal note)", "tk.forwarded": "Forwarded to #{id}",
+  "tk.closeBtn": "Close ticket", "tk.closeTitle": "Close ticket #{id}", "tk.closeReason": "Reason", "tk.closeHint": "You can reopen it later.",
+  "tk.closeHintStaff": "Closing saves the full transcript and DMs the player on Discord with the reason (without the transcript).",
+  "tk.cr.solved": "Resolved", "tk.cr.noReply": "No reply from player", "tk.cr.dup": "Duplicate ticket", "tk.cr.invalid": "Invalid or unrelated",
+  "tk.closed": "Ticket closed", "tk.closedDm": "Transcript saved and player notified", "tk.logs": "Close logs", "tk.logTitle": "Ticket #{id} close logs",
+  "tk.closedBy": "Closed by", "tk.closedAt": "Closed at", "tk.msgCount": "Messages", "tk.popout": "Open in desk", "tk.internalTag": "Internal",
+  "dk.title": "Support desk", "dk.sub": "Full-screen ticket workspace", "dk.pick": "Pick a ticket to start", "dk.pickHint": "Choose one on the left, or use J / K",
+  "dk.unread": "Unread", "dk.logs": "Close logs", "dk.noLogs": "No close logs yet", "dk.open": "Open", "dk.hint": "Right-click tickets or messages for actions · J / K to switch",
+  "dk.f.active": "Active", "dk.f.open": "Awaiting", "dk.f.answered": "Answered", "dk.f.mine": "Mine", "dk.f.closed": "Closed", "adm.desk": "Open support desk",
+  "nt.title": "Desktop notifications", "nt.desc": "Get notified about new tickets and replies even when the site is closed.",
+  "nt.enable": "Enable desktop notifications", "nt.enabled": "Requires browser notification permission", "nt.k.tickets": "New tickets & player replies", "nt.k.ticketsd": "Staff: notify when someone opens or replies",
+  "nt.k.replies": "Replies to my tickets", "nt.k.repliesd": "When staff reply to or close your ticket", "nt.test": "Send test", "nt.sent": "Test sent",
+  "nt.onOk": "Desktop notifications on", "nt.st.on": "On", "nt.st.off": "Off", "nt.st.denied": "Blocked", "nt.st.unsupported": "Unsupported",
+  "nt.help": "Notifications go to this browser on this device; enable them on other devices separately.", "nt.needLogin": "Sign in to enable notifications.",
+  "nt.denied": "Notification permission denied", "nt.deniedHelp": "Notifications are blocked: click the lock icon in the address bar, allow Notifications, then reload.",
+  "nt.unsupported": "This browser doesn't support push", "nt.unsupportedHelp": "This browser doesn't support push. On iPhone, add the site to your Home Screen first.",
+  "act.ticket.close": "Closed ticket", "act.ticket.message.delete": "Deleted ticket message", "act.ticket.message.forward": "Forwarded ticket message",
+});
+Object.assign(window.I18N.zh, { "nt.timeout": "連不上瀏覽器的推播服務，請稍後再試（部分瀏覽器或網路環境不支援）" });
+Object.assign(window.I18N.en, { "nt.timeout": "Couldn't reach the browser's push service. Try again later." });

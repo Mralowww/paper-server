@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from . import activity, config, db
+from . import activity, config, db, discord_api, push
 from .deps import MOD, SUPPORT, current_user, display_name, public_user, require, user_level
 
 router = APIRouter()
@@ -86,13 +86,37 @@ class TicketIn(BaseModel):
     fields: dict = {}
 
 
+def ensure_schema() -> None:
+    cols = {r["name"] for r in db.query("PRAGMA table_info(ticket_messages)")}
+    for name, ddl in [("reply_to", "INTEGER"), ("deleted_at", "TEXT"), ("deleted_by", "TEXT"), ("forwarded", "TEXT")]:
+        if name not in cols:
+            db.execute(f"ALTER TABLE ticket_messages ADD COLUMN {name} {ddl}")
+    db.execute("""CREATE TABLE IF NOT EXISTS ticket_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, subject TEXT NOT NULL, owner_id TEXT, owner_name TEXT,
+        closed_by TEXT, closed_by_name TEXT, reason TEXT, transcript TEXT NOT NULL, message_count INTEGER NOT NULL, created_at TEXT NOT NULL)""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tlogs_ticket ON ticket_logs(ticket_id)")
+
+
+def _push_new(t: dict, author: str, text: str, event: str) -> None:
+    """新單 / 玩家回覆 → 推播給客服；客服回覆 → 推播給開單玩家。"""
+    url = f"/desk#{t['id']}"
+    if event == "new":
+        push.fire(push.staff_ids(), {"title": f"新客服單 #{t['id']}", "body": f"{author}：{t['subject']}\n{text[:120]}", "url": url, "tag": f"ticket-{t['id']}"}, "tickets")
+    elif event == "reply":
+        push.fire(push.staff_ids(), {"title": f"客服單 #{t['id']} 有新回覆", "body": f"{author}：{text[:140]}", "url": url, "tag": f"ticket-{t['id']}"}, "tickets")
+    elif event == "staff_reply":
+        push.fire([t["user_id"]], {"title": f"你的客服單 #{t['id']} 有新回覆", "body": text[:160], "url": f"/ticket?id={t['id']}", "tag": f"ticket-{t['id']}"}, "replies")
+
+
 class MessageIn(BaseModel):
+    reply_to: int | None = None
     body: str = ""
     attachments: list[str] = []
     internal: bool = False
 
 
 class StatusIn(BaseModel):
+    reason: str | None = None
     status: str | None = None
     urgent: bool | None = None
     claim: bool | None = None
@@ -143,6 +167,7 @@ async def create_ticket(body: TicketIn, user: dict = Depends(current_user)):
     db.execute("INSERT OR REPLACE INTO ticket_reads VALUES (?,?,?)", (user["id"], tid, mid))
     t = db.one("SELECT * FROM tickets WHERE id = ?", (tid,))
     _notify(dict(t, author=display_name(user)), "new", text)
+    _push_new(t, display_name(user), text, "new")
     return {"ok": True, "id": tid}
 
 
@@ -159,7 +184,16 @@ async def get_ticket(ticket_id: int, request: Request, after: int = 0, user: dic
         m["author"] = public_user({"id": m["author_id"], "username": m.pop("username"), "global_name": m.pop("global_name"),
                                    "avatar": m.pop("avatar")}) if m["author_id"] and m.get("username") else None
         m.pop("username", None); m.pop("global_name", None); m.pop("avatar", None)
-    if msgs:
+    for m in msgs:
+        m["forwarded"] = json.loads(m["forwarded"]) if m.get("forwarded") else None
+        if m.get("deleted_at") and not staff:
+            m["body"], m["attachments"] = "", []
+        if m.get("reply_to"):
+            q = db.one("SELECT m.id, m.body, m.deleted_at, m.internal, u.username, u.global_name FROM ticket_messages m LEFT JOIN users u ON u.id = m.author_id WHERE m.id = ? AND m.ticket_id = ?",
+                       (m["reply_to"], ticket_id))
+            m["reply"] = q and (staff or not q["internal"]) and {"id": q["id"], "name": q["global_name"] or q["username"] or "?",
+                                                                 "body": "" if q["deleted_at"] and not staff else q["body"][:140], "deleted": bool(q["deleted_at"])}
+    if msgs and not (request.query_params.get("peek") == "1"):
         db.execute("INSERT OR REPLACE INTO ticket_reads VALUES (?,?,?)", (user["id"], ticket_id, msgs[-1]["id"]))
     owner = db.one("SELECT * FROM users WHERE id = ?", (t["user_id"],))
     extra = {}
@@ -179,6 +213,7 @@ async def get_ticket(ticket_id: int, request: Request, after: int = 0, user: dic
         extra["owner_mc"] = owner and owner.get("mc_name") and {"name": owner["mc_name"], "uuid": owner["mc_uuid"]}
         claimer = t["claimed_by"] and db.one("SELECT * FROM users WHERE id = ?", (t["claimed_by"],))
         extra["claimed"] = public_user(claimer) if claimer else None
+        extra["logs"] = db.query("SELECT id, closed_by_name, reason, message_count, created_at FROM ticket_logs WHERE ticket_id = ? ORDER BY id DESC", (ticket_id,))
     return {"ticket": t, "owner": public_user(owner), "messages": msgs, "staff": staff, "level": level, **extra}
 
 
@@ -192,15 +227,19 @@ async def post_message(ticket_id: int, body: MessageIn, request: Request, user: 
     if t["status"] == "closed" and not staff:
         raise HTTPException(400, "支援單已關閉")
     internal = body.internal and staff
+    reply_to = body.reply_to if body.reply_to and db.one("SELECT 1 FROM ticket_messages WHERE id = ? AND ticket_id = ?", (body.reply_to, ticket_id)) else None
     now = now_iso()
     mid = db.execute(
-        "INSERT INTO ticket_messages(ticket_id, author_id, body, attachments, staff, internal, created_at) VALUES (?,?,?,?,?,?,?)",
-        (ticket_id, user["id"], text, json.dumps(atts), int(staff and t["user_id"] != user["id"]), int(internal), now))
+        "INSERT INTO ticket_messages(ticket_id, author_id, body, attachments, staff, internal, reply_to, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (ticket_id, user["id"], text, json.dumps(atts), int(staff and t["user_id"] != user["id"]), int(internal), reply_to, now))
     if not internal:
         status = "answered" if staff and t["user_id"] != user["id"] else "open"
         db.execute("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?", (status, now, ticket_id))
         if status == "open":
             _notify(dict(t, author=display_name(user)), "reply", text)
+            _push_new(t, display_name(user), text, "reply")
+        else:
+            _push_new(t, display_name(user), text, "staff_reply")
     db.execute("INSERT OR REPLACE INTO ticket_reads VALUES (?,?,?)", (user["id"], ticket_id, mid))
     return {"ok": True, "id": mid}
 
@@ -216,8 +255,11 @@ async def set_status(ticket_id: int, body: StatusIn, request: Request, user: dic
             raise HTTPException(400, "不允許的狀態")
         if not staff and body.status == "open" and t["status"] != "closed":
             raise HTTPException(400, "支援單尚未關閉")
-        db.execute("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?", (body.status, now, ticket_id))
-        notes.append({"closed": "已關閉支援單", "open": "重新開啟支援單", "answered": "標記為已回覆"}[body.status])
+        if body.status == "closed" and t["status"] != "closed":
+            await close_ticket(t, user, (body.reason or "").strip()[:500])
+        else:
+            db.execute("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?", (body.status, now, ticket_id))
+            notes.append({"closed": "已關閉支援單", "open": "重新開啟支援單", "answered": "標記為已回覆"}[body.status])
     if staff and body.urgent is not None:
         db.execute("UPDATE tickets SET urgent = ? WHERE id = ?", (int(body.urgent), ticket_id))
         notes.append("標記為緊急" if body.urgent else "取消緊急")
@@ -237,6 +279,147 @@ async def set_status(ticket_id: int, body: StatusIn, request: Request, user: dic
         b, a = activity.diff(before, after)
         db.audit(user, "ticket.update", f"#{ticket_id} " + "、".join(notes), target=ticket_id, before=b, after=a)
     return {"ok": True}
+
+
+# ---------- 關單：保存紀錄 + Discord 私訊通知 ----------
+
+def _transcript(ticket_id: int) -> list[dict]:
+    rows = db.query("""SELECT m.*, u.username, u.global_name FROM ticket_messages m LEFT JOIN users u ON u.id = m.author_id
+                       WHERE m.ticket_id = ? ORDER BY m.id""", (ticket_id,))
+    return [{"id": r["id"], "author_id": r["author_id"], "author": r["global_name"] or r["username"] or ("系統" if r["system"] else "?"),
+             "body": r["body"], "attachments": json.loads(r["attachments"] or "[]"), "staff": bool(r["staff"]), "internal": bool(r["internal"]),
+             "system": bool(r["system"]), "reply_to": r.get("reply_to"), "deleted_at": r.get("deleted_at"), "deleted_by": r.get("deleted_by"),
+             "forwarded": json.loads(r["forwarded"]) if r.get("forwarded") else None, "created_at": r["created_at"]} for r in rows]
+
+
+async def close_ticket(t: dict, user: dict, reason: str) -> int:
+    now = now_iso()
+    closer = display_name(user)
+    note = "已關閉支援單" + (f"：{reason}" if reason else "")
+    db.execute("UPDATE tickets SET status = 'closed', updated_at = ? WHERE id = ?", (now, t["id"]))
+    db.execute("INSERT INTO ticket_messages(ticket_id, author_id, body, system, created_at) VALUES (?,?,?,1,?)", (t["id"], user["id"], note, now))
+    owner = db.one("SELECT * FROM users WHERE id = ?", (t["user_id"],))
+    msgs = _transcript(t["id"])
+    log_id = db.execute(
+        """INSERT INTO ticket_logs(ticket_id, subject, owner_id, owner_name, closed_by, closed_by_name, reason, transcript, message_count, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (t["id"], t["subject"], t["user_id"], owner and (owner.get("global_name") or owner.get("username")), user["id"], closer,
+         reason or None, json.dumps({"ticket": {k: t.get(k) for k in ("id", "category", "subject", "target", "priority", "created_at")}, "messages": msgs},
+                                    ensure_ascii=False), sum(1 for m in msgs if not m["system"]), now))
+    db.audit(user, "ticket.close", f"#{t['id']} {t['subject']}" + (f" — {reason}" if reason else ""), target=t["id"], meta={"log_id": log_id})
+    # 由客服關單時私訊通知玩家（不附對話紀錄）
+    if t["user_id"] != user["id"]:
+        embed = {"title": f"你的客服單 #{t['id']} 已關閉", "color": 0x97C8C7,
+                 "description": f"**{t['subject']}**", "fields": [{"name": "關閉原因", "value": reason or "未提供原因"},
+                                                                  {"name": "處理人員", "value": closer, "inline": True}],
+                 "footer": {"text": "鋸齒 SMP 客服中心 · 如有需要可在網站重新開啟或開立新的客服單"}, "url": f"{config.PUBLIC_URL}/ticket?id={t['id']}"}
+        async def _dm():
+            try:
+                await discord_api.dm(t["user_id"], embed=embed)
+            except Exception:  # noqa: BLE001
+                import logging
+                logging.getLogger("rewards.tickets").warning("關單私訊失敗 #%s", t["id"], exc_info=True)
+        asyncio.create_task(_dm())
+        push.fire([t["user_id"]], {"title": f"客服單 #{t['id']} 已關閉", "body": reason or t["subject"], "url": f"/ticket?id={t['id']}", "tag": f"ticket-{t['id']}"}, "replies")
+    return log_id
+
+
+class CloseIn(BaseModel):
+    reason: str = ""
+
+
+@router.post("/api/tickets/{ticket_id}/close")
+async def close(ticket_id: int, body: CloseIn, request: Request, user: dict = Depends(current_user)):
+    t, level = await _load(ticket_id, request, user)
+    if t["status"] == "closed":
+        raise HTTPException(400, "支援單已經關閉")
+    log_id = await close_ticket(t, user, body.reason.strip()[:500])
+    return {"ok": True, "log_id": log_id}
+
+
+@router.post("/api/tickets/{ticket_id}/read")
+async def mark_read(ticket_id: int, body: dict, request: Request, user: dict = Depends(current_user)):
+    await _load(ticket_id, request, user)
+    last = int(body.get("last_id") or 0) or (db.one("SELECT MAX(id) AS m FROM ticket_messages WHERE ticket_id = ?", (ticket_id,))["m"] or 0)
+    if body.get("unread"):
+        prev = db.one("SELECT MAX(id) AS m FROM ticket_messages WHERE ticket_id = ? AND id < ?", (ticket_id, last))["m"] or 0
+        last = prev
+    db.execute("INSERT OR REPLACE INTO ticket_reads VALUES (?,?,?)", (user["id"], ticket_id, last))
+    return {"ok": True, "last_id": last}
+
+
+@router.delete("/api/tickets/{ticket_id}/messages/{mid}")
+async def delete_message(ticket_id: int, mid: int, request: Request, user: dict = Depends(current_user)):
+    t, level = await _load(ticket_id, request, user)
+    m = db.one("SELECT * FROM ticket_messages WHERE id = ? AND ticket_id = ?", (mid, ticket_id))
+    if not m or m["system"]:
+        raise HTTPException(404, "找不到訊息")
+    if m["deleted_at"]:
+        raise HTTPException(400, "訊息已經刪除")
+    if level < SUPPORT and m["author_id"] != user["id"]:
+        raise HTTPException(403, "只能刪除自己的訊息")
+    db.execute("UPDATE ticket_messages SET deleted_at = ?, deleted_by = ? WHERE id = ?", (now_iso(), display_name(user), mid))
+    db.audit(user, "ticket.message.delete", f"#{ticket_id} 訊息 {mid}", target=ticket_id, before={"body": m["body"], "attachments": json.loads(m["attachments"] or "[]")})
+    return {"ok": True}
+
+
+class ForwardIn(BaseModel):
+    to: int
+    visible: bool = False   # 預設轉成內部備註，只有客服看得到
+    note: str = ""
+
+
+@router.post("/api/staff/tickets/{ticket_id}/messages/{mid}/forward")
+async def forward_message(ticket_id: int, mid: int, body: ForwardIn, staff: dict = Depends(require(SUPPORT))):
+    m = db.one("""SELECT m.*, u.username, u.global_name FROM ticket_messages m LEFT JOIN users u ON u.id = m.author_id
+                  WHERE m.id = ? AND m.ticket_id = ?""", (mid, ticket_id))
+    if not m or m["system"] or m["deleted_at"]:
+        raise HTTPException(404, "找不到訊息")
+    dst = db.one("SELECT * FROM tickets WHERE id = ?", (body.to,))
+    if not dst or body.to == ticket_id:
+        raise HTTPException(404, "找不到目標客服單")
+    now = now_iso()
+    meta = {"ticket": ticket_id, "message": mid, "author": m["global_name"] or m["username"] or "?", "created_at": m["created_at"], "by": display_name(staff)}
+    text = (body.note.strip() + "\n\n" if body.note.strip() else "") + m["body"]
+    new_id = db.execute(
+        "INSERT INTO ticket_messages(ticket_id, author_id, body, attachments, staff, internal, forwarded, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (body.to, staff["id"], text[:5000], m["attachments"], 1, int(not body.visible), json.dumps(meta, ensure_ascii=False), now))
+    db.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, body.to))
+    db.audit(staff, "ticket.message.forward", f"#{ticket_id} → #{body.to}", target=body.to, meta={**meta, "visible": body.visible})
+    return {"ok": True, "id": new_id}
+
+
+@router.get("/api/staff/tickets/{ticket_id}/logs/{log_id}")
+async def ticket_log(ticket_id: int, log_id: int, _: dict = Depends(require(SUPPORT))):
+    r = db.one("SELECT * FROM ticket_logs WHERE id = ? AND ticket_id = ?", (log_id, ticket_id))
+    if not r:
+        raise HTTPException(404, "找不到紀錄")
+    r["transcript"] = json.loads(r["transcript"])
+    return r
+
+
+@router.get("/api/staff/tickets/{ticket_id}/logs/{log_id}/download")
+async def ticket_log_txt(ticket_id: int, log_id: int, _: dict = Depends(require(SUPPORT))):
+    from fastapi.responses import PlainTextResponse
+    r = db.one("SELECT * FROM ticket_logs WHERE id = ? AND ticket_id = ?", (log_id, ticket_id))
+    if not r:
+        raise HTTPException(404, "找不到紀錄")
+    tr = json.loads(r["transcript"])
+    lines = [f"鋸齒 SMP 客服單 #{ticket_id}：{r['subject']}", f"開單者：{r['owner_name']}  關閉者：{r['closed_by_name']}  關閉時間：{r['created_at']}",
+             f"關閉原因：{r['reason'] or '未提供'}", "=" * 60]
+    for m in tr["messages"]:
+        tag = "[系統]" if m["system"] else "[內部備註]" if m["internal"] else "[客服]" if m["staff"] else ""
+        extra = (f"（已由 {m['deleted_by']} 刪除）" if m["deleted_at"] else "") + (f"（轉發自 #{m['forwarded']['ticket']}）" if m.get("forwarded") else "")
+        lines.append(f"[{m['created_at']}] {tag}{m['author']}{extra}：{m['body']}" + (f"  附件：{' '.join(m['attachments'])}" if m["attachments"] else ""))
+    return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": f"attachment; filename=ticket-{ticket_id}-log-{log_id}.txt"})
+
+
+@router.get("/api/staff/ticket-logs")
+async def all_logs(q: str = "", _: dict = Depends(require(SUPPORT))):
+    where, args = "", ()
+    if q:
+        where, args = "WHERE subject LIKE ? OR owner_name LIKE ? OR CAST(ticket_id AS TEXT) = ?", (f"%{q}%", f"%{q}%", q.lstrip("#"))
+    return {"logs": db.query(f"SELECT id, ticket_id, subject, owner_name, closed_by_name, reason, message_count, created_at FROM ticket_logs {where} ORDER BY id DESC LIMIT 200", args)}
 
 
 # ---------- 客服端 ----------
