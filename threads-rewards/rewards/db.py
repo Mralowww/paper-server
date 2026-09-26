@@ -41,7 +41,7 @@ DEFAULT_SETTINGS = {
     "canned_replies": "你好，我們已經收到你的回報，正在處理中，請耐心等候。\n可以提供更多細節或截圖嗎？\n已處理完畢，感謝你的回報！\n此問題已轉交相關人員處理。",
     "match_enabled": "1",
     "match_time_limit": "60",
-    "rank_tiers": "0:戰鬥新手\n50:熟練戰士\n150:精英鬥士\n400:戰場大師\n1000:傳奇",
+    "rank_tiers": "0:戰鬥新手|#9ca3af|剛踏上戰場的新人，一切從這裡開始\n10:見習冒險者|#b08455|拿下第一批擊殺，開始摸索戰鬥的節奏\n30:鐵血士兵|#8fa3b8|身經數戰，已經不怕正面衝突\n60:熟練戰士|#4ade80|熟悉各種武器與走位，是團隊可靠的戰力\n120:精英鬥士|#60a5fa|戰技純熟，讓對手不敢輕忽的存在\n200:戰場先鋒|#a78bfa|總是衝在最前線，帶頭打開局面\n350:戰場大師|#fbbf24|精通戰場的一切，名字本身就是威懾\n600:屠戰者|#fb7a3c|身後堆滿敗者，戰場上的收割者\n1000:傳奇|#ef4444|千殺成就，伺服器裡流傳的傳說\n2000:神話|rainbow|凌駕一切的存在，鋸齒 SMP 的頂點",
 }
 
 SCHEMA = """
@@ -290,6 +290,9 @@ def conn() -> sqlite3.Connection:
         _conn.execute("PRAGMA foreign_keys=ON")
         _conn.executescript(SCHEMA)
         _migrate(_conn)
+        # 舊版預設段位 → 新版（有顏色與介紹）；管理員改過的不動
+        _conn.execute("UPDATE settings SET value = ? WHERE key = 'rank_tiers' AND value = ?",
+                      (DEFAULT_SETTINGS["rank_tiers"], "0:戰鬥新手\n50:熟練戰士\n150:精英鬥士\n400:戰場大師\n1000:傳奇"))
         for k, v in DEFAULT_SETTINGS.items():
             _conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
         _conn.commit()

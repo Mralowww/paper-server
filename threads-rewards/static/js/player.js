@@ -8,13 +8,13 @@
     return `<div class="card reveal"><div class="card-title"><h3>${t("pp.overview")}</h3>${p.online ? `<span class="right tag ok live">${t("home.online")}</span>` : ""}</div>
       <div class="kv-grid" style="margin-top:0">
         <div class="kv"><span>${t("pp.rank")}</span><b>${d.rank ? "#" + d.rank : "—"}</b></div>
-        <div class="kv"><span>${t("pp.tier")}</span><b>${esc(s.tier.name)}</b></div>
+        <div class="kv"><span>${t("pp.tier")}</span><b>${App.tierTag(s.tier)} <button class="tier-help sm" data-tiers="${s.tier.level}" type="button" title="${t("tier.title")}">${ART.icon("gem", 13)}</button></b></div>
         <div class="kv"><span>${t("pl.firstSeen")}</span><b>${p.first_seen ? date(p.first_seen, false) : "—"}</b></div>
         <div class="kv"><span>${t("pl.lastSeen")}</span><b>${p.online ? t("home.online") : p.last_seen ? ago(p.last_seen) : "—"}</b></div>
         <div class="kv"><span>${t("pp.playtime")}</span><b>${App.playtime(s.playtime)}</b></div>
         <div class="kv"><span>${t("pp.linked")}</span><b class="${p.linked ? "good" : ""}">${p.linked ? "✓" : "—"}</b></div>
       </div>
-      ${s.tier.next ? `<div style="margin-top:18px"><div class="row" style="justify-content:space-between;font-size:13px"><span class="muted">${t("pp.nextTier")}：${esc(s.tier.next.name)}</span><span class="mono">${s.kills} / ${s.tier.next.kills}</span></div><div class="progress" style="height:6px"><i style="width:${Math.min(100, (s.kills / s.tier.next.kills) * 100)}%"></i></div></div>` : ""}
+      ${s.tier.next ? `<div style="margin-top:18px"><div class="row" style="justify-content:space-between;font-size:13px"><span class="muted">${t("pp.nextTier")}：${App.tierTag(s.tier.next)}</span><span class="mono">${s.kills} / ${s.tier.next.kills}</span></div><div class="progress tier-prog" style="height:6px;${s.tier.color === "rainbow" ? "" : `--tc:${esc(s.tier.next.color === "rainbow" ? "#fbbf24" : s.tier.next.color)}`}"><i style="width:${Math.min(100, (s.kills / s.tier.next.kills) * 100)}%"></i></div></div>` : ""}
     </div>
     <div class="card reveal section tight"><div class="card-title"><h3>${t("pp.history")}</h3></div>
       ${d.punishments.length ? d.punishments.map((x) => `<div class="pun-item ${x.active ? "" : "off"}" data-pt="${x.type}"><span class="bar"></span><div class="desc"><div class="row" style="gap:6px">${ptTag(x.type, !!x.active)}<span class="dim mono" style="font-size:12px">#${x.id}</span></div><p>${esc(x.reason)}</p><small>${date(x.created_at)} · ${x.active ? t("pl.remaining") + " " + remaining(x.expires_at) : t("pl.expired")}</small></div></div>`).join("") : `<div class="empty">${t("pp.clean")}</div>`}
@@ -77,7 +77,9 @@
     document.title = `${p.name} · 鋸齒 SMP`;
     $("#pname").textContent = p.name;
     $("#skin").src = `https://mc-heads.net/body/${p.uuid}/360`; $("#skin").dataset.zoom = `https://mc-heads.net/body/${p.uuid}/600`;
-    $("#tier span:last-child").textContent = d.stats.tier.name;
+    const tb = $("#tier"); tb.querySelector("span:last-child").textContent = d.stats.tier.name;
+    tb.classList.toggle("rainbow", d.stats.tier.color === "rainbow"); if (d.stats.tier.color !== "rainbow") tb.style.setProperty("--accent", d.stats.tier.color);
+    tb.dataset.tiers = d.stats.tier.level; tb.title = t("tier.title"); tb.style.cursor = "pointer";
     $("#namemc").href = `https://namemc.com/profile/${p.uuid}`;
     render();
     $("#ptabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (!b) return; tab = b.dataset.tab; store.set("pp.tab", tab); sfx("switch"); render(); });

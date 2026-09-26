@@ -820,10 +820,30 @@
   }
   document.addEventListener("app:ready", () => maintRibbon(true));
 
+  /* ---------- 段位 ---------- */
+  function tierTag(tr, { lg = false } = {}) {
+    if (!tr) return "";
+    const rb = tr.color === "rainbow";
+    return `<span class="tier-chip ${rb ? "rainbow" : ""} ${lg ? "lg" : ""}" ${rb ? "" : `style="--tc:${esc(tr.color)}"`}><i></i>${esc(tr.name)}</span>`;
+  }
+  async function tiersInfo(mine = -1) {
+    const d = await api("/api/tiers", { quiet: true });
+    const o = modal({ title: esc(t("tier.title")), body: `<p class="dim" style="margin:0 0 14px">${t("tier.desc")}</p><div class="tier-list">${d.tiers.map((x) => {
+      const rb = x.color === "rainbow";
+      return `<div class="tier-item ${x.level === mine ? "me" : ""}" style="--i:${x.level};${rb ? "" : `--tc:${esc(x.color)}`}">
+        <span class="tier-gem ${rb ? "rainbow" : ""}">${ART.icon("gem", 18)}</span>
+        <div class="tier-body">${tierTag(x)}${x.level === mine ? `<small class="tier-you">${t("tier.you")}</small>` : ""}<p>${esc(x.desc || "")}</p></div>
+        <div class="tier-need"><b>${fmt(x.kills)}+</b><small>${t("rk.kills")}</small><small class="dim">${t("tier.players", { n: fmt(x.players) })}</small></div></div>`;
+    }).join("")}</div>` });
+    const me = o.el.querySelector(".tier-item.me"); if (me) me.scrollIntoView({ block: "center" });
+    return o;
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-tiers]"); if (b) { e.preventDefault(); tiersInfo(b.dataset.tiers === "" ? -1 : +b.dataset.tiers).catch((err) => fail(err.message)); } });
+
   window.App = {
     $, $$, esc, t, applyI18n, setLang, get lang() { return lang; }, store, sound, sfx, api, progress, playtime, ambient,
     holdHeight, badges, fmt, compact, ago, date, px, metricsHTML, countUp, observe, toast, ok, fail, modal, confirm: confirmBox,
     zoom, copy, tabs, confetti, go, showCtx, ctxProviders, openPalette, renderBanner, get me() { return me; }, get mePromise() { return mePromise; },
-    setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining,
+    setTheme, get theme() { return theme; }, icon: (...a) => window.ART.icon(...a), mcHead, CATS, PTYPES, catTag, ptTag, dur, parseDur, remaining, tierTag, tiersInfo,
   };
 })();

@@ -27,21 +27,47 @@ SORTS = {
 }
 
 
-def tiers() -> list[tuple[int, str]]:
+PALETTE = ["#9ca3af", "#b08455", "#8fa3b8", "#4ade80", "#60a5fa", "#a78bfa", "#fbbf24", "#fb7a3c", "#ef4444", "rainbow"]
+
+
+def tiers() -> list[dict]:
+    """段位表，每行「擊殺數:名稱|顏色|介紹」（顏色與介紹可省略）。"""
     out = []
     for line in (db.settings().get("rank_tiers") or "").splitlines():
         if ":" in line:
             k, v = line.split(":", 1)
             if k.strip().isdigit():
-                out.append((int(k), v.strip()))
-    return sorted(out) or [(0, "戰鬥新手")]
+                parts = [x.strip() for x in v.split("|")]
+                color = parts[1] if len(parts) > 1 else ""
+                if not (color == "rainbow" or (color.startswith("#") and len(color) in (4, 7) and all(c in "0123456789abcdefABCDEF" for c in color[1:]))):
+                    color = ""
+                out.append({"kills": int(k), "name": parts[0] or "—", "color": color, "desc": parts[2] if len(parts) > 2 else ""})
+    out.sort(key=lambda x: x["kills"])
+    for i, t in enumerate(out):
+        t["color"] = t["color"] or PALETTE[min(i, len(PALETTE) - 1)]
+    return out or [{"kills": 0, "name": "戰鬥新手", "color": PALETTE[0], "desc": ""}]
 
 
 def tier_of(kills: int) -> dict:
     ts = tiers()
-    idx = max(i for i, (need, _) in enumerate(ts) if kills >= need) if any(kills >= n for n, _ in ts) else 0
+    idx = max((i for i, t in enumerate(ts) if kills >= t["kills"]), default=0)
     nxt = ts[idx + 1] if idx + 1 < len(ts) else None
-    return {"name": ts[idx][1], "level": idx, "next": nxt and {"name": nxt[1], "kills": nxt[0]}}
+    return {"name": ts[idx]["name"], "color": ts[idx]["color"], "level": idx,
+            "next": nxt and {"name": nxt["name"], "kills": nxt["kills"], "color": nxt["color"]}}
+
+
+@router.get("/api/tiers")
+async def list_tiers():
+    ts = tiers()
+    rows = db.query("SELECT kills FROM player_stats")
+    counts = [0] * len(ts)
+    for r in rows:
+        counts[tier_of_index(ts, r["kills"] or 0)] += 1
+    return {"tiers": [dict(t, level=i, players=counts[i]) for i, t in enumerate(ts)], "total": len(rows)}
+
+
+def tier_of_index(ts: list[dict], kills: int) -> int:
+    return max((i for i, t in enumerate(ts) if kills >= t["kills"]), default=0)
 
 
 def _stat_row(uuid: str) -> dict:

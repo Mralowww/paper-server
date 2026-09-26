@@ -24,12 +24,12 @@
     $("#podium").innerHTML = top.length ? [1, 0, 2].map((i) => top[i] ? `
       <a class="pc p${i + 1} reveal-s" href="/player?name=${encodeURIComponent(top[i].name)}">
         <span class="medal">#${i + 1}</span><img src="https://mc-heads.net/body/${top[i].uuid}/${i === 0 ? 180 : 150}" alt="">
-        <b>${esc(top[i].name)}</b><div class="big">${main(top[i])}</div><small class="dim">${t("rk." + sort)} · ${esc(top[i].tier.name)}</small></a>` : "<div></div>").join("") : "";
+        <b>${esc(top[i].name)}</b><div class="big">${main(top[i])}</div><small class="dim">${t("rk." + sort)}</small><div class="pc-tier">${App.tierTag(top[i].tier)}</div></a>` : "<div></div>").join("") : "";
     $("#list").innerHTML = ps.length ? ps.map((p, i) => `
       <a class="rank-row" href="/player?name=${encodeURIComponent(p.name)}" style="animation-delay:${Math.min(i, 20) * 25}ms">
         <span class="no ${i < 3 && !q ? "r" + (i + 1) : ""}">${i + 1}</span>
         <img class="mc-av" src="${mcHead(p.uuid, 44)}" width="44" height="44" alt="">
-        <span class="nm"><b><i class="status-dot ${p.online ? "on" : ""}"></i>${esc(p.name)}</b><small>${esc(p.tier.name)}</small></span>
+        <span class="nm"><b><i class="status-dot ${p.online ? "on" : ""}"></i>${esc(p.name)}</b>${App.tierTag(p.tier)}</span>
         <span class="v hl">${main(p)}</span><span class="v">${fmt(p.kills)}<small>${t("rk.kills")}</small></span>
         <span class="v">${p.kdr.toFixed(2)}<small>KDR</small></span><span class="v">${fmt(p.wins)}<small>${t("rk.wins")}</small></span>
       </a>`).join("") : `<div class="empty">${App.px("trophy", 48)}<div>${t("rk.empty")}</div></div>`;
@@ -37,6 +37,7 @@
   }
 
   document.addEventListener("app:ready", () => {
+    $("#tier-help").innerHTML = ART.icon("gem", 15);
     renderSorts(); load().catch((e) => App.fail(e.message));
     $("#sorts").addEventListener("click", (e) => {
       const b = e.target.closest("[data-sort]"); if (!b || b.dataset.sort === sort) return;
