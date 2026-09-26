@@ -3,6 +3,7 @@ version: '${version}'
 main: dev.sawsmp.core.SawSMPPlugin
 api-version: '26.2'
 folia-supported: true
+softdepend: [PlaceholderAPI]
 author: opopjjjidj
 website: https://sawsmp.me
 description: 鋸齒 SMP 核心：網站串接、懲處、帳號綁定、權限同步、戰績回報與 PVP 配對

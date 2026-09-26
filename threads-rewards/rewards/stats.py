@@ -70,6 +70,22 @@ class KillIn(BaseModel):
     killer: Who | None = None
     victim: Who
     method: str = "other"
+    count: bool = True  # False = 戰績由 PAPI 同步，只記錄擊殺方式與連殺
+
+
+class StatIn(BaseModel):
+    uuid: str
+    name: str
+    kills: int | None = None
+    deaths: int | None = None
+    playtime: int | None = None
+    wins: int | None = None
+    losses: int | None = None
+    best_streak: int | None = None
+
+
+class StatsSyncIn(BaseModel):
+    players: list[StatIn]
 
 
 class MatchIn(BaseModel):
@@ -87,16 +103,35 @@ async def plugin_kill(body: KillIn):
     v = dashed(body.victim.uuid)
     upsert_player(v, body.victim.name)
     _stat_row(v)
-    db.execute("UPDATE player_stats SET deaths = deaths + 1, streak = 0, updated_at = ? WHERE uuid = ?", (now, v))
+    add = 1 if body.count else 0
+    db.execute("UPDATE player_stats SET deaths = deaths + ?, streak = 0, updated_at = ? WHERE uuid = ?", (add, now, v))
     if body.killer:
         k = dashed(body.killer.uuid)
         upsert_player(k, body.killer.name)
         _stat_row(k)
-        db.execute("""UPDATE player_stats SET kills = kills + 1, streak = streak + 1,
-                      best_streak = MAX(best_streak, streak + 1), updated_at = ? WHERE uuid = ?""", (now, k))
+        db.execute("""UPDATE player_stats SET kills = kills + ?, streak = streak + 1,
+                      best_streak = MAX(best_streak, streak + 1), updated_at = ? WHERE uuid = ?""", (add, now, k))
         db.execute("""INSERT INTO kill_methods(uuid, method, count) VALUES (?,?,1)
                       ON CONFLICT(uuid, method) DO UPDATE SET count = count + 1""", (k, method))
     return {"ok": True}
+
+
+@router.post("/api/plugin/stats", dependencies=[Depends(plugin_auth)])
+async def plugin_stats(body: StatsSyncIn):
+    """插件從 PlaceholderAPI 讀到的戰績（玩家原本的紀錄），以絕對值覆蓋。"""
+    now, n = now_iso(), 0
+    for p in body.players[:500]:
+        u = dashed(p.uuid)
+        upsert_player(u, p.name)
+        _stat_row(u)
+        vals = {f: max(0, int(getattr(p, f))) for f in ("kills", "deaths", "playtime", "wins", "losses", "best_streak")
+                if getattr(p, f) is not None}
+        if not vals:
+            continue
+        sets = ", ".join(f"{f} = ?" for f in vals)
+        db.execute(f"UPDATE player_stats SET {sets}, updated_at = ? WHERE uuid = ?", (*vals.values(), now, u))
+        n += 1
+    return {"ok": True, "updated": n}
 
 
 @router.post("/api/plugin/match", dependencies=[Depends(plugin_auth)])

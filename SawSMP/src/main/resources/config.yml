@@ -21,6 +21,21 @@ stats:
   enabled: true
   # 受到玩家攻擊後幾秒內死亡，仍算該玩家擊殺（例如被打下懸崖）
   combat-tag-seconds: 10
+  # 戰績來源：papi = 讀取玩家原本就有的紀錄（PlaceholderAPI）；plugin = 插件自己從現在開始統計
+  source: papi
+  papi:
+    # 多久同步一次線上玩家的戰績（秒，最少 15）
+    interval-seconds: 60
+    # 每個欄位對應的佔位符，留空 = 不從 PAPI 讀取（改用網站 / 插件自己的紀錄）
+    # 預設使用 Statistic 擴充：/papi ecloud download Statistic 後 /papi reload
+    placeholders:
+      kills: "%statistic_player_kills%"
+      deaths: "%statistic_deaths%"
+      playtime: "%statistic_seconds_played%"
+      # 勝場 / 敗場預設由網站配對系統記錄
+      wins: ""
+      losses: ""
+      best_streak: ""
 
 match:
   # 對戰傳送的世界

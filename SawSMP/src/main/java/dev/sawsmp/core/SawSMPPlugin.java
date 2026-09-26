@@ -11,6 +11,7 @@ import dev.sawsmp.core.cmd.PunishCommand;
 import dev.sawsmp.core.match.MatchService;
 import dev.sawsmp.core.perm.PermService;
 import dev.sawsmp.core.punish.PunishService;
+import dev.sawsmp.core.stats.PapiStats;
 import dev.sawsmp.core.stats.StatsListener;
 import dev.sawsmp.core.util.Msg;
 import dev.sawsmp.core.util.Sched;
@@ -28,6 +29,7 @@ public final class SawSMPPlugin extends JavaPlugin {
     private PunishService punish;
     private PermService perms;
     private MatchService matches;
+    private PapiStats papi;
     private final AtomicBoolean beating = new AtomicBoolean();
     private volatile boolean warnedOffline;
 
@@ -40,6 +42,7 @@ public final class SawSMPPlugin extends JavaPlugin {
         punish = new PunishService(this);
         perms = new PermService(this);
         matches = new MatchService(this);
+        papi = new PapiStats(this);
 
         var pm = getServer().getPluginManager();
         pm.registerEvents(punish, this);
@@ -56,6 +59,9 @@ public final class SawSMPPlugin extends JavaPlugin {
         bind("sawsmp", new AdminCommand(this));
 
         if (!api.configured()) getLogger().warning("尚未設定 api.key：請到網站後台 → API Keys 產生插件金鑰，填入 config.yml 後執行 /sawsmp reload");
+        // PAPI 在所有插件載入後才可用，延後初始化
+        Sched.globalLater(() -> papi.load(), 20);
+        Sched.asyncRepeating(() -> papi.syncAll(), Math.max(15, getConfig().getInt("stats.papi.interval-seconds", 60)));
         Sched.asyncRepeating(this::heartbeat, Math.max(2, getConfig().getInt("heartbeat-seconds", 5)));
         // 重新載入插件時，替已在線的玩家同步權限
         Sched.globalLater(() -> perms.refreshAll(), 40);
@@ -77,6 +83,7 @@ public final class SawSMPPlugin extends JavaPlugin {
         reloadConfig();
         api.configure(getConfig().getString("api.url", ""), getConfig().getString("api.key", ""), getConfig().getInt("api.timeout-seconds", 5));
         Msg.setPrefix(getConfig().getString("messages.prefix", ""));
+        if (papi != null) papi.load();
     }
 
     /** 回報線上玩家，取得網站排入的動作（踢出、禁言、權限重載、配對開始…），執行後回報完成。 */
@@ -120,4 +127,5 @@ public final class SawSMPPlugin extends JavaPlugin {
     public PunishService punish() { return punish; }
     public PermService perms() { return perms; }
     public MatchService matches() { return matches; }
+    public PapiStats papi() { return papi; }
 }

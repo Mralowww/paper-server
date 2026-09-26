@@ -125,6 +125,8 @@ public final class StatsListener implements Listener {
         plugin.api().post("/api/plugin/kill", ApiClient.obj(
                 "killer", ApiClient.obj("uuid", killer.toString(), "name", killerName),
                 "victim", ApiClient.obj("uuid", victim.getUniqueId().toString(), "name", victim.getName()),
-                "method", method));
+                "method", method,
+                // 戰績改由 PAPI 同步時，只記錄擊殺方式與連殺，不重複計算擊殺 / 死亡
+                "count", !plugin.papi().active()));
     }
 }
